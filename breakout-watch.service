@@ -1,0 +1,49 @@
+# systemd unit for the low-latency resident scanner.
+#
+# INSTALL (Linux VPS / Raspberry Pi):
+#   sudo cp breakout-watch.service /etc/systemd/system/
+#   sudo nano /etc/systemd/system/breakout-watch.service    # fix paths + secrets
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now breakout-watch
+#
+# WATCH IT:
+#   sudo systemctl status breakout-watch
+#   sudo journalctl -u breakout-watch -f
+#
+# Prefer an EnvironmentFile over inline secrets:
+#   sudo install -m 600 /dev/null /etc/breakout-watch.env
+#   sudo nano /etc/breakout-watch.env      # KEY=value, no quotes, no export
+#   then uncomment EnvironmentFile= below and delete the Environment= lines.
+
+[Unit]
+Description=Weekly Breakout Scanner (low-latency watcher)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/weekly-breakout-flat
+
+# --- secrets: either inline ...
+Environment=DHAN_CLIENT_ID=1000000003
+Environment=DHAN_ACCESS_TOKEN=replace_me
+Environment=TELEGRAM_BOT_TOKEN=replace_me
+Environment=TELEGRAM_CHAT_ID=replace_me
+# --- ... or (better) a 0600 file:
+# EnvironmentFile=/etc/breakout-watch.env
+
+ExecStart=/usr/bin/python3 /home/ubuntu/weekly-breakout-flat/watch.py --settle 12
+
+# Keep it alive across crashes and nightly restarts.
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+# Modest hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
