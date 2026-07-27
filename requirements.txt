@@ -1,9 +1,0 @@
-# Upper bounds pin the MAJOR version on purpose.
-# CI installs fresh every run, so an unpinned `pandas>=2.0` silently pulled
-# pandas 3.x - a major upgrade landing in a live trading scanner with no code
-# change and no warning. Verified working on pandas 2.x and 3.0.x.
-# To adopt a new major: raise the bound, run the tests, then deploy.
-pandas>=2.0,<4.0
-numpy>=1.24,<3.0
-requests>=2.31,<3.0
-PyYAML>=6.0,<7.0
