@@ -1,0 +1,84 @@
+name: Paper Trading Report
+
+# Post-market, Mon-Fri. NSE closes 15:30 IST = 10:00 UTC; running at 10:30 UTC
+# (16:00 IST) leaves time for the last candles to settle.
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      weeks:
+        description: "Weeks of history to include (1 = this week)"
+        type: string
+        default: "1"
+      capital:
+        description: "Rupees per stock"
+        type: string
+        default: "100000"
+      symbols:
+        description: "Comma-separated subset (blank = whole snapshot)"
+        type: string
+        default: ""
+
+concurrency:
+  group: paper-report
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Build and send report
+        env:
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python paper_report.py \
+            --weeks "${{ inputs.weeks || '1' }}" \
+            --capital "${{ inputs.capital || '100000' }}" \
+            ${{ inputs.symbols && format('{0}', inputs.symbols) || '' }}
+
+      # Keep a copy even if the Telegram upload fails.
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-report
+          path: "*.xlsx"
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
+            echo "Telegram secrets not set - skipping failure notice"
+            exit 0
+          fi
+          MSG=$'⚠️ <b>Paper report failed</b>\n'"Check the log: ${RUN_URL}"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "text=${MSG}" > /dev/null
