@@ -1,0 +1,26 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt "pytest>=8,<10" check-jsonschema
+
+      # Validate the workflow files against GitHub's own schema BEFORE trusting
+      # them. A stray unindented line inside a `run: |` block parses fine in
+      # PyYAML but is rejected by GitHub at load time - this catches that early.
+      - name: Validate workflow YAML
+        run: check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
+
+      - run: python -m pytest -q
