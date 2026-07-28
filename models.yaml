@@ -1,0 +1,97 @@
+# =============================================================================
+#  A/B PAPER TRADING MODELS
+#
+#  Two competing theses about the same weekly-breakout signal, run side by side
+#  on the SAME live data so that after a week the market decides, not either of
+#  us. Nothing here places orders.
+#
+#  Rules of a fair test:
+#    * identical universe, identical capital, identical costs
+#    * identical square-off (no overnight, both are intraday)
+#    * each model applies ONLY its own entry filters and its own exit rule
+#    * every trade is stamped with its model and appended to one ledger
+#
+#  The stop is the SAME in both models - entry candle low - 0.02%.
+#  (User instruction, twice: "do not change stop loss".)
+# =============================================================================
+
+defaults:
+  capital: 100000          # rupees deployed per trade, per model
+  square_off: "15:15"      # both models are intraday-only
+  cost_round_trip: 0.22    # % of turnover, all-in incl. slippage
+  include_deferred: false  # measure cross entries; alerts still send both
+
+models:
+
+  # ---------------------------------------------------------------------------
+  #  MODEL A - "GATED"   (the assistant's recommendation)
+  #
+  #  Thesis: take only breakouts the full weekly gate confirms. c09 stays ON.
+  #  Accept that this enters later; in exchange every entry has the complete
+  #  13-row weekly momentum picture behind it. Exit on loss of momentum
+  #  (first 5m close below the 9-EMA) rather than a fixed target.
+  #
+  #  Evidence for: raw c09 was the highest-precision filter measured
+  #  (70% vs 30-55% for every relaxation tested, 27-28 Jul sweep).
+  #  Evidence against: it delays 72% of entries by a median 290 minutes.
+  # ---------------------------------------------------------------------------
+  A_gated:
+    label: "A · GATED (full weekly gate, EMA exit)"
+    strategy:
+      strict_entry: true
+      drop_c09: false
+      gate_tolerance: 0
+      volume_mode: "off"
+      rvol_mode: "off"
+      bar_rvol_min: 0.0
+      min_atr_pct: 1.0          # measured: PF 0.72 -> 1.84, held out of sample
+      max_ext_above_level: 0.0
+      one_per_week: true
+    exit:
+      rule: "ema"               # first 5m close below the 9-EMA
+      be_at_r: 0.0
+      target_r: 0.0
+      target_pct: 0.0
+
+  # ---------------------------------------------------------------------------
+  #  MODEL B - "MOVER"   (the user's recommendation)
+  #
+  #  Thesis: the money is in stocks that explode 5-10% within minutes, like
+  #  MONARCH / TMB / SENCO on 27-Jul. Those moves are visible AT THE CROSS as a
+  #  volume surge, and a genuine move does not come back to hunt the entry
+  #  candle low. So: enter at the raw cross (no c09 delay), demand real
+  #  time-of-day-aware volume conviction, refuse to chase an extended break,
+  #  then give the trade room to run instead of scalping it.
+  #
+  #  Thresholds chosen to catch the user's own reference names:
+  #      MONARCH  rvol 15.8x  bar_rvol  20.8x  atr 2.19  ext +0.28%  -> +8.55%
+  #      TMB      rvol 12.3x  bar_rvol 382.7x  atr 1.12  ext +2.17%  -> +5.69%
+  #      SENCO    rvol 10.3x  bar_rvol  19.6x  atr 1.65  ext +1.55%  -> +5.91%
+  #      PYRAMID  rvol 121.5x bar_rvol 442.6x  atr 1.04  ext +0.38%  -> +4.20%
+  #  atr>1.0 & rvol>10 & bar_rvol>10 keeps all four.
+  #
+  #  Evidence for: entering at the raw cross cuts stop-outs 67.5% -> 50.2%
+  #  and nearly doubles the +5% rate (11.0% -> 19.7%). 74% of +5% movers never
+  #  break the entry candle low.
+  #  Evidence against: on 12 weeks of history this set measured -0.52%/trade
+  #  (t = -2.87). That is exactly what this live test re-examines.
+  # ---------------------------------------------------------------------------
+  B_mover:
+    label: "B · MOVER (raw cross + volume surge, run the move)"
+    strategy:
+      strict_entry: true
+      drop_c09: true            # the delay is the enemy
+      gate_tolerance: 0
+      volume_mode: "off"
+      rvol_mode: "on"           # today-so-far vs same minute, last 20 sessions
+      rvol_min: 10.0
+      bar_rvol_min: 10.0        # THIS candle vs same minute, last 20 sessions
+      rvol_lookback_sessions: 20
+      min_atr_pct: 1.0
+      max_ext_above_level: 3.0  # never chase a break already +3% extended
+      one_per_week: true
+    exit:
+      rule: "target"            # let it run to a multiple of initial risk
+      be_at_r: 1.0              # stop to breakeven once +1R is seen
+      target_r: 3.0             # exit at +3R
+      target_pct: 0.0
