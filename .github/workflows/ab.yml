@@ -1,0 +1,121 @@
+name: A/B Paper Trading
+
+# Post-market, Mon-Fri. NSE closes 15:30 IST = 10:00 UTC; 10:45 UTC (16:15 IST)
+# leaves time for the final candles to settle and runs after the normal report.
+#
+# Appends the day's trades for BOTH models to ab_ledger.csv and commits it, so
+# a week of evidence accumulates in the repo. The ledger de-duplicates on
+# (model, symbol, signal date, signal time), so re-running is always safe.
+on:
+  schedule:
+    - cron: "45 10 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Sessions back to replay (1 = today only)"
+        type: string
+        default: "1"
+      capital:
+        description: "Rupees per trade, per model"
+        type: string
+        default: "100000"
+      report_only:
+        description: "Just print the standings, do not fetch"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ab-paper
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run A/B paper trading
+        env:
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN_2: ${{ secrets.TELEGRAM_BOT_TOKEN_2 }}
+          TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
+        run: |
+          if [[ "${{ inputs.report_only }}" == "true" ]]; then
+            python ab_paper.py --report-only --telegram
+          else
+            python ab_paper.py --from-snapshot \
+              --days "${{ inputs.days || '1' }}" \
+              --capital "${{ inputs.capital || '100000' }}" \
+              --telegram
+          fi
+
+      # Always commit: a cancelled or partially failed run still has value.
+      - name: Commit the ledger
+        if: always()
+        run: |
+          if [[ ! -f ab_ledger.csv ]]; then
+            echo "no ledger to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ab_ledger.csv
+          if git diff --cached --quiet; then
+            echo "ledger unchanged"
+            exit 0
+          fi
+          git commit -m "A/B ledger $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4 5; do
+            if git push; then
+              echo "pushed"; exit 0
+            fi
+            echo "push failed, retry $i"
+            sleep $((i * 5))
+            git pull --rebase --autostash || true
+          done
+          echo "could not push the ledger"; exit 1
+
+      - name: Upload ledger artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ab-ledger
+          path: ab_ledger.csv
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN_2: ${{ secrets.TELEGRAM_BOT_TOKEN_2 }}
+          TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
+            echo "Telegram secrets not set - skipping failure notice"
+            exit 0
+          fi
+          MSG=$'⚠️ <b>A/B paper trading failed</b>\n'"Check the log: ${RUN_URL}"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "text=${MSG}" > /dev/null
