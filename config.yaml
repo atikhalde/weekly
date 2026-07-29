@@ -1,0 +1,141 @@
+# =============================================================================
+#  Weekly Momentum Breakout Scanner  +  5-min Entry
+#  Every value under `strategy:` maps 1:1 to an input in the Pine indicator.
+#  Change them here and the Python entry stays identical to the chart.
+# =============================================================================
+
+strategy:
+  # --- Scanner settings (Pine group "Scanner settings")
+  #
+  # BREAKOUT LEVEL - SETTLED 28-Jul-2026 (user decision: "Option B").
+  # entry_level = highest(high, 26) INCLUDING the last closed week.
+  # Do NOT shift it back a week to match the orange line on a TradingView
+  # screenshot. That line is a rendering artifact: Pine fetches the level via
+  # request.security(..., lookahead_off), which during a developing week
+  # returns the TWO-weeks-back value, while the indicator's own 13-row table
+  # shows the correct one. Pixel-measured on the user's charts:
+  #     TMB     plotted 821.29 / table 847.00   <- table is right
+  #     RADICO  plotted 4161.57 / table 4193.00 <- table is right
+  # The BUY arrows follow the lagged line, so the arrows are wrong, not us.
+  # Entering at the lagged value means entering BELOW the real 26-week high,
+  # i.e. before a breakout has actually happened. Guarded by BUG 21 tests.
+  len_long: 52            # Long breakout lookback (weeks)
+  len_short: 26           # Short breakout lookback (weeks)  <- the entry level
+  ema_fast_len: 20        # Weekly EMA fast
+  ema_slow_len: 50        # Weekly EMA slow
+  ema_slow_back: 2        # EMA slow rising vs N weeks ago
+  rsi_len: 14             # Weekly RSI length
+  rsi_min: 60             # Weekly RSI minimum
+  macd_fast: 12
+  macd_slow: 26
+  macd_sig: 9
+  vol_sma_len: 10         # Weekly volume SMA length
+  min_price: 100          # Min daily close
+
+  # --- Market cap (Pine c12) --- ENABLED 29-Jul-2026
+  #
+  # Dhan exposes no shares-outstanding field, so this was off for months and
+  # c12 auto-passed - which is how GANESHBE (881 Cr) and PYRAMID (665 Cr)
+  # reached your phone even though Chartink would reject them.
+  #
+  # mcap.py now builds mcap.csv as shares-outstanding x price. Validated
+  # against the c12 value on nine of your own TradingView screenshots; the
+  # error ran -3.9%..+2.3% (DIVISLAB +0.3%, LALPATHLAB -0.1%, RADICO +2.3%).
+  #
+  # On this week's 24 alerts it keeps 22 and blocks exactly the two names
+  # below 1000 Cr.
+  #
+  # SAFETY: a symbol MISSING from mcap.csv is treated as UNKNOWN and PASSES.
+  # Blocking on missing data would silently delete stocks from the scan.
+  # Rebuild the table with `python mcap.py` (~30s for the whole universe);
+  # the Weekly Snapshot workflow does it automatically.
+  use_mcap: true
+  min_mcap: 1000
+  # Tolerance for the few-percent error in reported share counts, so a stock
+  # computing at 1010 Cr that is really 980 is not dropped on a rounding call.
+  mcap_margin_pct: 5.0
+
+  # --- Entry (Pine group "Entry")
+  # ORIGINAL, VALIDATED SETTING - do not change without re-running paper.py.
+  # On 27-Jul this produced exactly the 5 valid names (RATNAVEER, MONARCH,
+  # SENCO, PYRAMID, TMB) + CREDITACC. Measured alternatives, same day:
+  #   gate_tolerance 1 or 2  -> +28 false names
+  #   volume_prorate true    -> 26 signals
+  #   gate_source "closed"   -> 20 signals, only 1 of the valid 5
+  strict_entry: true
+
+  # Both kept at their Pine-equivalent values. See the note above.
+  #   gate_tolerance 1/2 -> +28 false names
+  #   volume_mode "day"  -> 19 signals (15 false); "bar" -> 26 (22 false)
+  # c09 (weekly volume > 10w average) is the single strongest filter in the
+  # scan. Relaxing it in ANY form re-opens the floodgate, so it stays raw.
+  #
+  # PROVEN IMPOSSIBLE (28-Jul): no c09 setting satisfies both of the user's
+  # own examples at once. In pace mode c09 passes when ratio > frac * m:
+  #     VAIBHAVGBL Tue 10:35  ratio 0.4837 frac 0.2453 -> needs m <  1.972
+  #     RADICO     Tue 14:50  ratio 0.9325 frac 0.3813 -> needs m >= 2.445
+  # Feasible range [2.445, 1.972) is EMPTY. Furthermore VAIBHAVGBL spent 9
+  # bars above its level (Tue 10:35-14:10) and had c09 true for exactly 1 bar
+  # (Tue 15:25) - zero overlap, so it is a genuine REJECT that week, not a
+  # miss. Stop tuning this knob. See BUG 21 in test_regressions.py.
+  gate_tolerance: 0
+  volume_mode: "off"
+  # Conviction multiple used only when volume_mode = "pace".
+  # Swept on 27+28 Jul data (37 stocks, 8 known-good). NO multiple beat raw
+  # c09 on either precision or deferral count:
+  #     raw c09    10 signals  70% precision   6 deferred   <-- best
+  #     pace x2.5  20 signals  35% precision   9 deferred
+  #     pace x4.0  17 signals  41% precision   9 deferred
+  #     pace x6.0  11 signals  55% precision   7 deferred (and lost a good one)
+  # Relaxing c09 admits weak names earlier; they then stall on OTHER rows, so
+  # deferrals go UP. Kept for research only.
+  volume_pace_mult: 2.5
+
+  # --- Relative volume (optional extra filter, OFF by default) --------------
+  # Volume today up to this minute vs the median up to the same minute over
+  # the last N sessions. Unlike c09 it is time-of-day aware, so it means the
+  # same thing at 09:20 and 15:20. On 27-Jul it separated valid from false
+  # breakouts by ~20x (valid median 84.5, false 4.1).
+  #
+  # Shipped OFF because the full 13/13 gate already removes the low-volume
+  # names - every survivor scored rvol > 11 - and using RVOL to relax c09
+  # always LOWERED precision (strict 67% vs 57% with vol=day + rvol>=15).
+  #
+  #   off  - disabled (pure Pine)
+  #   warn - measure and report, never block
+  #   on   - require rvol >= rvol_min
+  rvol_mode: "off"
+  rvol_min: 5.0
+  rvol_lookback_sessions: 20
+
+
+  gate_source: live       # "live"  = developing week, matches the table (Pine default)
+                          # "closed" = last closed week, non-repainting
+  defer_entry: true       # fire later in the week if the gate turns true after the cross
+  gate_daily: false       # also require the previous completed daily bar to be green
+  req52: false            # also require close above the 52W level
+  one_per_week: true      # only the first entry per symbol per week
+
+universe:
+  exchange_segments: [NSE_EQ]     # add BSE_EQ for the BSE cash segment too
+  series: [EQ, BE]                # EQ = normal rolling settlement, BE = trade-to-trade
+  exclude_etf: true
+  include_symbols: []             # non-empty = whitelist only these
+  exclude_symbols: []
+  max_symbols: null               # cap the universe (useful while testing)
+
+runtime:
+  history_years: 5                # daily history pulled for the weekly snapshot
+  min_weekly_bars: 60
+  prefilter: true                 # bulk-quote funnel before the per-symbol replay
+  prefilter_headroom_pct: 0.0     # >0 keeps names slightly below the level too
+  max_workers: 4
+  data_rate_per_sec: 4            # Dhan allows 5/s; stay just under to leave
+                                  # headroom - at exactly 5 any jitter or retry
+                                  # trips 429 (70 symbols were lost that way).
+  quote_rate_per_sec: 1           # Dhan Quote API limit
+  market_open: "09:15"
+  market_close: "15:30"
+  bar_interval_min: 5
+  alert_cooldown_bars: 0
+  dry_run: false                  # true = log alerts instead of sending them
