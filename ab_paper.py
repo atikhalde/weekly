@@ -1,0 +1,818 @@
+#!/usr/bin/env python3
+"""
+A/B paper trading: run two competing models over the SAME live data.
+
+    MODEL A "GATED"  - full weekly gate incl. c09, exit on 9-EMA momentum loss
+    MODEL B "MOVER"  - raw cross + volume surge, run the move to +3R
+
+Both are intraday-only (square-off 15:15, nothing overnight), both use the
+SAME stop (entry candle low - 0.02%), the same universe, capital and costs.
+The only differences are the entry filters and the exit rule - which is the
+whole point of the experiment.
+
+Nothing here places orders.
+
+Usage
+    python ab_paper.py --from-snapshot --days 5
+    python ab_paper.py MONARCH TMB SENCO --days 5 --source yahoo
+    python ab_paper.py --from-snapshot --days 1 --ledger ab_ledger.csv
+
+The ledger is APPEND-ONLY and de-duplicated on (model, symbol, signal time),
+so running it daily builds a week of evidence without double-counting.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from dataclasses import dataclass, field
+from datetime import datetime, time as dtime, timedelta
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import yaml
+
+from config import load_config
+from mcap import load_table as load_mcap_table
+from paper import COST_ROUND_TRIP, SL_BUFFER, SQUARE_OFF, PaperTrade, _stamp, fetch_5m
+from strategy import (IST_TZ as IST, build_snapshot, replay_week, week_start_of)
+
+import indicators as ind
+
+EMA_LEN = 9
+ROOT = Path(__file__).resolve().parent
+MCAP: dict[str, float] = {}
+
+
+# --------------------------------------------------------------------------- #
+#  Model definitions
+# --------------------------------------------------------------------------- #
+@dataclass
+class Model:
+    key: str
+    label: str
+    strategy: dict
+    exit: dict
+    horizon: str = "intraday"      # "intraday" | "swing"
+    hold_days: int = 0             # swing only: sessions before the time exit
+
+    @property
+    def is_swing(self) -> bool:
+        return self.horizon == "swing"
+
+
+def load_models(path: Path | str | None = None) -> tuple[dict, list[Model]]:
+    p = Path(path) if path else ROOT / "models.yaml"
+    raw = yaml.safe_load(p.read_text())
+    defaults = raw.get("defaults", {}) or {}
+    models = []
+    for k, v in (raw.get("models", {}) or {}).items():
+        hz = str(v.get("horizon", "intraday")).lower()
+        if hz not in ("intraday", "swing"):
+            raise SystemExit(f"models.yaml: {k} has unknown horizon '{hz}'")
+        models.append(Model(key=k, label=v.get("label", k),
+                            strategy=v.get("strategy", {}) or {},
+                            exit=v.get("exit", {}) or {},
+                            horizon=hz,
+                            hold_days=int(v.get("hold_days", 0) or 0)))
+    return defaults, models
+
+
+def apply_overrides(base_strategy, overrides: dict):
+    """Return a copy of the Strategy dataclass with `overrides` applied."""
+    import dataclasses
+    valid = {f.name for f in dataclasses.fields(base_strategy)}
+    unknown = set(overrides) - valid
+    if unknown:
+        raise SystemExit(f"models.yaml: unknown strategy keys {sorted(unknown)}")
+    return dataclasses.replace(base_strategy, **overrides)
+
+
+# --------------------------------------------------------------------------- #
+#  Exit engine
+# --------------------------------------------------------------------------- #
+def simulate_model(sig, bars_after: pd.DataFrame, capital: float,
+                   bars_before: pd.DataFrame | None,
+                   exit_rule: dict, square_off: str = SQUARE_OFF,
+                   cost_round_trip: float = COST_ROUND_TRIP) -> PaperTrade:
+    """
+    One trade, one model's exit rule.
+
+    Shared with paper.py: entry at the signal candle close, stop at the entry
+    candle low - SL_BUFFER, mandatory intraday square-off, costs on both legs.
+
+    exit_rule:
+        rule       "ema"    first 5m close below the 9-EMA   (model A)
+                   "target" run to target_r x initial risk   (model B)
+        be_at_r    move the stop to breakeven once +N x risk is seen (0 = off)
+        target_r   exit at N x initial risk                  (0 = off)
+        target_pct exit at a fixed percent gain              (0 = off)
+    """
+    signal_close = float(sig.price)
+    sig_d, sig_t = _stamp(sig.bar_time)
+
+    bar_low = float(getattr(sig, "bar_low", 0.0) or 0.0)
+    if not (0.0 < bar_low < signal_close):
+        bar_low = signal_close
+    stop = bar_low * (1.0 - SL_BUFFER)
+
+    t = PaperTrade(
+        symbol=sig.symbol, week=sig.week_start,
+        signal_date=sig_d, signal_time=sig_t, signal_close=signal_close,
+        entry_date=sig_d, entry_time=sig_t, entry=signal_close,
+        qty=0, invested=0.0, bar_low=bar_low, stop=stop,
+        level_26w=float(sig.entry_level), level_52w=float(sig.level_52),
+        trigger=sig.trigger,
+        rsi=float(sig.evaluation.values.get("rsi", float("nan"))),
+        macd_hist=float(sig.evaluation.values.get("macd_hist", float("nan"))),
+    )
+    if bars_after.empty:
+        t.exit_reason = "NO_FILL"
+        t.exit_note = "no candle after the signal"
+        return t
+
+    entry = signal_close
+    qty = int(capital // entry) if entry > 0 else 0
+    if qty <= 0:
+        t.exit_reason = "NO_FILL"
+        t.exit_note = f"price {entry:,.2f} above capital"
+        return t
+    t.qty = qty
+    t.invested = qty * entry
+
+    risk_per_share = max(entry - stop, entry * SL_BUFFER)
+    t.r_multiple = 0.0
+
+    rule = str(exit_rule.get("rule", "ema")).lower()
+    be_at_r = float(exit_rule.get("be_at_r", 0.0) or 0.0)
+    target_r = float(exit_rule.get("target_r", 0.0) or 0.0)
+    target_pct = float(exit_rule.get("target_pct", 0.0) or 0.0)
+
+    target = None
+    if target_r > 0:
+        target = entry + target_r * risk_per_share
+    elif target_pct > 0:
+        target = entry * (1.0 + target_pct / 100.0)
+
+    # 9-EMA warmed on real pre-entry candles (never seeded at the entry price)
+    alpha = 2.0 / (EMA_LEN + 1.0)
+    if bars_before is not None and len(bars_before) >= EMA_LEN:
+        hist = np.asarray(bars_before["close"].astype(float))[-(EMA_LEN * 10):]
+        series = ind.ema(hist, EMA_LEN)
+        ema_prev = float(series[-1])
+        warmup = 0
+    else:
+        ema_prev = entry
+        warmup = EMA_LEN
+
+    hi = lo = entry
+    peak = entry
+    ret_reason = None
+
+    for i, (_, bar) in enumerate(bars_after.iterrows(), start=1):
+        o = float(bar["open"]); high = float(bar["high"])
+        low = float(bar["low"]); close = float(bar["close"])
+        bar_d, bar_t = _stamp(bar["datetime"])
+
+        # --- INTRADAY: never hold past the session
+        if bar_d != sig_d:
+            t.exit = o
+            t.exit_reason = "EOD"
+            t.exit_note = "forced square-off: next session reached"
+            t.bars_held = i
+            t.exit_date, t.exit_time = bar_d, bar_t
+            ret_reason = True
+            break
+        if bar_t >= square_off:
+            t.exit = close
+            t.exit_reason = "EOD"
+            t.exit_note = f"intraday square-off at {square_off}"
+            t.bars_held = i
+            t.exit_date, t.exit_time = bar_d, bar_t
+            ret_reason = True
+            break
+
+        hi, lo = max(hi, high), min(lo, low)
+
+        # --- stop first: a resting SL-M triggers intrabar (conservative)
+        if low <= stop:
+            t.exit = o if o <= stop else stop
+            if o <= stop:
+                t.exit_note = "gap through stop"
+            t.exit_reason = "SL" if stop < entry else "BE"
+            t.bars_held = i
+            t.exit_date, t.exit_time = bar_d, bar_t
+            ret_reason = True
+            break
+
+        # --- target
+        if target is not None and high >= target:
+            t.exit = target
+            t.exit_reason = "TGT"
+            t.bars_held = i
+            t.exit_date, t.exit_time = bar_d, bar_t
+            ret_reason = True
+            break
+
+        peak = max(peak, high)
+
+        # --- breakeven ratchet (model B): only ever raises the stop
+        if be_at_r > 0 and (peak - entry) >= be_at_r * risk_per_share:
+            stop = max(stop, entry * 1.0005)
+
+        # --- momentum exit (model A)
+        ema_now = alpha * close + (1.0 - alpha) * ema_prev
+        if rule == "ema" and i > warmup and close < ema_now:
+            t.exit = close
+            t.exit_reason = "EMA9"
+            t.bars_held = i
+            t.exit_date, t.exit_time = bar_d, bar_t
+            ret_reason = True
+            break
+        ema_prev = ema_now
+
+    if not ret_reason:
+        last = bars_after.iloc[-1]
+        t.exit = float(last["close"])
+        t.exit_reason = "OPEN"
+        t.exit_note = "still running at end of data"
+        t.bars_held = len(bars_after)
+        t.exit_date, t.exit_time = _stamp(last["datetime"])
+
+    t.gross_pnl = (t.exit - entry) * qty
+    turnover = (entry + t.exit) * qty
+    t.costs = turnover * (cost_round_trip / 100.0) / 2.0
+    t.pnl = t.gross_pnl - t.costs
+    t.pnl_pct = (t.exit / entry - 1.0) * 100.0 - cost_round_trip
+    t.mfe_pct = (hi / entry - 1.0) * 100.0
+    t.mae_pct = (lo / entry - 1.0) * 100.0
+    t.r_multiple = (t.exit - entry) / risk_per_share
+    return t
+
+
+# --------------------------------------------------------------------------- #
+#  Swing execution (Model C) - DAILY bars, multi-day hold
+# --------------------------------------------------------------------------- #
+def simulate_swing(sig, daily_after: pd.DataFrame, capital: float,
+                   exit_rule: dict, hold_days: int = 5,
+                   cost_round_trip: float = COST_ROUND_TRIP) -> PaperTrade:
+    """
+    A multi-day hold on DAILY candles.
+
+    Differs from the intraday path in three ways, all deliberate:
+      * the stop is a PERCENT of entry, not the entry-candle low. Measured on
+        452 breakouts, the entry-candle low acts like a ~4% stop that fires on
+        a third of trades; 7% fires on 7% and earns +5.59 vs +4.05 per trade.
+      * there is no square-off. The position is meant to be held overnight.
+      * the time exit is `hold_days` completed sessions, not a clock time.
+
+    Conservative intrabar ordering: if a day's low breaches the stop AND its
+    high tags the target, the STOP is taken. Real fills are not knowable from
+    daily bars, so the pessimistic branch is the honest one.
+    """
+    entry = float(sig.price)
+    sig_d, sig_t = _stamp(sig.bar_time)
+
+    stop_pct = float(exit_rule.get("stop_pct", 7.0) or 7.0)
+    be_at_r = float(exit_rule.get("be_at_r", 0.0) or 0.0)
+    target_r = float(exit_rule.get("target_r", 0.0) or 0.0)
+    hold = int(exit_rule.get("hold_days", hold_days) or hold_days)
+
+    stop = entry * (1.0 - stop_pct / 100.0)
+    risk = entry - stop
+
+    t = PaperTrade(
+        symbol=sig.symbol, week=sig.week_start,
+        signal_date=sig_d, signal_time=sig_t, signal_close=entry,
+        entry_date=sig_d, entry_time=sig_t, entry=entry,
+        qty=0, invested=0.0, bar_low=float(getattr(sig, "bar_low", 0.0) or 0.0),
+        stop=stop, level_26w=float(sig.entry_level),
+        level_52w=float(sig.level_52), trigger=sig.trigger,
+        rsi=float(sig.evaluation.values.get("rsi", float("nan"))),
+        macd_hist=float(sig.evaluation.values.get("macd_hist", float("nan"))),
+    )
+    if daily_after.empty or risk <= 0:
+        t.exit_reason = "NO_FILL"
+        t.exit_note = "no daily candle after the signal"
+        return t
+
+    qty = int(capital // entry) if entry > 0 else 0
+    if qty <= 0:
+        t.exit_reason = "NO_FILL"
+        t.exit_note = f"price {entry:,.2f} above capital"
+        return t
+    t.qty = qty
+    t.invested = qty * entry
+
+    target = entry + target_r * risk if target_r > 0 else None
+    hi = lo = entry
+    peak = entry
+    done = False
+
+    for i, (_, bar) in enumerate(daily_after.head(hold).iterrows(), start=1):
+        o = float(bar["open"]); high = float(bar["high"])
+        low = float(bar["low"]); close = float(bar["close"])
+        d, _tm = _stamp(bar["datetime"])
+        hi, lo = max(hi, high), min(lo, low)
+
+        if low <= stop:                       # stop wins ties
+            t.exit = o if o <= stop else stop
+            if o <= stop:
+                t.exit_note = "gap through stop"
+            t.exit_reason = "SL" if stop < entry else "BE"
+            t.bars_held = i
+            t.exit_date, t.exit_time = d, "close"
+            done = True
+            break
+        if target is not None and high >= target:
+            t.exit = target
+            t.exit_reason = "TGT"
+            t.bars_held = i
+            t.exit_date, t.exit_time = d, "close"
+            done = True
+            break
+
+        peak = max(peak, high)
+        if be_at_r > 0 and (peak - entry) >= be_at_r * risk:
+            stop = max(stop, entry * 1.0005)
+
+    if not done:
+        seg = daily_after.head(hold)
+        last = seg.iloc[-1]
+        t.exit = float(last["close"])
+        t.exit_reason = "TIME"
+        t.exit_note = f"{len(seg)}-day time exit"
+        t.bars_held = len(seg)
+        t.exit_date, t.exit_time = _stamp(last["datetime"])[0], "close"
+
+    t.gross_pnl = (t.exit - entry) * qty
+    turnover = (entry + t.exit) * qty
+    t.costs = turnover * (cost_round_trip / 100.0) / 2.0
+    t.pnl = t.gross_pnl - t.costs
+    t.pnl_pct = (t.exit / entry - 1.0) * 100.0 - cost_round_trip
+    t.mfe_pct = (hi / entry - 1.0) * 100.0
+    t.mae_pct = (lo / entry - 1.0) * 100.0
+    t.r_multiple = (t.exit - entry) / risk
+    return t
+
+
+# --------------------------------------------------------------------------- #
+#  Ledger
+# --------------------------------------------------------------------------- #
+LEDGER_COLS = ["model", "model_label", "horizon", "symbol", "week", "signal_date",
+               "signal_time", "signal_close", "entry", "qty", "invested",
+               "bar_low", "stop", "level_26w", "trigger", "rsi", "macd_hist",
+               "exit_date", "exit_time", "exit", "exit_reason", "exit_note",
+               "bars_held", "gross_pnl", "costs", "pnl", "pnl_pct",
+               "r_multiple", "mfe_pct", "mae_pct"]
+
+
+def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int]:
+    """Append, de-duplicating on (model, symbol, signal_date, signal_time)."""
+    new = pd.DataFrame(rows)
+    if new.empty:
+        return 0, 0
+    for c in LEDGER_COLS:
+        if c not in new.columns:
+            new[c] = ""
+    new = new[LEDGER_COLS]
+    key = ["model", "symbol", "signal_date", "signal_time"]
+
+    if path.exists():
+        old = pd.read_csv(path)
+        for c in LEDGER_COLS:
+            if c not in old.columns:
+                old[c] = ""
+        old = old[LEDGER_COLS]
+        before = len(new)
+        merged = pd.concat([old, new], ignore_index=True)
+        merged = merged.drop_duplicates(subset=key, keep="first")
+        added = len(merged) - len(old)
+        merged.to_csv(path, index=False)
+        return added, before - added
+    new = new.drop_duplicates(subset=key, keep="first")
+    new.to_csv(path, index=False)
+    return len(new), 0
+
+
+# --------------------------------------------------------------------------- #
+#  Reporting
+# --------------------------------------------------------------------------- #
+def summarise(df: pd.DataFrame) -> dict:
+    if df.empty:
+        return dict(n=0)
+    closed = df[df.exit_reason != "NO_FILL"]
+    if closed.empty:
+        return dict(n=0)
+    pnl = closed["pnl"].astype(float)
+    pct = closed["pnl_pct"].astype(float)
+    wins = pnl[pnl > 0]
+    losses = pnl[pnl <= 0]
+    gw, gl = wins.sum(), abs(losses.sum())
+    return dict(
+        n=len(closed),
+        win=100.0 * (pnl > 0).mean(),
+        net=pnl.sum(),
+        gross=closed["gross_pnl"].astype(float).sum(),
+        costs=closed["costs"].astype(float).sum(),
+        avg_pct=pct.mean(),
+        med_pct=pct.median(),
+        pf=(gw / gl) if gl > 0 else float("inf"),
+        avg_r=closed["r_multiple"].astype(float).mean(),
+        best=pct.max(), worst=pct.min(),
+        mfe=closed["mfe_pct"].astype(float).mean(),
+        mae=closed["mae_pct"].astype(float).mean(),
+        big=100.0 * (closed["mfe_pct"].astype(float) >= 5).mean(),
+        held=100.0 * (closed["mae_pct"].astype(float) > -0.05).mean(),
+        bars=closed["bars_held"].astype(float).mean(),
+    )
+
+
+def print_report(ledger: pd.DataFrame, models: list[Model]) -> None:
+    print("\n" + "=" * 78)
+    title = ("PAPER TRADING — HEAD TO HEAD" if len(models) > 1
+             else "PAPER TRADING")
+    print(title)
+    print("=" * 78)
+
+    if ledger.empty:
+        print("\nNo trades recorded yet.")
+        return
+
+    days = sorted(ledger["signal_date"].astype(str).unique())
+    print(f"Sessions: {len(days)}  ({days[0]} .. {days[-1]})")
+
+    stats = {}
+    for m in models:
+        sub = ledger[ledger["model"] == m.key]
+        stats[m.key] = summarise(sub)
+
+    rows = [
+        ("Trades", "n", "{:.0f}"),
+        ("Win rate %", "win", "{:.1f}"),
+        ("Net P&L Rs", "net", "{:,.0f}"),
+        ("Gross P&L Rs", "gross", "{:,.0f}"),
+        ("Costs Rs", "costs", "{:,.0f}"),
+        ("Avg per trade %", "avg_pct", "{:+.2f}"),
+        ("Median %", "med_pct", "{:+.2f}"),
+        ("Profit factor", "pf", "{:.2f}"),
+        ("Avg R", "avg_r", "{:+.2f}"),
+        ("Best %", "best", "{:+.2f}"),
+        ("Worst %", "worst", "{:+.2f}"),
+        ("Avg MFE %", "mfe", "{:+.2f}"),
+        ("Avg MAE %", "mae", "{:+.2f}"),
+        ("Reached +5% MFE %", "big", "{:.0f}"),
+        ("Never broke entry low %", "held", "{:.0f}"),
+        ("Avg bars held", "bars", "{:.1f}"),
+    ]
+    keys = [m.key for m in models]
+    print()
+    print(f"{'metric':26}" + "".join(f"{k:>24}" for k in keys))
+    print("-" * (26 + 24 * len(keys)))
+    for label, key, fmt in rows:
+        line = f"{label:26}"
+        for k in keys:
+            v = stats[k].get(key)
+            line += f"{(fmt.format(v) if v is not None else '-'):>24}"
+        print(line)
+
+    print()
+    for m in models:
+        s = stats[m.key]
+        if s.get("n"):
+            print(f"  {m.key}: {m.label}")
+
+    # verdict
+    print("\n" + "-" * 78)
+    live = [(k, stats[k]) for k in keys if stats[k].get("n")]
+    if len(live) == 1:
+        # Single model: there is nothing to rank, so report whether the
+        # sample is big enough to mean anything yet.
+        k, s = live[0]
+        if s["n"] < 10:
+            print(f"VERDICT: too early. {k} has {s['n']} closed trade(s); "
+                  "wait for >= 10.")
+        else:
+            verdict = ("PROFITABLE so far" if s["avg_pct"] > 0
+                       else "LOSING so far")
+            print(f"VERDICT: {k} is {verdict} — {s['avg_pct']:+.2f}% per trade "
+                  f"over {s['n']} trades (PF {s['pf']:.2f}).")
+            if s["n"] < 30:
+                print("         Indicative only until ~30 trades.")
+    elif not live:
+        print("VERDICT: no closed trades yet.")
+    else:
+        thin = [f"{k} n={s['n']}" for k, s in live if s["n"] < 10]
+        ranked = sorted(live, key=lambda kv: -kv[1]["avg_pct"])
+        board = " · ".join(f"{k} {s['avg_pct']:+.2f}%" for k, s in ranked)
+        if thin:
+            print(f"VERDICT: too early ({', '.join(thin)}). "
+                  "Need >= 10 closed trades each.")
+            print(f"         Standing: {board}")
+        else:
+            (ka, sa), (kb, sb) = ranked[0], ranked[1]
+            print(f"VERDICT: {ka} leads by {sa['avg_pct'] - sb['avg_pct']:.2f}% "
+                  f"per trade over {kb}.")
+            print(f"         Standing: {board}")
+            print("         Indicative until each side has ~30 trades. Note A/B "
+                  "are intraday and C is a 5-day hold, so C locks capital "
+                  "longer per trade.")
+    print("-" * 78)
+
+
+# --------------------------------------------------------------------------- #
+#  Main
+# --------------------------------------------------------------------------- #
+def telegram_summary(ledger: pd.DataFrame, models: list[Model]) -> str:
+    """Compact HTML standings for Telegram."""
+    if ledger.empty:
+        return "📊 <b>Paper Trading</b>\n\nNo trades recorded yet."
+    days = sorted(ledger["signal_date"].astype(str).unique())
+    stats = {m.key: summarise(ledger[ledger["model"] == m.key]) for m in models}
+
+    lines = ["📊 <b>Paper Trading</b>",
+             f"<i>{len(days)} session(s): {days[0]} .. {days[-1]}</i>", ""]
+    for m in models:
+        s = stats[m.key]
+        if not s.get("n"):
+            lines.append(f"<b>{m.key}</b> — no trades yet")
+            continue
+        icon = "🟢" if s["net"] > 0 else ("🔴" if s["net"] < 0 else "⚪")
+        lines += [
+            f"{icon} <b>{m.key}</b> · {m.label.split('·')[-1].strip()}",
+            f"   trades <b>{s['n']}</b> · win <b>{s['win']:.0f}%</b> · "
+            f"PF <b>{s['pf']:.2f}</b>",
+            f"   net <b>Rs {s['net']:,.0f}</b> · avg <b>{s['avg_pct']:+.2f}%</b> "
+            f"· avgR <b>{s['avg_r']:+.2f}</b>",
+            f"   +5% MFE <b>{s['big']:.0f}%</b> · held low <b>{s['held']:.0f}%</b>",
+            "",
+        ]
+    live = [(m.key, stats[m.key]) for m in models if stats[m.key].get("n")]
+    if len(live) == 1:
+        k, s = live[0]
+        if s["n"] < 10:
+            lines.append(f"⏳ Too early — {k} has {s['n']} trade(s), need ≥10.")
+        else:
+            icon = "✅" if s["avg_pct"] > 0 else "❌"
+            lines.append(f"{icon} <b>{k}</b> {s['avg_pct']:+.2f}%/trade "
+                         f"over {s['n']} trades")
+    elif len(live) >= 2:
+        ranked = sorted(live, key=lambda kv: -kv[1]["avg_pct"])
+        if min(s["n"] for _k, s in ranked) < 10:
+            thin = ", ".join(f"{k} {s['n']}" for k, s in ranked)
+            lines.append(f"⏳ Too early — need ≥10 trades each ({thin}).")
+        else:
+            (ka, sa), (_kb, sb) = ranked[0], ranked[1]
+            gap = sa["avg_pct"] - sb["avg_pct"]
+            lines.append(f"🏁 <b>{ka}</b> leads by {gap:.2f}%/trade")
+    return "\n".join(lines)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("symbols", nargs="*")
+    ap.add_argument("--telegram", action="store_true",
+                    help="send the standings to Telegram")
+    ap.add_argument("--from-snapshot", action="store_true",
+                    help="use every symbol in weekly_snapshot.csv")
+    ap.add_argument("--days", type=int, default=5,
+                    help="how many sessions back to replay (default 5)")
+    ap.add_argument("--capital", type=float, default=None)
+    ap.add_argument("--source", choices=["dhan", "yahoo"], default="dhan")
+    ap.add_argument("--ledger", default="ab_ledger.csv")
+    ap.add_argument("--models", default=None, help="path to models.yaml")
+    ap.add_argument("--config", default=None)
+    ap.add_argument("--report-only", action="store_true",
+                    help="print the standings from the existing ledger")
+    args = ap.parse_args()
+
+    defaults, models = load_models(args.models)
+
+    # Market caps for c12. Without this every snapshot carries mcap=None; with
+    # use_mcap on that is "unknown" (which passes), but loading the real table
+    # means the paper models see exactly what the live scanner sees.
+    global MCAP
+    MCAP = load_mcap_table(load_config(args.config).paths["mcap"])
+    ledger_path = Path(args.ledger)
+    if not ledger_path.is_absolute():
+        ledger_path = ROOT / ledger_path
+
+    if args.report_only:
+        if not ledger_path.exists():
+            print(f"{ledger_path} not found")
+            return 1
+        led = pd.read_csv(ledger_path)
+        print_report(led, models)
+        if args.telegram:
+            _send_telegram(telegram_summary(led, models))
+        return 0
+
+    cfg = load_config(args.config)
+    capital = args.capital or float(defaults.get("capital", 100000))
+    square_off = str(defaults.get("square_off", SQUARE_OFF))
+    cost = float(defaults.get("cost_round_trip", COST_ROUND_TRIP))
+    include_deferred = bool(defaults.get("include_deferred", False))
+    interval = cfg.runtime.bar_interval_min
+
+    symbols = [s.upper() for s in args.symbols]
+    if args.from_snapshot:
+        p = cfg.paths["snapshot"]
+        if not p.exists():
+            print(f"{p} not found - run build_snapshot.py first")
+            return 1
+        symbols = sorted(pd.read_csv(p, dtype=str)["symbol"].str.upper().unique())
+    if not symbols:
+        print("give symbols, or --from-snapshot")
+        return 2
+
+    print("=" * 78)
+    print("PAPER TRADING")
+    print("=" * 78)
+    for m in models:
+        print(f"  {m.key:10} {m.label}")
+    print(f"\n  capital Rs {capital:,.0f}/trade · square-off {square_off} · "
+          f"costs {cost:.2f}% round trip")
+    for m in models:
+        if m.is_swing:
+            print(f"  {m.key:10} SWING · {m.hold_days}d hold · "
+                  f"{m.exit.get('stop_pct', 7.0):.1f}% stop (no square-off)")
+        else:
+            print(f"  {m.key:10} INTRADAY · square-off {square_off} · "
+                  f"stop = entry candle low - {SL_BUFFER*100:.2f}%")
+    print(f"  {len(symbols)} symbol(s), last {args.days} session(s)\n")
+
+    # ---- data source
+    today = datetime.now(IST).date()
+    start_day = today - timedelta(days=max(args.days * 2, args.days + 4))
+    start_week = week_start_of(start_day)
+
+    if args.source == "yahoo":
+        fetch = _yahoo_fetch
+        sec_map = {s: (s, "NSE_EQ") for s in symbols}
+        client = None
+    else:
+        from dhan import DhanClient, DhanError, last_n_years
+        if not cfg.secrets.dhan_access_token:
+            print("DHAN_ACCESS_TOKEN not set - use --source yahoo for a dry run")
+            return 2
+        client = DhanClient(cfg.secrets.dhan_client_id,
+                            cfg.secrets.dhan_access_token,
+                            data_rate=cfg.runtime.data_rate_per_sec,
+                            quote_rate=cfg.runtime.quote_rate_per_sec)
+        print("Loading instrument list ...")
+        ins = DhanClient.fetch_instruments(cfg.universe.exchange_segments,
+                                           cfg.universe.series,
+                                           exclude_etf=cfg.universe.exclude_etf)
+        sec_map = {i.symbol.upper(): (i.security_id, i.exchange_segment)
+                   for i in ins}
+        fetch = None
+
+    rows: list[dict] = []
+    per_model_counts = {m.key: 0 for m in models}
+
+    for n, sym in enumerate(symbols, 1):
+        if sym not in sec_map:
+            continue
+        sid, seg = sec_map[sym]
+
+        try:
+            if args.source == "yahoo":
+                daily, five = _yahoo_fetch(sym)
+            else:
+                from dhan import DhanError, last_n_years
+                from_date, to_date = last_n_years(cfg.runtime.history_years)
+                daily = client.daily_candles(sid, seg, from_date, to_date)
+                five = fetch_5m(
+                    client, sid, seg,
+                    datetime.combine(start_week.date(), dtime(9, 0)).replace(tzinfo=IST),
+                    datetime.now(IST), interval)
+        except Exception as exc:                       # noqa: BLE001
+            print(f"  {sym}: fetch failed ({str(exc)[:60]})")
+            continue
+        if daily is None or daily.empty or five is None or five.empty:
+            continue
+
+        five = five.copy()
+        fts = pd.to_datetime(five["datetime"])
+        try:
+            fts = fts.dt.tz_convert(IST)
+        except (TypeError, AttributeError):
+            pass
+        five["_day"] = fts.dt.tz_localize(None).dt.normalize()
+
+        d = daily.copy()
+        d["_day"] = pd.to_datetime(d["datetime"]).dt.tz_localize(None).dt.normalize()
+
+        for m in models:
+            strat = apply_overrides(cfg.strategy, m.strategy)
+            busy_until = None
+            wk = start_week
+            end_week = week_start_of(today)
+            while wk <= end_week:
+                hist = d[d["_day"] < wk]
+                snap = (build_snapshot(sym, str(sid), seg, hist, strat, wk,
+                                       mcap=MCAP.get(sym.upper()))
+                        if not hist.empty else None)
+                if snap is not None:
+                    wbars = five[(five["_day"] >= wk) &
+                                 (five["_day"] < wk + pd.Timedelta(days=7))]
+                    if not wbars.empty:
+                        res = replay_week(snap, strat, wbars, history=five)
+                        for sig in res.signals:
+                            sig_ts = pd.Timestamp(sig.bar_time)
+                            if sig_ts.tzinfo is None:
+                                sig_ts = sig_ts.tz_localize(IST)
+                            if busy_until is not None and sig_ts <= busy_until:
+                                continue
+                            if not include_deferred and sig.trigger != "cross":
+                                continue
+                            if m.is_swing:
+                                # Multi-day hold: step forward on DAILY bars
+                                # from the session AFTER the breakout day.
+                                sig_day = pd.Timestamp(sig.bar_time).normalize().tz_localize(None)
+                                dafter = d[d["_day"] > sig_day]
+                                tr = simulate_swing(sig, dafter, capital,
+                                                    m.exit, m.hold_days, cost)
+                            else:
+                                ts = pd.to_datetime(five["datetime"])
+                                after = five[ts > pd.Timestamp(sig.bar_time)]
+                                before = five[ts <= pd.Timestamp(sig.bar_time)]
+                                tr = simulate_model(sig, after, capital, before,
+                                                    m.exit, square_off, cost)
+                            rec = dict(tr.__dict__)
+                            rec["model"] = m.key
+                            rec["model_label"] = m.label
+                            rec["horizon"] = m.horizon
+                            rows.append(rec)
+                            per_model_counts[m.key] += 1
+                            if tr.exit_date:
+                                # A swing trade blocks the symbol for DAYS, so
+                                # the busy window is end-of-that-session.
+                                # Swing trades block the symbol for DAYS; the
+                                # intraday exit_time may be "close", which is
+                                # not parseable, so normalise both here.
+                                et = tr.exit_time
+                                if m.is_swing or not et or ":" not in str(et):
+                                    et = "15:30"
+                                bu = pd.Timestamp(f"{tr.exit_date} {et}")
+                                busy_until = (bu.tz_localize(IST)
+                                              if bu.tzinfo is None else bu)
+                wk += pd.Timedelta(days=7)
+
+        if len(symbols) > 25 and n % 25 == 0:
+            print(f"  ...{n}/{len(symbols)}  {len(rows)} trades so far")
+
+    for k, v in per_model_counts.items():
+        print(f"  {k}: {v} trade(s) this run")
+
+    added, dupes = append_ledger(ledger_path, rows)
+    print(f"\nLedger {ledger_path.name}: +{added} new, {dupes} already recorded")
+
+    if ledger_path.exists():
+        led = pd.read_csv(ledger_path)
+        print_report(led, models)
+        if args.telegram:
+            _send_telegram(telegram_summary(led, models))
+    return 0
+
+
+def _send_telegram(msg: str) -> None:
+    try:
+        from telegram import build_telegram
+        from config import load_config as _lc
+        c = _lc(None)
+        tg = build_telegram(c)
+        tg.send(msg)
+        print("\nTelegram: sent")
+    except Exception as exc:                            # noqa: BLE001
+        print(f"\nTelegram: failed ({str(exc)[:80]})")
+
+
+def _yahoo_fetch(sym: str):
+    """Offline/dry-run data source so the A/B can be tested without Dhan."""
+    import json
+    import urllib.request
+
+    def grab(rng, iv):
+        u = (f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.NS"
+             f"?range={rng}&interval={iv}")
+        req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
+        d = json.load(urllib.request.urlopen(req, timeout=30))
+        res = d["chart"]["result"][0]
+        ts = res["timestamp"]; q = res["indicators"]["quote"][0]
+        out = []
+        for i, t in enumerate(ts):
+            if q["close"][i] is None:
+                continue
+            out.append({"datetime": datetime.fromtimestamp(t, IST).replace(tzinfo=None),
+                        "open": q["open"][i], "high": q["high"][i],
+                        "low": q["low"][i], "close": q["close"][i],
+                        "volume": q["volume"][i] or 0})
+        return pd.DataFrame(out)
+
+    return grab("2y", "1d"), grab("60d", "5m")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
