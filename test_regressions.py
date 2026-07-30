@@ -2755,6 +2755,12 @@ def test_watchlist_ranks_by_distance_and_caps():
     Closest-to-level first, hard cap on the list. Measured on the live book,
     momentum filters cut 88 -> 64 while distance cut it to ~18, so ranking is
     what makes the digest actionable.
+
+    BUG 36 note: distance is now the SECOND key, after the PRE score. These
+    rows carry no pre_score (they stand in for --no-metrics / unscreened
+    output), so they all tie on quality and distance decides - which is
+    exactly the ordering asserted here. The line prefix also gained a score
+    badge, so the match is on the symbol rather than the start of the line.
     """
     from watchlist import build_message
 
@@ -2763,7 +2769,8 @@ def test_watchlist_ranks_by_distance_and_caps():
             for i in range(1, 60)]
     msg = build_message("2026-07-27", rows, {"universe": 59, "eligible": 59},
                         99.0, top_n=15)
-    listed = [ln for ln in msg.splitlines() if ln.startswith("• <b>S")]
+    listed = [ln for ln in msg.splitlines()
+              if ln.startswith("• ") and "<b>S0" in ln]
     assert len(listed) == 15, f"expected 15 rows, got {len(listed)}"
     assert "S001" in listed[0], "the closest name must rank first"
     assert "more in the CSV" in msg
@@ -3790,19 +3797,265 @@ def test_unknown_market_cap_does_not_cost_a_point():
 
 def test_watchlist_ranks_by_score_then_distance():
     """
-    An 8/8 slightly further out must outrank a 5/8 that is nearer - that is
-    the whole point of the change.
+    A high scorer slightly further out must outrank a low scorer that is nearer
+    - that is the whole point of the change.
+
+    SUPERSEDED BY BUG 36 (30-Jul-2026). The ranking key moved from the frozen
+    gate-row count (`score`) to the measured PRE score (`pre_score`), because
+    the gate rows barely varied across the shortlist - nearly every name at a
+    26-week high passes them. The INVARIANT under test is unchanged: quality
+    outranks proximity. Only the field supplying "quality" changed.
     """
     from watchlist import build_message
 
     rows = [
         dict(symbol="WEAK", ltp=99.9, level=100.0, which="C", mcap_cr=5000.0,
-             score=5, max_score=8, pct=-0.1, gap=0.1, bucket="WATCH"),
+             score=5, max_score=8, pre_score=3, pre_max=8,
+             pct=-0.1, gap=0.1, bucket="WATCH"),
         dict(symbol="STRONG", ltp=99.6, level=100.0, which="C", mcap_cr=5000.0,
-             score=8, max_score=8, pct=-0.4, gap=0.4, bucket="WATCH"),
+             score=8, max_score=8, pre_score=8, pre_max=8,
+             pct=-0.4, gap=0.4, bucket="WATCH"),
     ]
     msg = build_message("2026-07-27", rows,
                         {"universe": 2, "eligible": 2, "capped": 2}, 3.0)
     assert msg.index("STRONG") < msg.index("WEAK"), \
-        "the 8/8 name must rank above the nearer 5/8"
-    assert "8/8" in msg and "5/8" in msg, "the score must be visible"
+        "the high scorer must rank above the nearer weak one"
+    assert "8/8" in msg and "3/8" in msg, "the score must be visible"
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 36 - watchlist listed names that could never be traded, and ranked on
+#  gate rows that carry almost no information.
+#
+#  User, 30-Jul: "still coming too many false stocks and under 1000cr", and
+#  then "53 approaching stocks". The digest was unusable as a shortlist.
+#
+#  Measured on 33,755 point-in-time signals over 5 years (RALLY_FILTERS.md),
+#  target P(MFE >= +30% in 30 days):
+#
+#    LIQUIDITY IS A TRAP. The strongest raw factors were all illiquidity
+#    proxies - turnover < 0.63 Cr/day scored +4.36%/trade. That is unfillable:
+#    two-thirds of the whole measured edge came from stocks a real order cannot
+#    trade. Inside a tradeable universe the same edge is +0.28%.
+#
+#    VOLATILITY IS THE FILTER. atr_pct decile 1 -> P(+30%) = 5.5%,
+#    decile 10 -> 22.4%. A four-fold spread, robust out of sample. This
+#    CONTRADICTS the "tight coiled base" intuition and the tests below pin that
+#    direction down so it cannot be silently inverted later.
+#
+#    PRE SCORE RANKS. Out-of-sample P(+30%) by PRE score: 1 -> 2.5%,
+#    4 -> 7.4%, 7 -> 20.4%, 8 -> 22.8%.
+#
+#  SCOPE, deliberately: watchlist.py ONLY. scan.py, telegram.py alerts and
+#  LOGIC_VERSION are untouched, so no live alert changes behaviour. The test
+#  below asserts that scoping.
+# --------------------------------------------------------------------------- #
+def _metrics(**over):
+    """A metrics dict that passes every gate and scores 8/8, unless overridden."""
+    m = dict(px=250.0, atr_pct=4.5, turnover_cr=25.0, ret_12m=80.0,
+             ret_3m=30.0, ret_1m=20.0, dist_50dma=20.0, dist_200dma=35.0,
+             dma200_slope=4.0, base_tight=4.6, base_depth_pct=-40.0,
+             spike_level=4.0)
+    m.update(over)
+    return m
+
+
+def test_bug36_hard_gates_reject_illiquid_and_quiet():
+    from watchlist import (MIN_ATR_PCT, MIN_PRICE_GATE, MIN_TURNOVER_CR,
+                           gate_reasons)
+
+    assert gate_reasons(_metrics()) == [], "a clean name must pass every gate"
+
+    # illiquid - the QMSMEDI class of problem
+    bad = gate_reasons(_metrics(turnover_cr=0.4))
+    assert any("turnover" in b for b in bad), bad
+
+    # penny - one tick is a whole percent
+    bad = gate_reasons(_metrics(px=12.0))
+    assert any("px" in b for b in bad), bad
+
+    # too quiet - the single most predictive factor measured
+    bad = gate_reasons(_metrics(atr_pct=1.8))
+    assert any("atr" in b for b in bad), bad
+
+    # thresholds must not drift without a deliberate edit
+    assert MIN_TURNOVER_CR == 2.0
+    assert MIN_PRICE_GATE == 30.0
+    assert MIN_ATR_PCT == 3.0
+
+
+def test_bug36_unknown_metrics_never_silently_drop_a_name():
+    """
+    UNKNOWN IS NOT A FAILURE - the same principle as c12/market cap.
+
+    A transient Dhan error must not quietly empty the watchlist, and it must
+    not quietly promote a junk name either. `None` returns no gate failures
+    (so nothing is deleted) while score_pre gives 0 (so it ranks last).
+    """
+    from watchlist import gate_reasons, score_pre
+
+    assert gate_reasons(None) == [], "unknown metrics must not delete a name"
+    score, passed = score_pre(None)
+    assert score == 0 and passed == [], "unknown must not manufacture a score"
+
+    # a NaN field fails its own condition without raising
+    score, _ = score_pre(_metrics(ret_12m=float("nan")))
+    assert score == 7, score
+
+
+def test_bug36_pre_score_direction_matches_the_measurement():
+    """
+    Every condition must point the way the data pointed. The volatility ones
+    are the important pair: high ATR and a LIVELY base score HIGHER. If someone
+    later "fixes" this to reward tight quiet bases, this test fails.
+    """
+    from watchlist import PRE_MAX, score_pre
+
+    assert PRE_MAX == 8
+    full, passed = score_pre(_metrics())
+    assert full == 8, passed
+
+    # volatility: quiet must score LOWER, not higher
+    assert score_pre(_metrics(atr_pct=2.0))[0] < full
+    assert score_pre(_metrics(base_tight=2.0))[0] < full
+
+    # momentum: weaker must score lower
+    assert score_pre(_metrics(ret_12m=5.0))[0] < full
+    assert score_pre(_metrics(dist_50dma=2.0))[0] < full
+    assert score_pre(_metrics(dma200_slope=-1.0))[0] < full
+
+    # a deep, broken base must score lower than a shallow one
+    assert score_pre(_metrics(base_depth_pct=-70.0))[0] < full
+
+    # CENTENKA: a level made by one lonely spike must score LOWER
+    assert score_pre(_metrics(spike_level=0.5))[0] < full
+
+    # very high-priced names score lower
+    assert score_pre(_metrics(px=3000.0))[0] < full
+
+
+def test_bug36_brk_score_tags_breakout_conviction():
+    from watchlist import BRK_MAX, score_brk
+
+    assert BRK_MAX == 5
+
+
+    import pandas as pd
+
+    def frame(o, h, l, c, v, prev_close=100.0, vol_hist=1000.0):
+        rows = [dict(open=prev_close, high=prev_close, low=prev_close,
+                     close=prev_close, volume=vol_hist) for _ in range(50)]
+        rows.append(dict(open=o, high=h, low=l, close=c, volume=v))
+        return pd.DataFrame(rows)
+
+    # wide range, big gap, huge volume, closes at the high, well clear of 100
+    strong = frame(o=102.0, h=112.0, l=101.0, c=111.5, v=5000.0)
+    score, passed = score_brk(strong, 100.0)
+    assert score == 5, passed
+
+    # scrapes over the level on no volume, closes mid-range, no gap
+    weak = frame(o=100.1, h=100.6, l=99.8, c=100.1, v=900.0)
+    score, _ = score_brk(weak, 100.0)
+    assert score <= 1, score
+
+    # not computable -> None, so the caller omits the tag instead of printing 0
+    assert score_brk(None, 100.0)[0] is None
+    assert score_brk(pd.DataFrame(), 100.0)[0] is None
+    assert score_brk(strong, 0.0)[0] is None
+
+
+def test_bug36_screened_names_leave_the_watch_bucket_but_stay_in_the_csv():
+    """
+    A screened-out name must not be listed as actionable, but must remain
+    visible in the attachment - a wrong gate has to be auditable, not silent.
+    """
+    from watchlist import build_message
+
+    rows = [
+        dict(symbol="GOOD", ltp=99.6, level=100.0, which="C", mcap_cr=5000.0,
+             pre_score=7, pre_max=8, atr_pct=4.4, pct=-0.4, gap=0.4,
+             bucket="WATCH", screened_ok=True),
+        dict(symbol="JUNK", ltp=99.9, level=100.0, which="C", mcap_cr=264.0,
+             pre_score=2, pre_max=8, atr_pct=1.1, pct=-0.1, gap=0.1,
+             bucket="SCREENED", screened_ok=True, gate_failed="turnover<2Cr"),
+    ]
+    msg = build_message("2026-07-27", rows,
+                        {"universe": 2, "eligible": 2, "capped": 2,
+                         "screened": 1}, 3.0)
+    assert "GOOD" in msg
+    assert "JUNK" not in msg, "a screened name must not be listed as actionable"
+    assert "screened out" in msg.lower()
+
+
+def test_bug36_unscreened_names_rank_last_but_are_still_shown():
+    from watchlist import build_message
+
+    rows = [
+        dict(symbol="KNOWN", ltp=99.5, level=100.0, which="C", mcap_cr=5000.0,
+             pre_score=4, pre_max=8, pct=-0.5, gap=0.5, bucket="WATCH",
+             screened_ok=True),
+        dict(symbol="NODATA", ltp=99.95, level=100.0, which="C", mcap_cr=5000.0,
+             pre_score=None, pre_max=8, pct=-0.05, gap=0.05, bucket="WATCH",
+             screened_ok=False),
+    ]
+    msg = build_message("2026-07-27", rows,
+                        {"universe": 2, "eligible": 2, "capped": 2,
+                         "unscreened": 1}, 3.0)
+    assert "NODATA" in msg, "an unscreened name must still be visible"
+    assert msg.index("KNOWN") < msg.index("NODATA"), \
+        "a scored name outranks an unscored one even when further away"
+    assert "unscreened" in msg.lower()
+
+
+def test_bug36_change_is_scoped_to_the_watchlist_only():
+    """
+    The gates are a SHORTLIST tool. They must not have leaked into the live
+    scanner, the alert path, or the snapshot format - a change there would
+    alter real alerts, which was explicitly not asked for.
+    """
+    import inspect
+
+    import scan
+    import strategy
+    import telegram
+
+    for mod in (scan, telegram, strategy):
+        src = inspect.getsource(mod)
+        for token in ("MIN_TURNOVER_CR", "MIN_ATR_PCT", "score_pre", "score_brk"):
+            assert token not in src, \
+                f"{token} leaked into {mod.__name__} - watchlist-only change"
+
+    # the snapshot contract is untouched, so no rebuild is forced
+    assert strategy.LOGIC_VERSION == 3, \
+        "LOGIC_VERSION must not change: no snapshot field was added"
+
+
+def test_bug36_metrics_are_computed_from_closed_bars_only():
+    """
+    compute_metrics must be usable pre-market: it may look at the LTP for the
+    current price, but every historical input has to come from closed daily
+    bars. A silent look-ahead here would inflate every backtest that reuses it.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from watchlist import compute_metrics
+
+    n = 300
+    rng = np.random.default_rng(3)
+    close = 100 * np.cumprod(1 + rng.normal(0.001, 0.02, n))
+    df = pd.DataFrame(dict(
+        open=close * 0.995, high=close * 1.02, low=close * 0.98,
+        close=close, volume=np.full(n, 500000.0)))
+
+    m = compute_metrics(df, level=float(close.max()), ltp=float(close[-1]))
+    assert m is not None
+    for key in ("atr_pct", "turnover_cr", "ret_12m", "dist_50dma",
+                "dma200_slope", "base_tight", "base_depth_pct", "spike_level"):
+        assert key in m, key
+        assert not isinstance(m[key], str)
+    assert m["atr_pct"] > 0 and m["turnover_cr"] > 0
+
+    # too little history must return None, never a half-computed dict
+    assert compute_metrics(df.head(10), level=100.0) is None
+    assert compute_metrics(pd.DataFrame(), level=100.0) is None
