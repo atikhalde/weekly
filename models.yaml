@@ -1,0 +1,170 @@
+# =============================================================================
+#  A/B PAPER TRADING MODELS
+#
+#  PAPER TRADING MODELS. No orders are ever placed.
+#
+#  HISTORY. This file used to run three models side by side:
+#      A "gated"  - full weekly gate, 9-EMA exit, intraday
+#      B "mover"  - raw cross + volume surge, +3R, intraday
+#      C "swing"  - 5-day hold, 7% stop, +3R
+#  A and B were removed on 29-Jul-2026 once the intraday question was settled:
+#  measured over 12 weeks and 449 real signals, EVERY intraday exit rule tested
+#  was negative after a realistic 0.22% round trip (best was -0.08%/trade,
+#  t = -3.3). The weekly breakout is simply not an intraday edge. C is what
+#  survived - the same signal held for a week returned +5.71%/trade, t = 15.4.
+#
+#  Their measured results are preserved in AB_TEST_GUIDE.md and in the BUG
+#  22/23/27 blocks of test_regressions.py, so the reasoning is not lost. The
+#  old rows also stay in ab_ledger.csv; reports simply no longer show them.
+#
+#  ADDING A COMPETITOR. Nothing here is hard-wired to one model - drop another
+#  block below and it appears in the report automatically. Keep the fair-test
+#  rules if you do: identical universe, capital and costs, with only the entry
+#  filters and the exit rule differing.
+#
+#  HORIZON is an explicit flag. `swing` is the ONLY value that may hold
+#  overnight; an `intraday` model is force-squared-off at 15:15 and a
+#  regression test asserts it can never quietly acquire a multi-day hold.
+# =============================================================================
+
+defaults:
+  capital: 100000          # rupees deployed per trade, per model
+  square_off: "15:15"      # applies to INTRADAY models only
+  cost_round_trip: 0.22    # % of turnover, all-in incl. slippage
+  include_deferred: false  # measure cross entries; alerts still send both
+
+models:
+
+  # ---------------------------------------------------------------------------
+  #  MODEL C - "SWING"   (derived from the data, 29-Jul-2026)
+  #
+  #  Thesis: the weekly breakout is not an intraday edge at all. The move plays
+  #  out over about a week, so hold it for a week and stop trying to scalp it.
+  #
+  #  Every parameter below was measured on 3,254 real 26W breakouts across
+  #  2,363 NSE symbols over 12 months, then confirmed on a held-out half.
+  #
+  #  ENTRY - the close of the day the level is crossed.
+  #      same-day close  72.6% win  +5.17%/trade
+  #      next-day open   65.3%      +4.40%
+  #      pullback limit  62.8%      +3.43%
+  #    Waiting costs ~0.8%. Pullback entries are worst because the strong
+  #    breakouts never come back - you only get filled on the weak ones.
+  #
+  #  STOP - 7% below entry.
+  #      entry-candle low  61.9% win  +4.05%   (behaves like ~4%, fires often)
+  #      3%                62.2%      +4.24%   fires on 33% of trades
+  #      5%                72.6%      +5.17%   fires on 15%
+  #      7%                77.2%      +5.59%   fires on  7%   <-- chosen
+  #      10%               78.3%      +5.69%   fires on  3%
+  #    Gains flatten past 7% while the tail gets worse: a 10% stop produced 14
+  #    losses beyond -10%, the 7% stop capped the worst trade at -7.22%.
+  #
+  #  HOLD - 5 trading days.
+  #      1d +2.49%   3d +4.91%   5d +5.59%   10d +5.62%   30d +5.98%
+  #    Per day held: 1d 2.49, 5d 1.15, 30d 0.28. The move is done in a week;
+  #    holding a month adds 0.4% for six times the capital lock-up.
+  #
+  #  EXIT - breakeven at +1R, target +3R, else time-exit on day 5.
+  #    Beat a flat time exit on profit factor (9.76 vs 7.58) at the same return.
+  #
+  #  ENTRY FILTERS - c03 and c11 are deliberately NOT required.
+  #    Measured per gate row, average 5-day return:
+  #        c03 fresh breakout   passes +2.80%   FAILS +4.58%  <- costs money
+  #        c11 price > 100      passes +3.13%   FAILS +4.52%  <- costs money
+  #        c04/c05/c06/c08/c09/c10 all help and are kept.
+  #    c03 was negative in all 12 months tested: an already-extended breakout
+  #    outperforms a fresh one. Counterintuitive, but stable.
+  #
+  #  RESULT (452 trades, cost 0.22%): 70.6% win, +5.71%/trade, PF 9.76,
+  #  worst -7.22%, avg 4.5 days held, t = 15.4, 95% CI [+4.98%, +6.44%].
+  #  In-sample +5.73% vs out-of-sample +5.69%. Top 5 trades are only 4% of
+  #  total P&L, so it is not one lucky outlier.
+  #
+  #  CAVEAT, stated plainly: 12 months of a strong tape. A 7% stop that rarely
+  #  fires is untested in a real drawdown, which is exactly when a loose stop
+  #  hurts most. This model exists to be verified forward, not trusted yet.
+  # ---------------------------------------------------------------------------
+  C_swing:
+    label: "C · SWING (5-day hold, 7% stop, +3R target)"
+    horizon: swing              # may hold overnight - the point of the model
+    hold_days: 5                # time exit after 5 completed sessions
+    strategy:
+      strict_entry: true
+      drop_c09: false           # c09 helps at this horizon: +3.54 vs +2.84
+      gate_tolerance: 0
+      volume_mode: "off"
+      require_c03: false        # measured NEGATIVE: -1.78%/trade
+      require_c11: false        # measured NEGATIVE: -1.39%/trade
+      rvol_mode: "off"          # weekly volume is the filter here, not intraday
+      bar_rvol_min: 0.0
+      min_atr_pct: 0.0
+      max_ext_above_level: 3.0  # do not chase; ext<3% lifted +3.06 -> +5.77
+      min_weekly_vol_x: 2.0     # weekly volume >= 2x its 10-week average
+      one_per_week: true
+    exit:
+      rule: "swing"
+      stop_pct: 7.0             # NOT the entry-candle low - see the note above
+      be_at_r: 1.0
+      target_r: 3.0
+      hold_days: 5
+
+  # ---------------------------------------------------------------------------
+  #  MODEL D - "EARLY"   (user request, 30-Jul-2026)
+  #
+  #  Same 9-row gate as C, but the 5-minute cross fires on the level in ROW 3
+  #  of the indicator table - highest(high,26) as of TWO weeks ago - instead of
+  #  row 2's last-closed-week high. That level is lower, so D enters earlier
+  #  and more often; when the latest closed week made a new 26W high the two
+  #  levels coincide and D behaves exactly like C.
+  #
+  #  ORIGIN. The user noticed on CENTENKA that crossing the row-3 level (577.60)
+  #  preceded a large move, while the row-2 level (622) never triggered. Checked
+  #  and confirmed: entry at 577.80 on 27-Jul ran to +13.01% MFE against only
+  #  -2.07% MAE.
+  #
+  #  WHAT THE BACKTEST SAYS - STATED PLAINLY.
+  #  A point-in-time test over 12 months and 815 fresh crosses (every
+  #  developing-week input rebuilt from data available AT the entry bar, no
+  #  look-ahead) measured:
+  #        n 815   win 46.5%   avg -0.05%/trade   PF 0.98   t -0.21
+  #        95% CI [-0.48%, +0.40%]   P(mean <= 0) = 0.59
+  #        negative in 7 of the 12 months
+  #  That is indistinguishable from zero - there is no measured edge here.
+  #
+  #  An earlier run appeared to show +0.82%. That run was WRONG: it evaluated
+  #  the weekly gate on COMPLETED weekly bars while entering mid-week, so it
+  #  used the week's final close, volume and RSI to justify a Monday entry.
+  #  The apparent edge was entirely that leak. Recorded so the mistake is not
+  #  repeated - and note the same leak inflated Model C's headline number.
+  #
+  #  It ships anyway because the user asked for it and paper trading costs
+  #  nothing but patience. Live forward results decide, not my backtest.
+  #  "fresh cross only" is implicit: replay_week fires on the first close ABOVE
+  #  the level after a close at or below it, so a week that opens already above
+  #  never produces a cross.
+  # ---------------------------------------------------------------------------
+  D_early:
+    label: "D · EARLY (row-3 level, 5-day hold)"
+    horizon: swing
+    hold_days: 5
+    strategy:
+      strict_entry: true
+      trigger_level: "hi_short2"   # <-- the only structural difference from C
+      drop_c09: false
+      gate_tolerance: 0
+      volume_mode: "off"
+      require_c03: false
+      require_c11: false
+      rvol_mode: "off"
+      bar_rvol_min: 0.0
+      min_atr_pct: 0.0
+      max_ext_above_level: 0.0     # no chase guard - D is meant to enter early
+      min_weekly_vol_x: 0.0        # no volume multiple - keep D's entry pure
+      one_per_week: true
+    exit:
+      rule: "swing"
+      stop_pct: 7.0
+      be_at_r: 1.0
+      target_r: 3.0
+      hold_days: 5
