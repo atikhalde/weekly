@@ -27,6 +27,7 @@ import pandas as pd
 
 from config import load_config
 from dhan import IST, DhanClient, DhanError
+from mcap import load_table as load_mcap_table
 from state import AlertState
 from strategy import LOGIC_VERSION, WeeklySnapshot, replay_week, week_start_of
 from telegram import build_telegram, format_heartbeat
@@ -104,6 +105,53 @@ def load_snapshots(cfg, week: str) -> list[WeeklySnapshot]:
             "NO USABLE SNAPSHOT ROWS for week %s at logic_version %d. "
             "Refusing to scan rather than alert against stale breakout levels. "
             "Run the Weekly Snapshot workflow.", week, LOGIC_VERSION)
+        return snaps
+
+    # ---- BUG 37: MARKET CAP COMES FROM mcap.csv, NOT THE SNAPSHOT ------------
+    # The snapshot stores whatever market cap was known WHEN IT WAS BUILT. A
+    # snapshot written before mcap.py existed carries mcap="" on every row, and
+    # because "unknown is not small" is the correct rule inside evaluate_bar,
+    # every one of those rows PASSES c12. The filter then looks enabled in the
+    # config and does nothing at all - silently.
+    #
+    # That is not hypothetical. Measured on the live 27-Jul snapshot:
+    #     rows with a populated mcap: 1 of 2100   (only SAKHTISUG)
+    # and two names below the 1000 Cr floor alerted that week:
+    #     GANESHBE  881 Cr        PYRAMID  665 Cr
+    #
+    # mcap.csv is refreshed by the snapshot workflow and is the live source of
+    # truth, so it OVERRIDES the frozen row. Market cap is a slow-moving
+    # universe filter, not a frozen weekly level - there is no correctness
+    # reason to freeze it, and freezing it is what broke the filter.
+    #
+    # A symbol absent from the table keeps whatever the snapshot had (usually
+    # None -> passes). Unknown must still never block a name.
+    if getattr(cfg.strategy, "use_mcap", False):
+        caps = load_mcap_table(cfg.paths["mcap"])
+        if not caps:
+            # Loud, because the config claims a filter that cannot run.
+            log.error(
+                "use_mcap is ON but %s is empty or missing - the market-cap "
+                "filter CANNOT be applied and every stock will pass c12. "
+                "Run `python mcap.py` (the Weekly Snapshot workflow does this).",
+                cfg.paths["mcap"])
+        else:
+            filled = 0
+            for s in snaps:
+                cap = caps.get(s.symbol.upper())
+                if cap is not None:
+                    s.mcap = cap
+                    filled += 1
+            log.info("market cap: %d/%d rows resolved from %s (min %g Cr, "
+                     "margin %g%%)", filled, len(snaps), cfg.paths["mcap"].name,
+                     cfg.strategy.min_mcap,
+                     getattr(cfg.strategy, "mcap_margin_pct", 0.0))
+            # If the table covers almost nothing the filter is effectively off.
+            if filled < 0.5 * len(snaps):
+                log.error(
+                    "only %d of %d snapshot rows got a market cap - the c12 "
+                    "filter is mostly INERT. Rebuild mcap.csv.",
+                    filled, len(snaps))
     return snaps
 
 

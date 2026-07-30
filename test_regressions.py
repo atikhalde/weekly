@@ -4059,3 +4059,232 @@ def test_bug36_metrics_are_computed_from_closed_bars_only():
     # too little history must return None, never a half-computed dict
     assert compute_metrics(df.head(10), level=100.0) is None
     assert compute_metrics(pd.DataFrame(), level=100.0) is None
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 37 - the market-cap filter was ENABLED in config but INERT in the live
+#  scanner, because scan.py read the cap off the FROZEN SNAPSHOT.
+#
+#  The snapshot stores whatever cap was known when it was BUILT. The live
+#  27-Jul snapshot was written before mcap.py was wired into the workflow, so:
+#
+#      rows with a populated mcap: 1 of 2100     (only SAKHTISUG)
+#
+#  evaluate_bar() treats `snap.mcap is None` as a PASS - correctly, because
+#  "unknown is not small". The combination means use_mcap: true did absolutely
+#  nothing, with no error anywhere. Two names below the 1000 Cr floor alerted
+#  in the 27-Jul week and reached the user's Telegram:
+#
+#      GANESHBE   881 Cr        PYRAMID   665 Cr
+#
+#  FIX: load_snapshots() overrides s.mcap from mcap.csv, which the snapshot
+#  workflow refreshes and commits. Market cap is a slow-moving universe filter,
+#  not a frozen weekly level - freezing it bought nothing and broke the filter.
+#
+#  This is the same CLASS of bug as BUG 24/25 (stale snapshot data trusted
+#  silently). The rule that keeps being relearned: a stale input must either be
+#  refreshed from the live source or refused loudly - never used quietly.
+# --------------------------------------------------------------------------- #
+def _snapshot_csv(tmp_path, rows):
+    """Write a minimal but complete snapshot CSV and return its directory."""
+    import pandas as pd
+
+    import strategy as _strat
+
+    # Built by round-tripping a real WeeklySnapshot through to_row(), so the
+    # fixture can never drift from the actual on-disk column set.
+    import indicators as _ind
+
+    _snap = _strat.WeeklySnapshot(
+        symbol="X", security_id="1", exchange_segment="NSE_EQ",
+        week_start="2026-07-27",
+        entry_level=100.0, level_52=120.0, hi_short2=95.0, close_1=90.0,
+        ema_fast=_ind.EmaState(length=20, prev=55.0),
+        ema_slow=_ind.EmaState(length=50, prev=50.0),
+        ema_slow_2=49.0,
+        rsi=_ind.RsiState(length=14, avg_gain=2.0, avg_loss=1.0, prev_close=90.0),
+        rsi_1=65.0,
+        macd=_ind.MacdState(fast=12, slow=26, signal=9,
+                            ema_fast=90.0, ema_slow=88.0, sig=1.5),
+        vol_sma=_ind.SmaState(length=10, sum_prev=1000.0),
+        g_ema_fast=55.0, g_ema_slow=50.0, g_ema_slow_2=49.0,
+        g_rsi=70.0, g_rsi_1=65.0, g_hist=1.0,
+        prev_daily_close=95.0, prev_daily_open=94.0,
+        mcap=None,
+    )
+    base = {k: ("" if v is None else str(v)) for k, v in _snap.to_row().items()}
+    base["logic_version"] = str(_strat.LOGIC_VERSION)
+    out = []
+    for r in rows:
+        d = dict(base)
+        d.update({k: str(v) for k, v in r.items()})
+        out.append(d)
+    df = pd.DataFrame(out)
+    p = tmp_path / "weekly_snapshot.csv"
+    df.to_csv(p, index=False)
+    return p
+
+
+def test_bug37_scan_reads_market_cap_from_the_live_table(tmp_path):
+    """
+    A snapshot with an EMPTY mcap column must still get real caps, because
+    load_snapshots() overrides them from mcap.csv.
+    """
+    import scan
+    from config import load_config
+
+    _snapshot_csv(tmp_path, [
+        dict(symbol="GANESHBE", security_id="11"),
+        dict(symbol="PYRAMID", security_id="12"),
+        dict(symbol="RADICO", security_id="13"),
+    ])
+    (tmp_path / "mcap.csv").write_text(
+        "symbol,mcap_cr,updated\n"
+        "GANESHBE,881,2026-07-29\n"
+        "PYRAMID,665,2026-07-29\n"
+        "RADICO,58556,2026-07-29\n")
+    (tmp_path / "config.yaml").write_text(
+        "strategy:\n  use_mcap: true\n  min_mcap: 1000\n  mcap_margin_pct: 5.0\n")
+
+    cfg = load_config(tmp_path / "config.yaml")
+    assert cfg.strategy.use_mcap is True
+
+    snaps = scan.load_snapshots(cfg, "2026-07-27")
+    caps = {s.symbol: s.mcap for s in snaps}
+    assert caps["GANESHBE"] == 881.0, "cap must come from mcap.csv, not the snapshot"
+    assert caps["PYRAMID"] == 665.0
+    assert caps["RADICO"] == 58556.0
+
+
+def test_bug37_the_two_names_that_wrongly_alerted_are_now_blocked(tmp_path):
+    """
+    The exact regression, end to end: GANESHBE (881 Cr) and PYRAMID (665 Cr)
+    must FAIL c12 while RADICO passes, using the real gate code.
+    """
+    import scan
+    from config import load_config
+    from strategy import evaluate_bar
+
+    _snapshot_csv(tmp_path, [
+        dict(symbol="GANESHBE", security_id="11"),
+        dict(symbol="PYRAMID", security_id="12"),
+        dict(symbol="RADICO", security_id="13"),
+    ])
+    (tmp_path / "mcap.csv").write_text(
+        "symbol,mcap_cr\nGANESHBE,881\nPYRAMID,665\nRADICO,58556\n")
+    (tmp_path / "config.yaml").write_text(
+        "strategy:\n  use_mcap: true\n  min_mcap: 1000\n  mcap_margin_pct: 5.0\n")
+    cfg = load_config(tmp_path / "config.yaml")
+
+    snaps = {s.symbol: s for s in scan.load_snapshots(cfg, "2026-07-27")}
+    got = {}
+    for sym, s in snaps.items():
+        ev = evaluate_bar(s, cfg.strategy, price=110.0, week_open=100.0,
+                          week_volume=5000.0, day_open=105.0, week_fraction=1.0)
+        got[sym] = ev.conditions["c12"]
+
+    assert got["GANESHBE"] is False, "881 Cr must fail a 1000 Cr floor"
+    assert got["PYRAMID"] is False, "665 Cr must fail a 1000 Cr floor"
+    assert got["RADICO"] is True, "58,556 Cr must pass"
+
+
+def test_bug37_unknown_market_cap_still_passes(tmp_path):
+    """
+    UNKNOWN IS NOT SMALL, still. A symbol missing from mcap.csv must keep
+    passing c12 - the override must not turn a data gap into a silent block,
+    which would delete names from the scan with no visible symptom.
+    """
+    import scan
+    from config import load_config
+    from strategy import evaluate_bar
+
+    _snapshot_csv(tmp_path, [dict(symbol="NEWLISTING", security_id="99")])
+    (tmp_path / "mcap.csv").write_text("symbol,mcap_cr\nSOMETHINGELSE,5000\n")
+    (tmp_path / "config.yaml").write_text(
+        "strategy:\n  use_mcap: true\n  min_mcap: 1000\n")
+    cfg = load_config(tmp_path / "config.yaml")
+
+    s = scan.load_snapshots(cfg, "2026-07-27")[0]
+    assert s.mcap is None, "a symbol absent from the table stays unknown"
+    ev = evaluate_bar(s, cfg.strategy, price=110.0, week_open=100.0,
+                      week_volume=5000.0, day_open=105.0, week_fraction=1.0)
+    assert ev.conditions["c12"] is True, "unknown must never block a name"
+
+
+def test_bug37_empty_mcap_table_is_an_error_not_a_silent_pass(tmp_path, caplog):
+    """
+    The failure that hid this bug for a week: config says the filter is ON, the
+    data says it cannot run, and nothing was logged. It must be LOUD now.
+    """
+    import logging
+
+    import scan
+    from config import load_config
+
+    _snapshot_csv(tmp_path, [dict(symbol="AAA", security_id="1")])
+    (tmp_path / "config.yaml").write_text(
+        "strategy:\n  use_mcap: true\n  min_mcap: 1000\n")
+    cfg = load_config(tmp_path / "config.yaml")
+
+    with caplog.at_level(logging.ERROR):
+        scan.load_snapshots(cfg, "2026-07-27")
+    blob = caplog.text.lower()
+    assert "use_mcap is on" in blob and "mcap" in blob, caplog.text
+
+
+def test_bug37_mostly_empty_table_is_flagged(tmp_path, caplog):
+    """A table covering a tiny fraction of the universe means the filter is
+    effectively off. That must be reported, not merely counted."""
+    import logging
+
+    import scan
+    from config import load_config
+
+    rows = [dict(symbol=f"S{i:03d}", security_id=str(i)) for i in range(20)]
+    _snapshot_csv(tmp_path, rows)
+    (tmp_path / "mcap.csv").write_text("symbol,mcap_cr\nS000,5000\nS001,6000\n")
+    (tmp_path / "config.yaml").write_text(
+        "strategy:\n  use_mcap: true\n  min_mcap: 1000\n")
+    cfg = load_config(tmp_path / "config.yaml")
+
+    with caplog.at_level(logging.ERROR):
+        snaps = scan.load_snapshots(cfg, "2026-07-27")
+    assert len(snaps) == 20
+    assert "inert" in caplog.text.lower(), caplog.text
+
+
+def test_bug37_override_is_skipped_when_use_mcap_is_off(tmp_path):
+    """No surprise behaviour when the filter is disabled: the snapshot value
+    stands, and no table is consulted."""
+    import scan
+    from config import load_config
+
+    _snapshot_csv(tmp_path, [dict(symbol="AAA", security_id="1", mcap="123")])
+    (tmp_path / "mcap.csv").write_text("symbol,mcap_cr\nAAA,999999\n")
+    (tmp_path / "config.yaml").write_text(
+        "strategy:\n  use_mcap: false\n  min_mcap: 1000\n")
+    cfg = load_config(tmp_path / "config.yaml")
+
+    s = scan.load_snapshots(cfg, "2026-07-27")[0]
+    assert s.mcap == 123.0, "with use_mcap off the frozen value must be kept"
+
+
+def test_bug37_watch_and_watchlist_share_the_same_fix():
+    """
+    watch.py and watchlist.py both call load_snapshots(), so the fix must be
+    inside that function rather than duplicated at each call site. If someone
+    later inlines a private loader in one of them, this fails.
+    """
+    import inspect
+
+    import scan
+    import watch
+    import watchlist
+
+    src = inspect.getsource(scan.load_snapshots)
+    assert "load_mcap_table" in src, "the override must live in load_snapshots"
+
+    for mod in (watch, watchlist):
+        body = inspect.getsource(mod)
+        assert "def load_snapshots" not in body, (
+            f"{mod.__name__} must reuse scan.load_snapshots, not shadow it")

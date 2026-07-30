@@ -597,6 +597,11 @@ def main() -> int:
     # Market caps come from mcap.csv, NOT the snapshot: a snapshot built before
     # the c12 feature carries mcap=None for every row and would disable the
     # filter here without any visible symptom.
+    #
+    # BUG 37: load_snapshots() now applies the same override for the live
+    # scanner, so s.mcap is already correct here. This table is still loaded
+    # because the digest prints the cap next to each name and needs it for
+    # symbols the snapshot never carried.
     caps = load_mcap_table(cfg.paths["mcap"]) if cfg.strategy.use_mcap else {}
     if cfg.strategy.use_mcap and not caps:
         log.warning("use_mcap is ON but %s is empty - the watchlist will not "
