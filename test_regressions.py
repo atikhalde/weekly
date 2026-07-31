@@ -3337,8 +3337,18 @@ def test_intraday_models_a_and_b_stay_retired():
     for m in models:
         assert m.is_swing, f"{m.key} is intraday - that question is settled"
         assert m.hold_days == 5
-        assert m.exit["stop_pct"] == 7.0
-        assert m.exit["target_r"] == 3.0
+        rule = str(m.exit.get("rule", "")).lower()
+        if rule == "btst":
+            # Model E is an overnight rule with its own exit grammar
+            # (stop_pct / take_pct). It is still a swing horizon and still
+            # capped at 5 sessions, which is what this test guards. Its stop
+            # is deliberately NOT 7% - see the measurement block in
+            # models.yaml and BUG 39.
+            assert "take_pct" in m.exit, f"{m.key} btst exit needs take_pct"
+            assert m.exit["stop_pct"] > 0
+        else:
+            assert m.exit["stop_pct"] == 7.0
+            assert m.exit["target_r"] == 3.0
 
 
 def test_retired_models_reasoning_is_preserved():
@@ -4288,3 +4298,670 @@ def test_bug37_watch_and_watchlist_share_the_same_fix():
         body = inspect.getsource(mod)
         assert "def load_snapshots" not in body, (
             f"{mod.__name__} must reuse scan.load_snapshots, not shadow it")
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 38 - c09 held entries until AFTER the move, and there was no BTST path.
+#
+#  User, 31-Jul: "rather than showing deferred why I'm missing those entry",
+#  "only yasho gave massive, others loosing", "more focus on btst setup".
+#
+#  THE CASE. YASHO, 31-Jul-2026:
+#      26W level 3262.80, opened 3258.90 - already at the level
+#      weekly volume  Mon 0.08x  Tue 0.19x  Wed 0.51x  Fri 2.24x
+#      c09 flipped true at 12:20, price 3690.90 -> the alert was 13.1% HIGH
+#      day high/close 3858.70
+#      from the level +18.3%, from the alert +4.5% - 75% of the move was gone
+#
+#  c09 is "weekly volume > 10-week average". Mid-week that volume has not
+#  traded yet, so the row passes only once the MOVE creates the volume. The
+#  gate therefore systematically delays entry on exactly the explosive names.
+#
+#  MEASURED, point-in-time, 5 years, 18,259 tradeable breakouts, same trades
+#  entered early vs when the full gate allowed it:
+#      next close  early +0.45% (t 12.7)  vs gated +0.16% (t 4.3)
+#      3 days      early +0.96% (t 16.5)  vs gated +0.15% (t 2.6)
+#      5 days      early +1.26% (t 17.4)  vs gated +0.36% (t 5.0)
+#  and c09 blocked 37% of breakouts for the ENTIRE week - entries never given.
+#
+#  BTST. Buying every breakout close and selling next close earns +0.01%
+#  (nothing). The edge is entirely in the breakout DAY's character:
+#      TIER A  day>=15% & closed at high   n=417   +1.75%  t 5.2
+#      TIER B  close@high .90 & rvol>=3 & atr>=3   n=1086  +0.83%  t 5.0
+#  Both held out of sample (A +1.62 -> +2.01, B +0.76 -> +0.96).
+#
+#  NOT SHIPPED, deliberately: selling at the next OPEN measures +0.45% t=42,
+#  but the whole universe gaps +0.42% at the open in this data. That is a
+#  recording artifact, not an edge. Only next-CLOSE is used.
+# --------------------------------------------------------------------------- #
+def test_bug38_drop_c09_is_enabled_in_the_shipped_config():
+    from config import load_config
+
+    cfg = load_config(None)
+    assert cfg.strategy.drop_c09 is True, (
+        "c09 must be OUT of the live gate - it delays entry until after the "
+        "move (YASHO 31-Jul: alerted 13.1% above the level)")
+
+
+def test_bug38_dropping_c09_removes_only_that_row():
+    """
+    drop_c09 must not weaken anything else. Every other gate row still has to
+    be able to block an entry, and the level break itself is untouched.
+    """
+    from config import Strategy
+    from strategy import BarEval, gate_ok
+
+    class Snap:
+        close_1 = 100.0; hi_short2 = 120.0
+        g_ema_fast = 55.0; g_ema_slow = 50.0; g_ema_slow_2 = 49.0
+        g_rsi = 70.0; g_rsi_1 = 65.0; g_hist = 1.0
+        mcap = 5000.0
+
+    cfg = Strategy(drop_c09=True, strict_entry=True, gate_tolerance=0,
+                   require_c03=False, require_c11=False, use_mcap=False)
+
+    def ev(**over):
+        conds = {f"c{i:02d}": True for i in range(1, 14)}
+        conds.update(over)
+        return BarEval(conditions=conds, values={})
+
+    assert gate_ok(Snap(), cfg, ev()) is True
+    # c09 false must NO LONGER block
+    assert gate_ok(Snap(), cfg, ev(c09=False)) is True, "c09 must be ignored"
+    # everything else must still block
+    for row in ("c04", "c05", "c06", "c07", "c08", "c10", "c13"):
+        assert gate_ok(Snap(), cfg, ev(**{row: False})) is False, \
+            f"{row} must still be able to block an entry"
+
+    # and with drop_c09 OFF, c09 blocks again
+    cfg_on = Strategy(drop_c09=False, strict_entry=True, gate_tolerance=0,
+                      require_c03=False, require_c11=False, use_mcap=False)
+    assert gate_ok(Snap(), cfg_on, ev(c09=False)) is False
+
+
+def test_bug38_chase_guard_stays_off_because_it_measured_worse():
+    """
+    The intuitive fix - "with c09 gone, also refuse signals far above the
+    level" - was tested and is WRONG. Capping extension made returns worse at
+    every threshold (5d: off +0.221% vs 3% cap +0.103%, and worse still out of
+    sample), because an extended breakout is a STRONG breakout. A 5% cap would
+    have discarded 343 of the 417 Tier A BTST setups.
+
+    This test exists so nobody "fixes" it back on without re-measuring.
+    """
+    from config import load_config
+
+    cfg = load_config(None)
+    assert cfg.strategy.max_ext_above_level == 0.0, (
+        "the chase guard measured NEGATIVE - see the config.yaml note before "
+        "turning it back on")
+
+
+def _btst_frame(day_ret, close_pos, rvol, atr_pct=5.0, n=260, price=100.0):
+    """Synthesise a daily frame ending in a candle with the wanted character."""
+    import numpy as np
+    import pandas as pd
+
+    base_v = 500000.0          # keeps 20d turnover well above the 2 Cr floor
+    rows = []
+    for _ in range(n - 1):
+        rows.append(dict(open=price * 0.995, high=price * (1 + atr_pct / 200),
+                         low=price * (1 - atr_pct / 200), close=price,
+                         volume=base_v))
+    o = price
+    c = o * (1 + day_ret / 100.0)
+    rng = max(abs(c - o) / max(close_pos, 0.01), c * 0.01)
+    low = c - rng * close_pos
+    high = low + rng
+    rows.append(dict(open=o, high=high, low=low, close=c, volume=base_v * rvol))
+    return pd.DataFrame(rows)
+
+
+def test_bug38_btst_tier_a_is_the_yasho_shape():
+    from btst import classify
+
+    m = classify(_btst_frame(day_ret=18.4, close_pos=1.0, rvol=8.0, atr_pct=4.9),
+                 level=95.0)
+    assert m is not None
+    assert m["tier"] == "A", m
+    assert m["day_ret"] > 15 and m["close_pos"] >= 0.85
+
+
+def test_bug38_btst_rejects_the_losers_from_31_jul():
+    """
+    The same day YASHO ran, eight other names alerted and most lost money.
+    Their shapes must NOT qualify - that is the whole point of the tiers.
+    """
+    from btst import classify
+
+    # ATULAUTO: closed red, at the bottom of its range
+    assert classify(_btst_frame(-1.2, 0.06, 4.75, 2.9), 95.0)["tier"] is None
+    # IIFL: red, weak close, no volume
+    assert classify(_btst_frame(-0.6, 0.21, 0.85, 3.3), 95.0)["tier"] is None
+    # SILVERTUC: red, mid-range
+    assert classify(_btst_frame(-0.7, 0.39, 3.47, 5.2), 95.0)["tier"] is None
+    # QUESS: up 7.9% but did NOT close at the high -> no tier
+    assert classify(_btst_frame(7.9, 0.73, 15.0, 3.5), 95.0)["tier"] is None
+
+
+def test_bug38_btst_requires_tradeability():
+    """An overnight hold in an illiquid name is worse than an intraday one -
+    you cannot get out at the open."""
+    from btst import classify
+
+    quiet = classify(_btst_frame(18.0, 1.0, 8.0, atr_pct=1.2), 95.0)
+    assert quiet["tier"] is None, "a 1.2% ATR stock must not qualify"
+    assert quiet.get("reject") == "not tradeable"
+
+
+def test_bug38_btst_never_places_orders_and_is_read_only():
+    from pathlib import Path
+
+    body = (ROOT / "btst.py").read_text()
+    for token in ("place_order", "placeorder", "/orders"):
+        assert token not in body.lower(), "BTST must never place an order"
+    # it must not write state.json - that would corrupt the live de-dup
+    assert "state.save()" not in body and ".mark(" not in body, \
+        "BTST must not mutate alert state"
+
+
+def test_bug38_watchlist_flags_btst_capable_names():
+    from watchlist import btst_ready
+
+    # YASHO-like: high ATR, lively base, strong 12m trend
+    assert btst_ready(dict(atr_pct=4.9, base_tight=4.6, ret_12m=80.0)) is True
+    # too quiet to ever print a +15% day
+    assert btst_ready(dict(atr_pct=2.1, base_tight=4.6, ret_12m=80.0)) is False
+    assert btst_ready(dict(atr_pct=4.9, base_tight=2.0, ret_12m=80.0)) is False
+    # no trend
+    assert btst_ready(dict(atr_pct=4.9, base_tight=4.6, ret_12m=2.0)) is False
+    assert btst_ready(None) is False
+
+
+def test_bug38_btst_is_a_separate_job_from_the_live_scanner():
+    """BTST must not alter scan.py's alert path."""
+    import inspect
+
+    import scan
+
+    src = inspect.getsource(scan)
+    for token in ("TIER", "btst", "classify"):
+        assert token not in src, f"{token} leaked into scan.py"
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 39 - MODEL E, the BTST rule (user request, 31-Jul-2026).
+#
+#  "take entry in top 5 btst watchlist stocks on end of day, sl should be 1%
+#   (adjust gap down possibilities), next day close position at end of the day
+#   if stocks moves more than 2%, or carry forward position next day if stocks
+#   in negative or positive less than 2%, intact D"
+#
+#  Shipped EXACTLY as specified. The measurement is recorded here because the
+#  1% stop is the part most likely to be "tidied up" later by someone who has
+#  not seen the numbers.
+#
+#  1,130 top-5 BTST trades, 5 years, net 0.22%, gap-aware fills:
+#      stop    win%    mean     PF     t    SL hit
+#      1%      26.5   +0.939   1.96   6.9    74%     <- as specified, best mean
+#      3%      41.2   +0.660   1.35   4.1    59%
+#      5%      55.1   +0.861   1.37   4.6    44%
+#      none    69.2   +0.915   1.31   3.6     0%
+#
+#  The 1% stop genuinely measures best on the mean. The caveats are real too:
+#    * median ATR of these names is 4.66%/day, so 1% is 0.21x ONE DAY'S RANGE
+#      and P(next-day low <= -1%) = 70%. It fires on noise, not on a thesis break.
+#    * win rate 26.5%, median trade -1.22%, longest losing streak in-sample
+#      THIRTY trades - about six weeks at 4-5 signals/week.
+#    * slippage is charged on 74% of trades. At 0.30% slippage the 1% stop
+#      (+0.743%) and the 5% stop (+0.741%) are identical; at 0.75% the 1% stop
+#      is WORSE (+0.449% vs +0.561%).
+#    * out of sample the ordering reverses: 1% stop +1.036 -> +0.751, while a
+#      plain next-close exit goes +0.735 -> +1.020.
+#
+#  Hence E_btst_wide: same signal, same entry, 5% stop, so live forward data
+#  decides instead of my backtest.
+#
+#  GAP HANDLING is explicitly required by the user ("adjust gap down
+#  possibilities") and is tested below: when a session opens BELOW the stop the
+#  fill must be the OPEN, not the stop. 7.5% of these names gap under -1%, and
+#  when they do the average fill is -2.03%, not -1.00%.
+# --------------------------------------------------------------------------- #
+def test_bug39_model_e_exists_and_d_is_untouched():
+    from ab_paper import load_models
+
+    _d, models = load_models()
+    by = {m.key: m for m in models}
+    assert "E_btst" in by, "Model E must be defined"
+    assert "E_btst_wide" in by, "the 5% control arm must exist"
+
+    # D_early must be EXACTLY as it was - the user said "intact D"
+    d = by["D_early"]
+    assert d.horizon == "swing" and d.hold_days == 5
+    assert d.exit["rule"] == "swing"
+    assert d.exit["stop_pct"] == 7.0
+    assert d.exit["be_at_r"] == 1.0
+    assert d.exit["target_r"] == 3.0
+    assert d.strategy["trigger_level"] == "hi_short2"
+
+    e = by["E_btst"]
+    assert e.exit["rule"] == "btst"
+    assert e.exit["stop_pct"] == 1.0, "1% stop as specified"
+    assert e.exit["take_pct"] == 2.0, "exit on a close >= +2% as specified"
+    assert e.strategy["btst_top_n"] == 5, "top 5 per day as specified"
+    assert e.strategy["btst_only"] is True
+
+
+def _sig(price=100.0):
+    from datetime import datetime
+
+    from strategy import BarEval, Signal
+
+    ev = BarEval(conditions={f"c{i:02d}": True for i in range(1, 14)},
+                 values={"rsi": 70.0, "macd_hist": 1.0})
+    return Signal(symbol="X", security_id="1", exchange_segment="NSE_EQ",
+                  bar_time=datetime(2026, 7, 31, 15, 25), price=price,
+                  entry_level=95.0, level_52=99.0, trigger="cross",
+                  evaluation=ev, week_start="2026-07-27",
+                  week_volume=1e6, day_open=90.0, week_open=90.0,
+                  bar_open=99.0, bar_high=101.0, bar_low=98.0)
+
+
+def _days(rows):
+    import pandas as pd
+
+    return pd.DataFrame([
+        dict(datetime=pd.Timestamp("2026-08-03") + pd.Timedelta(days=i),
+             open=o, high=h, low=l, close=c, volume=1e6)
+        for i, (o, h, l, c) in enumerate(rows)])
+
+
+def test_bug39_exits_next_close_when_up_more_than_2pct():
+    from ab_paper import simulate_btst
+
+    # day 1 closes +3% -> take it
+    t = simulate_btst(_sig(100.0), _days([(100.5, 104.0, 99.5, 103.0)]),
+                      100000.0, dict(stop_pct=1.0, take_pct=2.0, hold_days=5))
+    assert t.exit_reason == "TGT"
+    assert t.bars_held == 1
+    assert t.exit == 103.0
+
+
+def test_bug39_carries_when_the_move_is_small_or_negative():
+    from ab_paper import simulate_btst
+
+    # day 1 closes +0.5% (less than 2%) -> carry; day 2 closes +2.5% -> exit
+    t = simulate_btst(_sig(100.0),
+                      _days([(100.1, 101.0, 99.5, 100.5),
+                             (100.6, 103.0, 100.0, 102.5)]),
+                      100000.0, dict(stop_pct=5.0, take_pct=2.0, hold_days=5))
+    assert t.exit_reason == "TGT"
+    assert t.bars_held == 2, "must have carried through day 1"
+
+    # a NEGATIVE day 1 that does not hit the stop must also carry
+    t2 = simulate_btst(_sig(100.0),
+                       _days([(99.9, 100.2, 98.0, 98.5),
+                              (98.6, 103.0, 98.4, 102.6)]),
+                       100000.0, dict(stop_pct=5.0, take_pct=2.0, hold_days=5))
+    assert t2.exit_reason == "TGT" and t2.bars_held == 2
+
+
+def test_bug39_gap_down_fills_at_the_open_not_the_stop():
+    """
+    The user explicitly asked to "adjust gap down possibilities". A stop is a
+    promise the market does not keep: when the session opens BELOW it, the fill
+    is the open. Simulating a -1.00% fill on a -3% gap would be a lie that
+    flatters every backtest of this model.
+    """
+    from ab_paper import simulate_btst
+
+    t = simulate_btst(_sig(100.0), _days([(97.0, 98.0, 96.0, 96.5)]),
+                      100000.0, dict(stop_pct=1.0, take_pct=2.0, hold_days=5))
+    assert t.exit_reason == "SL"
+    assert t.exit == 97.0, "must fill at the OPEN, not the 99.00 stop"
+    assert "gap" in (t.exit_note or "").lower()
+    assert t.pnl_pct < -3.0, "the loss must reflect the real fill"
+
+
+def test_bug39_stop_wins_ties_against_the_target():
+    """A day that both breaches the stop and closes above the target must be
+    recorded as a STOP - daily bars cannot prove which came first."""
+    from ab_paper import simulate_btst
+
+    t = simulate_btst(_sig(100.0), _days([(100.0, 106.0, 98.0, 103.0)]),
+                      100000.0, dict(stop_pct=1.0, take_pct=2.0, hold_days=5))
+    assert t.exit_reason == "SL", "the pessimistic branch is the honest one"
+
+
+def test_bug39_time_exit_caps_the_carry():
+    from ab_paper import simulate_btst
+
+    flat = [(100.0, 100.5, 99.6, 100.1)] * 6
+    t = simulate_btst(_sig(100.0), _days(flat), 100000.0,
+                      dict(stop_pct=5.0, take_pct=2.0, hold_days=5))
+    assert t.exit_reason == "TIME"
+    assert t.bars_held == 5, "carry must not run forever"
+
+
+def test_bug39_tier_logic_is_shared_with_the_nightly_scanner():
+    """
+    ab_paper's Model E and btst.py must agree on what a BTST setup IS. If the
+    thresholds are duplicated they will drift; this asserts one source.
+    """
+    import inspect
+
+    import pandas as pd
+
+    import ab_paper
+    import btst
+
+    src = inspect.getsource(ab_paper.btst_tier_for)
+    assert "import btst" in src and "TIER_A_DAY" in src, \
+        "the paper model must import the thresholds, not restate them"
+    assert btst.TIER_A_DAY == 15.0
+    assert btst.TIER_A_CLOSE_POS == 0.85
+    assert btst.TIER_B_RVOL == 3.0
+
+    # a YASHO-shaped day is Tier A in both
+    day = dict(open=100.0, high=118.5, low=99.5, close=118.4, volume=8e6)
+    prev = pd.DataFrame(dict(volume=[1e6] * 60, high=[101.0] * 60,
+                             low=[99.0] * 60, close=[100.0] * 60))
+    assert ab_paper.btst_tier_for(day, prev, atr_pct=4.9) == "A"
+    # a weak day is neither
+    weak = dict(open=100.0, high=101.0, low=98.0, close=99.0, volume=5e5)
+    assert ab_paper.btst_tier_for(weak, prev, atr_pct=4.9) is None
+
+
+def test_bug39_the_1pct_stop_evidence_is_recorded():
+    """
+    The 1% stop fires on ~74% of trades and its advantage vanishes under
+    realistic slippage. Whoever changes it next must see that first.
+    """
+    doc = (ROOT / "models.yaml").read_text()
+    for token in ("74%", "slippage", "losing streak", "E_btst_wide"):
+        assert token.lower() in doc.lower(), f"models.yaml must document {token}"
+
+
+def test_bug39_btst_fields_reach_the_ledger():
+    from ab_paper import LEDGER_COLS
+
+    assert "btst_tier" in LEDGER_COLS
+    assert "btst_day_ret" in LEDGER_COLS
+
+
+def test_bug39_model_e_does_not_touch_the_live_scanner():
+    import inspect
+
+    import scan
+
+    src = inspect.getsource(scan)
+    for token in ("btst_only", "btst_top_n", "simulate_btst", "E_btst"):
+        assert token not in src, f"{token} leaked into scan.py"
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 40 - the end-of-day Telegram said HOW the models were doing but never
+#  WHICH stocks were actually taken.
+#
+#  User, 31-Jul: "send alert end of the day in which which stocks i tooks trade
+#  so i can confirm with the watchlist".
+#
+#  telegram_summary() reports aggregate standings (trades / win% / PF / avgR)
+#  per model. There was no way to reconcile the 08:45 watchlist against the
+#  positions the models actually entered, which is the whole point of running
+#  a watchlist. Added todays_trades_message() as a SEPARATE message - the two
+#  answer different questions and merging them made both unreadable.
+#
+#  Three things it must get right, all tested below:
+#    * NO_FILL is NOT a trade. It is a signal that could not be taken (price
+#      above capital, no candle after the signal). Listing it as a position
+#      would make the reconciliation wrong in the most confusing way - a name
+#      on the watchlist appearing as "taken" when nothing was bought.
+#    * an OPEN position is an instruction for tomorrow, not a result. It must
+#      show the STOP, not a P&L of 0.00%.
+#    * names that signalled but were not taken are still named, so a watchlist
+#      entry never just vanishes with no explanation.
+# --------------------------------------------------------------------------- #
+def _ledger_rows():
+    return [
+        dict(model="E_btst", symbol="YASHO", signal_date="2026-07-31",
+             entry=3858.7, qty=25, stop=3820.1, exit_date="", exit=0,
+             exit_reason="", bars_held=0, pnl_pct=0, btst_tier="A"),
+        dict(model="E_btst", symbol="NAZARA", signal_date="2026-07-31",
+             entry=317.1, qty=315, stop=313.9, exit_date="2026-08-01",
+             exit=326.0, exit_reason="TGT", bars_held=1, pnl_pct=2.59,
+             btst_tier="B"),
+        dict(model="E_btst_wide", symbol="YASHO", signal_date="2026-07-31",
+             entry=3858.7, qty=25, stop=3665.8, exit_date="", exit=0,
+             exit_reason="", bars_held=0, pnl_pct=0, btst_tier="A"),
+        dict(model="D_early", symbol="AETHER", signal_date="2026-07-31",
+             entry=1571.0, qty=63, stop=1461.0, exit_date="2026-08-01",
+             exit=1520.0, exit_reason="SL", bars_held=1, pnl_pct=-3.47,
+             btst_tier=""),
+        dict(model="D_early", symbol="NELCO", signal_date="2026-07-31",
+             entry=1013.0, qty=98, stop=942.1, exit_date="", exit=0,
+             exit_reason="NO_FILL", bars_held=0, pnl_pct=0, btst_tier=""),
+    ]
+
+
+def test_bug40_eod_message_names_every_stock_taken():
+    import pandas as pd
+
+    from ab_paper import load_models, todays_trades_message
+
+    _d, models = load_models()
+    msg = todays_trades_message(pd.DataFrame(_ledger_rows()), models)
+
+    for sym in ("YASHO", "NAZARA", "AETHER"):
+        assert sym in msg, f"{sym} was taken and must be listed"
+    # the model that took it must be identifiable
+    assert "E_btst" in msg and "D_early" in msg
+    # entry price and P&L must both be visible for a closed trade
+    assert "317.10" in msg and "+2.59%" in msg
+    assert "-3.47%" in msg
+
+
+def test_bug40_no_fill_is_not_reported_as_a_position():
+    """
+    The most dangerous confusion: a watchlist name showing as 'taken' when
+    nothing was actually bought.
+    """
+    import pandas as pd
+
+    from ab_paper import load_models, todays_trades_message
+
+    _d, models = load_models()
+    msg = todays_trades_message(pd.DataFrame(_ledger_rows()), models)
+
+    assert "4 position(s)" in msg, "NO_FILL must not be counted as a position"
+    # it is still NAMED, under a heading that says it was not taken
+    assert "not taken" in msg.lower()
+    assert "NELCO" in msg
+
+
+def test_bug40_open_positions_show_the_stop_not_a_fake_pnl():
+    import pandas as pd
+
+    from ab_paper import load_models, todays_trades_message
+
+    _d, models = load_models()
+    msg = todays_trades_message(pd.DataFrame(_ledger_rows()), models)
+
+    open_lines = [ln for ln in msg.splitlines() if "OPEN" in ln]
+    assert len(open_lines) == 2, open_lines
+    for ln in open_lines:
+        assert "SL" in ln, "an open position must carry its stop"
+        assert "+0.00%" not in ln, "an open position has no realised P&L"
+    # the two models' different stops must both be shown correctly
+    assert "3,820.10" in msg and "3,665.80" in msg
+
+
+def test_bug40_empty_and_all_nofill_days_are_handled():
+    import pandas as pd
+
+    from ab_paper import load_models, todays_trades_message
+
+    _d, models = load_models()
+    assert todays_trades_message(pd.DataFrame(), models) == ""
+
+    only_nofill = [r for r in _ledger_rows() if r["exit_reason"] == "NO_FILL"]
+    msg = todays_trades_message(pd.DataFrame(only_nofill), models)
+    assert "No positions taken today" in msg, msg
+
+
+def test_bug40_reports_the_latest_session_not_the_whole_ledger():
+    """A multi-day ledger must produce TODAY's positions, not every trade
+    ever recorded."""
+    import pandas as pd
+
+    from ab_paper import load_models, todays_trades_message
+
+    _d, models = load_models()
+    rows = _ledger_rows() + [
+        dict(model="E_btst", symbol="OLDNAME", signal_date="2026-07-20",
+             entry=100.0, qty=10, stop=99.0, exit_date="2026-07-21",
+             exit=103.0, exit_reason="TGT", bars_held=1, pnl_pct=2.8,
+             btst_tier="A")]
+    msg = todays_trades_message(pd.DataFrame(rows), models)
+    assert "OLDNAME" not in msg, "only the most recent session belongs here"
+    assert "2026-07-31" in msg
+
+    # and it can be pinned to a specific day
+    old = todays_trades_message(pd.DataFrame(rows), models, day="2026-07-20")
+    assert "OLDNAME" in old and "YASHO" not in old
+
+
+def test_bug40_both_telegram_paths_send_the_trade_list():
+    """--report-only and a live run must BOTH send it, or the 16:15 job would
+    be silent on the days it matters."""
+    import inspect
+
+    import ab_paper
+
+    src = inspect.getsource(ab_paper.main)
+    assert src.count("todays_trades_message") == 2, (
+        "both the --report-only path and the live path must send the list")
+    # and it must go out BEFORE the standings in each
+    for chunk in src.split("todays_trades_message")[1:]:
+        assert "telegram_summary" in chunk
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 41 - the BTST scan ran AFTER the close, which made it unusable.
+#
+#  User, 31-Jul: "this one should not nightly BTST scanner, it must be just
+#  right before end of the day btst.py so we can take able to take entry for
+#  the next day in advance btst".
+#
+#  I shipped it at 15:40 IST. That is ten minutes after the bell, so the only
+#  entry left is TOMORROW'S OPEN - which forfeits the overnight gap the entire
+#  model is built to capture. A correct design error, caught by the user.
+#
+#  MEASURED on 5-minute data (149 large caps, 8,047 stock-days), deciding the
+#  tier at a cutoff and entering at that same cutoff:
+#
+#      cutoff   tier precision   entry vs close   next-close (net)
+#      15:00        70.2%           -0.86%          +1.18%  t 2.2
+#      15:10        71.6%           -0.58%          +0.56%  t 1.0
+#      15:15        75.6%           -0.28%          +0.60%  t 1.2
+#      15:20        82.3%           -0.14%          +1.03%  t 2.2
+#      15:25       100.0%           -0.00%          +1.31%  t 2.7
+#
+#  Two findings. Precision climbs towards the bell because the candle stops
+#  changing. And the entry is CHEAPER earlier - these names close at their high
+#  so the last minutes drift up - which means moving the scan forward costs
+#  nothing on price and gains everything on executability.
+#
+#  15:20 chosen: 82% of flagged names still qualify at the close, the entry is
+#  0.14% below the close, and ten minutes is enough to act. 15:25 measures a
+#  shade better but five minutes is not a plan.
+#
+#  CONSEQUENCE: at 15:20 today's DAILY candle does not exist yet, so the tier
+#  must be judged on a partial candle assembled from 5-minute bars, with the
+#  volume benchmark pro-rated for the elapsed session. Both are tested here.
+# --------------------------------------------------------------------------- #
+def test_bug41_btst_workflow_runs_before_the_close():
+    import re
+
+    wf = (ROOT / ".github/workflows/btst.yml").read_text()
+    crons = re.findall(r'cron:\s*"([^"]+)"', wf)
+    assert crons, "the BTST workflow must be scheduled"
+    minute, hour = crons[0].split()[0], crons[0].split()[1]
+    utc_minutes = int(hour) * 60 + int(minute)
+    ist_minutes = utc_minutes + 5 * 60 + 30          # UTC -> IST
+    close = 15 * 60 + 30
+    assert ist_minutes < close, (
+        f"BTST runs at {ist_minutes//60:02d}:{ist_minutes%60:02d} IST, which is "
+        "AT OR AFTER the close - the entry would have to wait for tomorrow's "
+        "open and the overnight move is lost")
+    assert close - ist_minutes >= 8, (
+        "less than ~8 minutes before the bell leaves no time to place an order")
+    assert close - ist_minutes <= 35, (
+        "too early: the tier call is unreliable before ~15:15")
+
+
+def test_bug41_partial_candle_is_accepted_and_volume_prorated():
+    """
+    At 15:20 roughly 93% of the session has traded. Judging that volume against
+    a FULL-day average would understate rvol and silently reject good setups.
+    """
+    import pandas as pd
+
+    from btst import classify
+
+    def frame(vol_today, n=260, price=1000.0, base=500000.0):
+        rows = [dict(open=price * .995, high=price * 1.025, low=price * .975,
+                     close=price, volume=base) for _ in range(n - 1)]
+        # a Tier-B shaped day: closes at the high on heavy volume
+        rows.append(dict(open=price, high=price * 1.06, low=price * .999,
+                         close=price * 1.059, volume=vol_today))
+        return pd.DataFrame(rows)
+
+    # 2.8x a full day's average, but only 93% of the session has elapsed
+    df = frame(vol_today=500000.0 * 2.8)
+    full = classify(df, level=950.0, partial_frac=1.0)
+    part = classify(df, level=950.0, partial_frac=0.93)
+    assert part["rvol"] > full["rvol"], "a partial session must lift rvol"
+    assert part["tier"] == "B", part
+    assert part["partial_frac"] == 0.93
+
+    # a genuinely quiet day must still be rejected even when pro-rated
+    quiet = classify(frame(vol_today=500000.0 * 0.8), level=950.0,
+                     partial_frac=0.93)
+    assert quiet["tier"] is None, quiet
+
+
+def test_bug41_after_close_flag_exists_and_is_off_in_the_workflow():
+    """
+    --after-close is for a post-close review. The scheduled 15:20 job must NOT
+    use it, or it would skip every name whose candle is still forming, i.e.
+    all of them.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "--after-close" in body
+
+    wf = (ROOT / ".github/workflows/btst.yml").read_text()
+    run = wf.split("python btst.py", 1)[1].split("\n\n", 1)[0]
+    assert "inputs.after_close" in run, (
+        "after-close must be a manual input, not a hardcoded flag")
+    assert "'--after-close'" in run and "&&" in run, \
+        "it must be conditional on the input, defaulting off"
+
+
+def test_bug41_message_warns_the_candle_is_not_final():
+    """
+    82% precision means roughly one in five flagged names breaks down in the
+    last ten minutes. That has to be said, not buried.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "still forming" in body, "a partial pick must be labelled"
+    assert "82%" in body, "the measured precision must be stated to the user"
+
+
+def test_bug41_intraday_fetch_only_covers_today():
+    """The partial candle must be built from TODAY's bars only - pulling a
+    wider window would blend sessions into one fake candle."""
+    body = (ROOT / "btst.py").read_text()
+    assert "intraday_candles" in body
+    assert "dtime(9, 15)" in body, "the intraday window must start at the open"
+    assert "BARS_PER_SESSION = 75" in body

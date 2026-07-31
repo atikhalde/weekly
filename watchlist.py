@@ -368,6 +368,32 @@ PRE_MAX = 8
 BRK_MAX = 5
 
 
+def btst_ready(m: dict | None) -> bool:
+    """
+    Is this name capable of producing the YASHO shape if it breaks out?
+
+    NOT a prediction that it will. It is a capability check: the measured BTST
+    tiers require a wide-range close at the high on heavy volume, and a stock
+    whose average daily range is 1.5% essentially cannot print a +15% day.
+
+    Measured (5 years, 18,259 tradeable breakouts, entry at the breakout-day
+    close, exit next close, net): the BASELINE over all breakouts is +0.01%,
+    i.e. nothing. The edge lives entirely in high-ATR names that close hard at
+    the high, so flagging the capable ones in advance is the useful signal.
+    """
+    if not m:
+        return False
+    try:
+        atr = float(m.get("atr_pct") or 0)
+        r12 = float(m.get("ret_12m") or 0)
+        tight = float(m.get("base_tight") or 0)
+    except (TypeError, ValueError):
+        return False
+    if math.isnan(atr) or math.isnan(tight):
+        return False
+    return atr >= 4.0 and tight >= 4.0 and (math.isnan(r12) or r12 >= 25.0)
+
+
 def score_brk(daily: pd.DataFrame | None, level: float) -> tuple[int | None, list[str]]:
     """
     BRK score 0-5 for a name that has ALREADY broken out: how convincing was
@@ -504,7 +530,9 @@ def build_message(week: str, rows: list[dict], counts: dict,
         shown = watch[:top_n]
         lines += ["", f"👀 <b>CLOSEST TO BREAKOUT (top {len(shown)})</b>",
                   f"<i>within {near_pct:g}% · turnover ≥{MIN_TURNOVER_CR:g}Cr · "
-                  f"ATR ≥{MIN_ATR_PCT:g}% · ranked by PRE score</i>"]
+                  f"ATR ≥{MIN_ATR_PCT:g}% · ranked by PRE score</i>",
+                  "<i>🌙 = capable of a BTST-grade move (high ATR, lively, "
+                  "trending)</i>"]
         for r in shown:
             tag = r.get("which") or ""
             cap = r.get("mcap_cr")
@@ -516,6 +544,8 @@ def build_message(week: str, rows: list[dict], counts: dict,
             atr = r.get("atr_pct")
             if atr is not None and not (isinstance(atr, float) and math.isnan(atr)):
                 extra += f" <i>atr {atr:.1f}%</i>"
+            if r.get("btst_ready"):
+                extra += " 🌙"
             if not r.get("screened_ok", True):
                 extra += " <i>⚠unscreened</i>"
             lines.append(
@@ -697,6 +727,7 @@ def main() -> int:
             r["pre_score"] = ps if have else None
             r["pre_passed"] = ",".join(passed)
             r["pre_max"] = PRE_MAX
+            r["btst_ready"] = btst_ready(mm if have else None)
             bad = gate_reasons(mm if have else None, args.min_turnover,
                                args.min_px, args.min_atr)
             r["gate_failed"] = ",".join(bad)

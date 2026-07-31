@@ -103,6 +103,19 @@ class Strategy:
     drop_c09: bool = False
     bar_rvol_min: float = 0.0
 
+    # --- BTST day-character gate (Model E) -----------------------------------
+    # btst_only restricts a model to breakouts whose CANDLE matches a measured
+    # BTST tier - the YASHO shape. Buying every breakout close and selling the
+    # next close earns +0.01% (nothing); the edge is entirely in the character
+    # of the breakout day:
+    #     TIER A  day >= +15% and closed in the top 15% of range   +1.75%, t 5.2
+    #     TIER B  closed top 10% of range, rvol >= 3, atr >= 3%    +0.83%, t 5.0
+    # btst_top_n caps how many are taken per day, best first (Tier A, then the
+    # largest day move). Both are inert unless a model sets them, so the live
+    # scanner is unaffected.
+    btst_only: bool = False
+    btst_top_n: int = 0
+
     # --- Gate rows that MEASURED NEGATIVE at a multi-day horizon -------------
     # Both default to True (Pine behaviour, unchanged for the live scanner).
     # Model C turns them off because, over 3,166 breakouts with a 5-day hold,

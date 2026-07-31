@@ -109,6 +109,56 @@ strategy:
   rvol_lookback_sessions: 20
 
 
+  # --- c09 REMOVED FROM THE LIVE GATE (31-Jul-2026) ------------------------
+  # c09 is "weekly volume > 10-week average". Early in a week that volume
+  # simply has not traded yet, so the row cannot pass on merit - it passes only
+  # once the move itself creates the volume. The entry therefore arrives AFTER
+  # the move, which is the opposite of what a breakout signal is for.
+  #
+  # YASHO, 31-Jul-2026, is the case that settled it:
+  #     level 3262.80, opened 3258.90 (already at the level)
+  #     weekly volume:  Mon 0.08x  Tue 0.19x  Wed 0.51x  Fri 2.24x
+  #     c09 flipped true only at 12:20, price 3690.90  -> alerted 13.1% high
+  #     day high 3858.70. From the level +18.3%; from the alert +4.5%.
+  #     75% of the move was gone before the alert was sent.
+  #
+  # Measured point-in-time over 5 years, 18,259 tradeable breakouts, comparing
+  # the SAME trades entered early vs entered when the full gate allowed it:
+  #
+  #     hold        early (drop_c09)     gated (c09 on)     difference
+  #     next close      +0.45% t 12.7        +0.16% t  4.3       +0.30
+  #     2 days          +0.68% t 13.7        +0.09% t  1.8       +0.59
+  #     3 days          +0.96% t 16.5        +0.15% t  2.6       +0.81
+  #     5 days          +1.26% t 17.4        +0.36% t  5.0       +0.90
+  #
+  # And c09 never let 37% of breakouts through AT ALL that week - those are
+  # entries that simply never arrived. Of the ones it did allow, the median
+  # delay was 0 days but the mean chase was +0.95%, with 6.3% chased >=5%.
+  #
+  # Volume conviction is NOT abandoned: it moves to min_weekly_vol_x, which
+  # tests CLOSED weekly volume (a full week that actually traded) instead of a
+  # half-formed week, and to the breakout-day rvol used by the BTST tier.
+  drop_c09: true
+
+  # CHASE GUARD - TESTED AND REJECTED, left OFF deliberately.
+  #
+  # It seemed obvious that with c09 gone we should also refuse signals far
+  # above the level. Measured, it is wrong at every threshold - capping makes
+  # returns WORSE, not better:
+  #
+  #     cap    n/week    1d       3d       5d     5d OOS
+  #     off      70.9  +0.014   +0.078   +0.221   -0.125
+  #      3%      50.0  -0.089   -0.029   +0.103   -0.227
+  #      5%      60.8  -0.031   +0.035   +0.174   -0.175
+  #     10%      68.5  -0.010   +0.060   +0.215   -0.100
+  #
+  # The reason is the same one that made c03 measure negative: an extended
+  # breakout is a STRONG breakout. Cutting the extended ones removes the tail
+  # the strategy lives on - a 5% cap would have discarded 343 of the 417 Tier A
+  # BTST setups. Once c09 is off the entry is already near the cross, so the
+  # remaining "extension" is genuine strength, not lateness.
+  max_ext_above_level: 0.0
+
   gate_source: live       # "live"  = developing week, matches the table (Pine default)
                           # "closed" = last closed week, non-repainting
   defer_entry: true       # fire later in the week if the gate turns true after the cross

@@ -168,3 +168,120 @@ models:
       be_at_r: 1.0
       target_r: 3.0
       hold_days: 5
+
+  # ---------------------------------------------------------------------------
+  #  MODEL E - "BTST"   (user request, 31-Jul-2026)
+  #
+  #  Buy the breakout-day CLOSE on the top-5 BTST names, exit at the next close
+  #  if the trade is up more than 2%, otherwise carry it another day. Stop 1%.
+  #
+  #  D_early is UNTOUCHED and still runs alongside this.
+  #
+  #  ORIGIN. YASHO on 31-Jul closed +18.4% at the high of the day on 8x volume,
+  #  then continued. The user asked for a model that catches that shape
+  #  overnight instead of chasing it intraday.
+  #
+  #  WHAT THE MEASUREMENT SAYS - 1,130 top-5 BTST trades over 5 years, entry at
+  #  the breakout-day close, net of 0.22%, gap-aware stop fills:
+  #
+  #      stop     win%    mean     PF     t    days   SL hit
+  #      1%       26.5   +0.939   1.96   6.9   1.08    74%     <- as specified
+  #      2%       34.0   +0.774   1.52   5.2   1.26    66%
+  #      3%       41.2   +0.660   1.35   4.1   1.52    59%
+  #      5%       55.1   +0.861   1.37   4.6   2.29    44%
+  #      none     69.2   +0.915   1.31   3.6   5.08     0%
+  #
+  #  The 1% stop DOES measure best on the mean - the user's instinct is not
+  #  wrong. But read the rest of the row before accepting it:
+  #
+  #    * it is hit on 74% of trades, because a 1% stop on stocks with a 4.66%
+  #      median ATR is 0.21x ONE DAY'S RANGE. P(next-day low <= -1%) = 70%.
+  #      You are not stopping out on a thesis break, you are stopping out on
+  #      noise, three times out of four.
+  #    * win rate 26.5%, median trade -1.22%, and the longest losing streak in
+  #      the sample is 30 CONSECUTIVE TRADES. At 4-5 signals a week that is
+  #      six weeks of unbroken losses. Almost nobody keeps taking the signal.
+  #    * the whole edge is therefore in a 26% tail. Remove it and there is
+  #      nothing.
+  #    * SLIPPAGE. Because the stop fires 74% of the time, every basis point
+  #      of slippage is charged on 74% of trades:
+  #          slippage   1% stop    5% stop
+  #            0.00%    +0.939%    +0.861%
+  #            0.30%    +0.743%    +0.741%
+  #            0.75%    +0.449%    +0.561%
+  #      At realistic slippage the 1% stop's advantage is GONE and it is worse
+  #      than a 5% stop.
+  #    * GAPS. 7.5% of these names open below -1%. When they do, the average
+  #      fill is -2.03%, not -1.00%. The stop is not honoured on exactly the
+  #      days it is needed. This is simulated correctly (fill at the OPEN).
+  #    * OUT OF SAMPLE the ordering REVERSES:
+  #          1% stop   in-sample +1.036%  ->  out-of-sample +0.751%
+  #          5% stop   in-sample +0.892%  ->  out-of-sample +0.800%
+  #          plain 1d  in-sample +0.735%  ->  out-of-sample +1.020%
+  #      The 1% stop is the only one that got WORSE out of sample.
+  #
+  #  THE CARRY LEG. 48.8% of trades close day 1 negative and are carried. Those
+  #  carried losers average -3.10% at the day-2 close. Carrying losers while
+  #  cutting winners at +2% is the same asymmetry that was measured and
+  #  rejected in ASYMMETRIC_EXIT.md; at a 1-day horizon it is less damaging,
+  #  but it is not a source of edge. With a 1% stop most "carries" never
+  #  happen anyway - the stop fires first.
+  #
+  #  SHIPPED AS SPECIFIED. stop_pct 1.0 and take_pct 2.0 are exactly what was
+  #  asked for. E_btst_wide below runs the same signal with a 5% stop so the
+  #  two settle it on live forward data instead of on my backtest. Paper only.
+  # ---------------------------------------------------------------------------
+  E_btst:
+    label: "E · BTST (top-5, buy at close, 1% stop, exit >+2%)"
+    horizon: swing              # holds overnight - that is the whole point
+    hold_days: 5                # hard stop on carrying: 5 sessions
+    strategy:
+      strict_entry: true
+      drop_c09: true            # never wait for weekly volume - see config.yaml
+      gate_tolerance: 0
+      volume_mode: "off"
+      require_c03: false
+      require_c11: false
+      rvol_mode: "off"
+      bar_rvol_min: 0.0
+      min_atr_pct: 0.0
+      max_ext_above_level: 0.0  # measured NEGATIVE at every cap - do not add
+      min_weekly_vol_x: 0.0
+      one_per_week: true
+      # BTST day-character gate. Only breakouts matching the measured tiers
+      # are eligible; btst.py applies the identical test.
+      btst_only: true
+      btst_top_n: 5
+    exit:
+      rule: "btst"
+      stop_pct: 1.0             # AS SPECIFIED. See the slippage note above.
+      take_pct: 2.0             # exit on a close >= +2%
+      hold_days: 5
+
+  # Control arm. Identical signal and entry, only the stop differs. If the 1%
+  # stop is right this should lose to it on live data; the backtest says it
+  # wins once slippage is realistic, and it survives out of sample better.
+  E_btst_wide:
+    label: "E-wide · BTST control (same entry, 5% stop)"
+    horizon: swing
+    hold_days: 5
+    strategy:
+      strict_entry: true
+      drop_c09: true
+      gate_tolerance: 0
+      volume_mode: "off"
+      require_c03: false
+      require_c11: false
+      rvol_mode: "off"
+      bar_rvol_min: 0.0
+      min_atr_pct: 0.0
+      max_ext_above_level: 0.0
+      min_weekly_vol_x: 0.0
+      one_per_week: true
+      btst_only: true
+      btst_top_n: 5
+    exit:
+      rule: "btst"
+      stop_pct: 5.0
+      take_pct: 2.0
+      hold_days: 5

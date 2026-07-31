@@ -24,6 +24,7 @@ so running it daily builds a week of evidence without double-counting.
 from __future__ import annotations
 
 import argparse
+import collections
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, time as dtime, timedelta
@@ -357,6 +358,144 @@ def simulate_swing(sig, daily_after: pd.DataFrame, capital: float,
     return t
 
 
+def _atr_pct(daily: pd.DataFrame, length: int = 14) -> float:
+    """ATR over `length` daily bars as a percent of the last close."""
+    if daily is None or len(daily) < 2:
+        return 0.0
+    h = daily["high"].to_numpy(float); lo = daily["low"].to_numpy(float)
+    c = daily["close"].to_numpy(float)
+    pc = np.roll(c, 1); pc[0] = c[0]
+    tr = np.maximum(h - lo, np.maximum(np.abs(h - pc), np.abs(lo - pc)))
+    last = c[-1]
+    return float(np.mean(tr[-length:]) / last * 100.0) if last > 0 else 0.0
+
+
+def btst_tier_for(day_bar, prev_bars, atr_pct: float) -> str | None:
+    """
+    Which BTST tier (if any) the breakout DAY qualifies for.
+
+    Delegates the thresholds to btst.py so the paper model and the nightly
+    scanner cannot drift apart - a regression test asserts they agree.
+    """
+    import btst as _b
+
+    o = float(day_bar["open"]); h = float(day_bar["high"])
+    lo = float(day_bar["low"]); c = float(day_bar["close"])
+    v = float(day_bar.get("volume", 0.0) or 0.0)
+    if c <= 0 or o <= 0:
+        return None
+    rng = h - lo
+    day_ret = (c / o - 1.0) * 100.0
+    close_pos = ((c - lo) / rng) if rng > 0 else 0.5
+    vma = float(prev_bars["volume"].tail(50).mean()) if len(prev_bars) else 0.0
+    rvol = (v / vma) if vma > 0 else 0.0
+
+    if day_ret >= _b.TIER_A_DAY and close_pos >= _b.TIER_A_CLOSE_POS:
+        return "A"
+    if (close_pos >= _b.TIER_B_CLOSE_POS and rvol >= _b.TIER_B_RVOL
+            and atr_pct >= _b.TIER_B_ATR):
+        return "B"
+    return None
+
+
+def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
+                  exit_rule: dict, hold_days: int = 10,
+                  cost_round_trip: float = COST_ROUND_TRIP) -> PaperTrade:
+    """
+    BTST: buy the breakout-day CLOSE, decide again at every following close.
+
+        stop      : `stop_pct` below entry, checked intraday, GAP AWARE -
+                    when the day opens below the stop the fill is the OPEN,
+                    not the stop, because that is what actually happens
+        take      : exit at a close >= entry * (1 + take_pct/100)
+        carry     : any other close -> hold another day
+        time exit : `hold_days` sessions
+
+    Pessimistic intrabar ordering: if a day's low breaches the stop AND its
+    close clears the target, the STOP is taken. Daily bars cannot tell us which
+    came first, so the unfavourable branch is the honest one.
+    """
+    entry = float(sig.price)
+    sig_d, sig_t = _stamp(sig.bar_time)
+
+    stop_pct = float(exit_rule.get("stop_pct", 5.0) or 5.0)
+    take_pct = float(exit_rule.get("take_pct", 2.0) or 2.0)
+    hold = int(exit_rule.get("hold_days", hold_days) or hold_days)
+
+    stop = entry * (1.0 - stop_pct / 100.0)
+    risk = entry - stop
+    target = entry * (1.0 + take_pct / 100.0)
+
+    t = PaperTrade(
+        symbol=sig.symbol, week=sig.week_start,
+        signal_date=sig_d, signal_time=sig_t, signal_close=entry,
+        entry_date=sig_d, entry_time="close", entry=entry,
+        qty=0, invested=0.0, bar_low=float(getattr(sig, "bar_low", 0.0) or 0.0),
+        stop=stop, level_26w=float(sig.entry_level),
+        level_52w=float(sig.level_52), trigger=sig.trigger,
+        rsi=float(sig.evaluation.values.get("rsi", float("nan"))),
+        macd_hist=float(sig.evaluation.values.get("macd_hist", float("nan"))),
+    )
+    if daily_after.empty or risk <= 0:
+        t.exit_reason = "NO_FILL"
+        t.exit_note = "no daily candle after the signal"
+        return t
+    qty = int(capital // entry) if entry > 0 else 0
+    if qty <= 0:
+        t.exit_reason = "NO_FILL"
+        t.exit_note = f"price {entry:,.2f} above capital"
+        return t
+    t.qty = qty
+    t.invested = qty * entry
+
+    hi = lo = entry
+    done = False
+    for i, (_, bar) in enumerate(daily_after.head(hold).iterrows(), start=1):
+        o = float(bar["open"]); high = float(bar["high"])
+        low = float(bar["low"]); close = float(bar["close"])
+        d, _tm = _stamp(bar["datetime"])
+        hi, lo = max(hi, high), min(lo, low)
+
+        if low <= stop:                       # stop wins ties
+            gapped = o <= stop
+            t.exit = o if gapped else stop
+            if gapped:
+                t.exit_note = f"gapped through the stop, filled {o:,.2f}"
+            t.exit_reason = "SL"
+            t.bars_held = i
+            t.exit_date, t.exit_time = d, "close"
+            done = True
+            break
+        if close >= target:
+            t.exit = close
+            t.exit_reason = "TGT"
+            t.exit_note = f"closed >= +{take_pct:g}%"
+            t.bars_held = i
+            t.exit_date, t.exit_time = d, "close"
+            done = True
+            break
+        # otherwise: carry to the next session
+
+    if not done:
+        seg = daily_after.head(hold)
+        last = seg.iloc[-1]
+        t.exit = float(last["close"])
+        t.exit_reason = "TIME"
+        t.exit_note = f"{len(seg)}-day time exit"
+        t.bars_held = len(seg)
+        t.exit_date, t.exit_time = _stamp(last["datetime"])[0], "close"
+
+    t.gross_pnl = (t.exit - entry) * qty
+    turnover = (entry + t.exit) * qty
+    t.costs = turnover * (cost_round_trip / 100.0) / 2.0
+    t.pnl = t.gross_pnl - t.costs
+    t.pnl_pct = (t.exit / entry - 1.0) * 100.0 - cost_round_trip
+    t.mfe_pct = (hi / entry - 1.0) * 100.0
+    t.mae_pct = (lo / entry - 1.0) * 100.0
+    t.r_multiple = (t.exit - entry) / risk
+    return t
+
+
 # --------------------------------------------------------------------------- #
 #  Ledger
 # --------------------------------------------------------------------------- #
@@ -365,7 +504,9 @@ LEDGER_COLS = ["model", "model_label", "horizon", "symbol", "week", "signal_date
                "bar_low", "stop", "level_26w", "trigger", "rsi", "macd_hist",
                "exit_date", "exit_time", "exit", "exit_reason", "exit_note",
                "bars_held", "gross_pnl", "costs", "pnl", "pnl_pct",
-               "r_multiple", "mfe_pct", "mae_pct"]
+               "r_multiple", "mfe_pct", "mae_pct",
+               # BTST (Model E) only; blank for every other model
+               "btst_tier", "btst_day_ret"]
 
 
 def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int]:
@@ -524,6 +665,84 @@ def print_report(ledger: pd.DataFrame, models: list[Model]) -> None:
 # --------------------------------------------------------------------------- #
 #  Main
 # --------------------------------------------------------------------------- #
+def todays_trades_message(ledger: pd.DataFrame, models: list[Model],
+                          day: str | None = None) -> str:
+    """
+    Per-symbol list of the positions each model took TODAY, so the morning
+    watchlist can be reconciled against what actually happened.
+
+    The standings message answers "is the model working"; this one answers
+    "which stocks am I actually in". They are different questions and mixing
+    them into one block made the second impossible to read.
+
+    Positions still OPEN are listed separately from those already closed,
+    because for a BTST or swing model an open position is an instruction for
+    tomorrow, not a result.
+    """
+    from telegram import _esc, _fmt
+
+    if ledger is None or ledger.empty:
+        return ""
+    led = ledger.copy()
+    led["signal_date"] = led["signal_date"].astype(str)
+    if day is None:
+        day = max(led["signal_date"])
+    today = led[led["signal_date"] == day]
+    # NO_FILL is not a trade - it is a signal that could not be taken.
+    taken = today[today["exit_reason"].astype(str) != "NO_FILL"]
+    if taken.empty:
+        return (f"📒 <b>Trades taken — {day}</b>\n\n"
+                f"<i>No positions taken today.</i>")
+
+    order = [m.key for m in models]
+    lines = [f"📒 <b>Trades taken — {day}</b>",
+             f"<i>{len(taken)} position(s) across "
+             f"{taken['model'].nunique()} model(s)</i>", ""]
+
+    for key in order:
+        grp = taken[taken["model"] == key]
+        if grp.empty:
+            continue
+        lines.append(f"<b>{key}</b>")
+        for r in grp.sort_values("symbol").itertuples():
+            sym = _esc(str(r.symbol))
+            entry = float(getattr(r, "entry", 0) or 0)
+            qty = int(getattr(r, "qty", 0) or 0)
+            reason = str(getattr(r, "exit_reason", "") or "")
+            # A position whose exit date is not today is still open.
+            exit_date = str(getattr(r, "exit_date", "") or "")
+            still_open = reason in ("", "nan", "OPEN") or (
+                exit_date in ("", "nan", "None"))
+            tier = str(getattr(r, "btst_tier", "") or "")
+            tag = f" <i>[{tier}]</i>" if tier and tier != "nan" else ""
+
+            if still_open:
+                stop = float(getattr(r, "stop", 0) or 0)
+                lines.append(
+                    f"  🟡 <b>{sym}</b>{tag} · bought <b>{_fmt(entry)}</b> "
+                    f"× {qty} · SL <code>{_fmt(stop)}</code> · <b>OPEN</b>")
+            else:
+                pnl = float(getattr(r, "pnl_pct", 0) or 0)
+                exitp = float(getattr(r, "exit", 0) or 0)
+                icon = "🟢" if pnl > 0 else ("🔴" if pnl < 0 else "⚪")
+                held = int(getattr(r, "bars_held", 0) or 0)
+                lines.append(
+                    f"  {icon} <b>{sym}</b>{tag} · {_fmt(entry)} → "
+                    f"{_fmt(exitp)} · <b>{pnl:+.2f}%</b> · {reason}"
+                    + (f" · {held}d" if held > 1 else ""))
+        lines.append("")
+
+    # anything that signalled but could NOT be taken - the watchlist will show
+    # these names, so say plainly why they are absent from the list above
+    nofill = today[today["exit_reason"].astype(str) == "NO_FILL"]
+    if not nofill.empty:
+        names = ", ".join(sorted({_esc(str(x)) for x in nofill["symbol"]}))
+        lines.append(f"<i>signalled but not taken ({nofill['symbol'].nunique()}): "
+                     f"{names}</i>")
+    lines.append("<i>Paper only. No orders are placed.</i>")
+    return "\n".join(lines)
+
+
 def telegram_summary(ledger: pd.DataFrame, models: list[Model]) -> str:
     """Compact HTML standings for Telegram."""
     if ledger.empty:
@@ -605,6 +824,7 @@ def main() -> int:
         led = pd.read_csv(ledger_path)
         print_report(led, models)
         if args.telegram:
+            _send_telegram(todays_trades_message(led, models))
             _send_telegram(telegram_summary(led, models))
         return 0
 
@@ -634,7 +854,12 @@ def main() -> int:
     print(f"\n  capital Rs {capital:,.0f}/trade · square-off {square_off} · "
           f"costs {cost:.2f}% round trip")
     for m in models:
-        if m.is_swing:
+        if m.is_swing and str(m.exit.get("rule", "")).lower() == "btst":
+            print(f"  {m.key:10} BTST · buy at close · "
+                  f"{m.exit.get('stop_pct', 5.0):.1f}% stop · "
+                  f"exit on a close >= +{m.exit.get('take_pct', 2.0):.1f}% · "
+                  f"else carry (max {m.hold_days}d)")
+        elif m.is_swing:
             print(f"  {m.key:10} SWING · {m.hold_days}d hold · "
                   f"{m.exit.get('stop_pct', 7.0):.1f}% stop (no square-off)")
         else:
@@ -732,8 +957,30 @@ def main() -> int:
                                 # from the session AFTER the breakout day.
                                 sig_day = pd.Timestamp(sig.bar_time).normalize().tz_localize(None)
                                 dafter = d[d["_day"] > sig_day]
-                                tr = simulate_swing(sig, dafter, capital,
-                                                    m.exit, m.hold_days, cost)
+                                if str(m.exit.get("rule", "")).lower() == "btst":
+                                    # BTST enters at the breakout-day CLOSE, so
+                                    # the signal price is that close, not the
+                                    # 5m bar that happened to trigger.
+                                    day_row = d[d["_day"] == sig_day]
+                                    if day_row.empty:
+                                        continue
+                                    sig.price = float(day_row.iloc[-1]["close"])
+                                    if m.strategy.get("btst_only"):
+                                        prior = d[d["_day"] < sig_day]
+                                        atrp = _atr_pct(prior)
+                                        tier = btst_tier_for(day_row.iloc[-1],
+                                                             prior, atrp)
+                                        if tier is None:
+                                            continue
+                                        sig.btst_tier = tier
+                                        sig.btst_day_ret = (
+                                            float(day_row.iloc[-1]["close"])
+                                            / float(day_row.iloc[-1]["open"]) - 1) * 100
+                                    tr = simulate_btst(sig, dafter, capital,
+                                                       m.exit, m.hold_days, cost)
+                                else:
+                                    tr = simulate_swing(sig, dafter, capital,
+                                                        m.exit, m.hold_days, cost)
                             else:
                                 ts = pd.to_datetime(five["datetime"])
                                 after = five[ts > pd.Timestamp(sig.bar_time)]
@@ -744,6 +991,9 @@ def main() -> int:
                             rec["model"] = m.key
                             rec["model_label"] = m.label
                             rec["horizon"] = m.horizon
+                            # carried through so the top-N cap can rank on it
+                            rec["btst_tier"] = getattr(sig, "btst_tier", None)
+                            rec["btst_day_ret"] = getattr(sig, "btst_day_ret", None)
                             rows.append(rec)
                             per_model_counts[m.key] += 1
                             if tr.exit_date:
@@ -763,6 +1013,37 @@ def main() -> int:
         if len(symbols) > 25 and n % 25 == 0:
             print(f"  ...{n}/{len(symbols)}  {len(rows)} trades so far")
 
+    # ---- BTST top-N cap ----------------------------------------------------
+    # Model E takes only the best N setups per DAY, which is what a human with
+    # finite capital would actually do. Ranking: Tier A before Tier B, then the
+    # largest breakout-day move. Applied here rather than at signal time
+    # because it needs the whole day's candidates, which only exist once every
+    # symbol has been walked.
+    capped = []
+    by_model_day: dict[tuple, list] = {}
+    for rec in rows:
+        mk = rec.get("model")
+        mdl = next((mm for mm in models if mm.key == mk), None)
+        top_n = int((mdl.strategy.get("btst_top_n") or 0) if mdl else 0)
+        if top_n <= 0:
+            capped.append(rec)
+            continue
+        by_model_day.setdefault((mk, rec.get("signal_date")), []).append(rec)
+    for (mk, day), group in by_model_day.items():
+        mdl = next((mm for mm in models if mm.key == mk), None)
+        top_n = int(mdl.strategy.get("btst_top_n") or 0)
+        group.sort(key=lambda r: (0 if r.get("btst_tier") == "A" else 1,
+                                  -float(r.get("btst_day_ret") or 0.0)))
+        kept = group[:top_n]
+        capped.extend(kept)
+        dropped = len(group) - len(kept)
+        if dropped:
+            print(f"  {mk}: {day} had {len(group)} candidates, kept top {len(kept)}")
+    if len(capped) != len(rows):
+        print(f"  BTST top-N cap: {len(rows)} -> {len(capped)} trade(s)")
+    rows = capped
+    per_model_counts = collections.Counter(r["model"] for r in rows)
+
     for k, v in per_model_counts.items():
         print(f"  {k}: {v} trade(s) this run")
 
@@ -773,6 +1054,9 @@ def main() -> int:
         led = pd.read_csv(ledger_path)
         print_report(led, models)
         if args.telegram:
+            # WHAT was taken first, then HOW the models are doing. Two
+            # messages, because they answer different questions.
+            _send_telegram(todays_trades_message(led, models))
             _send_telegram(telegram_summary(led, models))
     return 0
 
