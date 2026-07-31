@@ -5173,11 +5173,16 @@ def test_bug43_btst_only_accepts_breakouts_dated_today():
     import re
     hits = re.findall(r"(not\s+)?state\.already_alerted\(week_s, s\.symbol\)",
                       body)
-    assert hits, "the anticipation pool still needs already_alerted"
+    # BUG 47 removed the anticipation pool's use of already_alerted entirely -
+    # it now screens BOTH sides of the level and excludes only names that fired
+    # TODAY. So either there are no call sites left, or any that remain are
+    # negated. A BARE week-wide selection must never come back.
     for neg in hits:
         assert neg and neg.strip() == "not", (
             "bare week-wide selection found - the BTST pool must filter on "
             "the alert DATE, not merely 'fired sometime this week'")
+    assert "fired_today" in body, (
+        "the anticipation pool must exclude only TODAY's breakouts")
 
 
 def test_bug43_stale_names_are_counted_and_explained():
@@ -5295,18 +5300,32 @@ def test_bug44_requires_a_close_at_the_top_of_range(monkeypatch):
     assert "close_pos" in m2["reject"]
 
 
-def test_bug44_rejects_names_already_above_the_level():
-    """QUESS and BLSE were already ABOVE their level on 30-Jul. A name that has
-    broken out cannot be anticipated."""
-    import pandas as pd
-
+def test_bug44_above_level_names_are_now_scanned(monkeypatch):
+    """
+    SUPERSEDED BY BUG 47. This used to assert that a name already ABOVE its
+    level was rejected. That was wrong and it discarded the better half:
+    same filter, 5 years, below +0.580% (n=2,229) vs above +0.819% (n=4,657).
+    A name above its level is now accepted and tagged side="above", up to
+    ANTICIPATE_ABOVE_MAX; beyond that it is a chase and still rejected.
+    """
+    import btst
     from btst import classify_approach
 
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+
     df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.5)
-    # push the last close above the level
     df.loc[df.index[-1], "close"] = lvl * 1.02
     df.loc[df.index[-1], "high"] = lvl * 1.03
-    assert classify_approach(df, lvl, lvl) is None
+    m = classify_approach(df, lvl, lvl)
+    assert m is not None, "an above-level name must no longer be discarded"
+    assert m["side"] == "above"
+    assert m["gap_pct"] < 0, "gap is negative when extended above the level"
+
+    # but a runaway extension is still refused
+    df2, lvl2 = _approach_frame(close_pos=0.97, gap_pct=1.5)
+    df2.loc[df2.index[-1], "close"] = lvl2 * 1.25
+    df2.loc[df2.index[-1], "high"] = lvl2 * 1.26
+    assert classify_approach(df2, lvl2, lvl2) is None, "25% above is a chase"
 
 
 def test_bug44_respects_the_distance_window_and_tradeability():
@@ -5598,3 +5617,138 @@ def test_bug46_weighted_variants_were_rejected_on_evidence():
     body = (ROOT / "test_regressions.py").read_text()
     for token in ("WEIGHTED 10", "+0.28", "GATED 8", "flat"):
         assert token in body, f"the rejected designs must stay documented: {token}"
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 47 - two changes from the final review, 01-Aug-2026.
+#
+#  (a) MODEL F WAS SCANNING THE WORSE HALF.
+#      classify_approach() returned None for any name already trading ABOVE
+#      its level - "not our trade". Measured on the same filter
+#      (close_pos>=0.90 & ret_12m>=40), 5 years, net of costs:
+#
+#          side of level      n       win%     net       OOS
+#          BELOW  (scanned)   2,229    50.8%   +0.580%   +0.569%
+#          ABOVE  (discarded) 4,657    54.7%   +0.819%   +0.776%
+#
+#      Twice the sample, better return, and it holds out of sample. The 31-Jul
+#      movers said the same thing from the other direction: 13 of 19 had
+#      ALREADY broken out at the prior close and only 3 sat in the sub-3%
+#      window this scan required.
+#
+#      Both sides are now scanned and tagged `side`, so they stay separable
+#      forever. A runaway extension is still refused (ANTICIPATE_ABOVE_MAX).
+#
+#  (b) THE 08:45 LIST WAS OVERSOLD.
+#      Its measured ceiling is +0.094% out of sample. The strongest factor in
+#      the whole study - close_pos - cannot be computed at 08:45 because the
+#      candle has not formed. On 30-Jul the top 15 spanned 55x in price and
+#      33x in market cap and ZERO met close_pos>=0.90; of the next day's 19
+#      big movers exactly ONE was on the list.
+#
+#      It is now titled "Shortlist", capped at 8, and states in the message
+#      that it is a narrowing pass rather than a signal. This is a HONESTY
+#      fix, not a performance one - it stops the morning list implying a
+#      precision the data does not support.
+# --------------------------------------------------------------------------- #
+def test_bug47_above_level_names_are_scanned_and_tagged(monkeypatch):
+    import btst
+    from btst import classify_approach
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+
+    # below the level -> tagged "below", positive gap
+    df, lvl = _approach_frame(close_pos=0.96, gap_pct=1.2)
+    below = classify_approach(df, lvl, lvl)
+    assert below["side"] == "below" and below["gap_pct"] > 0
+
+    # above the level -> tagged "above", negative gap, still accepted
+    df2, lvl2 = _approach_frame(close_pos=0.96, gap_pct=1.2)
+    df2.loc[df2.index[-1], "close"] = lvl2 * 1.03
+    df2.loc[df2.index[-1], "high"] = lvl2 * 1.04
+    above = classify_approach(df2, lvl2, lvl2)
+    assert above is not None and above["side"] == "above"
+    assert above["gap_pct"] < 0
+
+
+def test_bug47_extension_cap_still_refuses_a_chase(monkeypatch):
+    import btst
+    from btst import classify_approach
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    assert btst.ANTICIPATE_ABOVE_MAX == 10.0
+
+    df, lvl = _approach_frame(close_pos=0.96, gap_pct=1.0)
+    df.loc[df.index[-1], "close"] = lvl * 1.30
+    df.loc[df.index[-1], "high"] = lvl * 1.31
+    assert classify_approach(df, lvl, lvl) is None
+
+
+def test_bug47_close_pos_still_gates_both_sides(monkeypatch):
+    """Extending the pool must not weaken the filter that IS the edge."""
+    import btst
+    from btst import classify_approach
+
+    import pandas as pd
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+
+    def frame(close_pos, mult, n=260, price=1000.0, base=5e5):
+        """Build the last candle directly so close_pos is exactly as asked -
+        overriding `close` on a prebuilt frame silently changes the range."""
+        lvl = price
+        c = lvl * mult
+        rng = c * 0.06
+        low = c - rng * close_pos
+        high = low + rng
+        rows = [dict(open=price * .995, high=price * 1.02, low=price * .98,
+                     close=price, volume=base) for _ in range(n - 1)]
+        rows.append(dict(open=(low + high) / 2, high=high, low=low,
+                         close=c, volume=base * 1.5))
+        return pd.DataFrame(rows), lvl
+
+    for mult, side in ((0.985, "below"), (1.03, "above")):
+        df, lvl = frame(0.40, mult)
+        m = classify_approach(df, lvl, lvl)
+        assert m is not None, f"{side}: should be classified, then refused"
+        assert m["ok"] is False, f"{side}: a weak close must still be refused"
+        # and the same candle closing at the high must pass on BOTH sides
+        df2, lvl2 = frame(0.96, mult)
+        m2 = classify_approach(df2, lvl2, lvl2)
+        assert m2 is not None and m2["ok"] is True, f"{side}: strong close"
+
+
+def test_bug47_above_level_ranks_before_below():
+    """It measured better (+0.819% vs +0.580%), so it must sort first."""
+    body = (ROOT / "btst.py").read_text()
+    chunk = body.split("aq = [r for r in ant_rows", 1)[1][:600]
+    assert '"above"' in chunk and "sort" in chunk, chunk[:300]
+    assert "+0.819" in body and "+0.580" in body, (
+        "btst.py must record the measurement behind the ordering")
+
+
+def test_bug47_anticipation_pool_covers_both_sides():
+    body = (ROOT / "btst.py").read_text()
+    assert "fired_today" in body
+    assert "both sides of the" in body
+
+
+def test_bug47_shortlist_is_labelled_honestly():
+    body = (ROOT / "watchlist.py").read_text()
+    assert "NARROWING PASS" in body, "the docstring must say what this is"
+    assert "+0.09" in body, "the measured ceiling must be stated"
+    from watchlist import TOP_N
+    assert TOP_N == 8, "ranking beyond ~8 is noise"
+
+
+def test_bug47_shortlist_message_warns_it_is_not_a_signal():
+    from watchlist import build_message
+
+    rows = [dict(symbol="AAA", ltp=99.0, level=100.0, which="C", mcap_cr=5000.0,
+                 pre_score=7, pre_max=8, ret_12m=120.0, atr_pct=4.5,
+                 pct=-1.0, gap=1.0, bucket="WATCH", screened_ok=True)]
+    msg = build_message("2026-07-27", rows,
+                        {"universe": 2, "eligible": 2, "capped": 2}, 3.0)
+    assert "Shortlist" in msg
+    assert "15:20" in msg, "it must point at where decisions are made"
+    assert "not a signal" in msg.lower()

@@ -153,7 +153,8 @@ PICKS_FILE = "btst_picks.csv"
 #  Per trade the confirmation tiers are ~2.5x better (+1.74% Tier A vs +0.69%).
 #  This exists to cover the days the tiers are silent, not to replace them.
 # --------------------------------------------------------------------------- #
-ANTICIPATE_NEAR = 3.0        # max % below the level
+ANTICIPATE_NEAR = 3.0        # max % BELOW the level
+ANTICIPATE_ABOVE_MAX = 10.0  # max % ABOVE the level before it is a chase
 ANTICIPATE_CLOSE_POS = 0.90  # must finish at the top of its own range
 ANTICIPATE_TOP_N = 5
 ANTICIPATE_FILE = "anticipate_picks.csv"
@@ -311,17 +312,41 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
     if c <= 0 or o <= 0:
         return None
 
+    # ---- WHICH LEVEL, AND WHICH SIDE OF IT ---------------------------------
+    # Until 01-Aug-2026 this returned None for anything already trading ABOVE
+    # its level - "not our trade". That was wrong, and it was throwing away the
+    # BETTER half. Same filter (close_pos>=0.90 & ret_12m>=40), 5 years:
+    #
+    #     side of the level        n      win%     net      OOS
+    #     BELOW  (scanned)      2,229     50.8%   +0.580%  +0.569%
+    #     ABOVE  (discarded)    4,657     54.7%   +0.819%  +0.776%
+    #
+    # Twice the sample and a better return. It also matches what the 31-Jul
+    # movers showed: 13 of 19 had ALREADY broken out at the prior close, and
+    # only 3 were sitting in the sub-3% window this scan used to require.
+    #
+    # A name above its level is still an ANTICIPATION trade in the sense that
+    # matters - the entry is at today's close and the move is tomorrow's. The
+    # `side` field records which, so the two can be measured apart forever.
     cand = [x for x in (level_c, level_d) if x and x > 0]
     if not cand:
         return None
     above = [x for x in cand if c <= x]
-    if not above:
-        return None                      # already broken out - not our trade
-    level = min(above)
-    which = "C+D" if level_c == level_d else ("D" if level == level_d else "C")
-    gap = (level - c) / level * 100.0
-    if not (0.0 <= gap <= ANTICIPATE_NEAR):
-        return None
+    if above:
+        level = min(above)
+        side = "below"
+        gap = (level - c) / level * 100.0
+        if gap > ANTICIPATE_NEAR:
+            return None                  # too far away to be actionable
+    else:
+        # trading above BOTH levels: judge it against the higher one
+        level = max(cand)
+        side = "above"
+        gap = (level - c) / level * 100.0        # negative = extension
+        if -gap > ANTICIPATE_ABOVE_MAX:
+            return None                  # too extended, it is a chase
+    which = "C+D" if level_c == level_d else (
+        "D" if level == level_d else "C")
 
     prev = d.iloc[:-1]
     vma = float(prev["volume"].tail(50).mean()) if "volume" in d else 0.0
@@ -338,7 +363,8 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
         if "volume" in d else 0.0
 
     pre, _ = _pre_score_from_daily(d, level, c)
-    m = dict(symbol="", close=c, level=level, which=which, gap_pct=gap, pre=pre,
+    m = dict(symbol="", close=c, level=level, which=which, gap_pct=gap,
+             side=side, pre=pre,
              day_ret=(c / o - 1) * 100.0,
              close_pos=((c - lo) / rng) if rng > 0 else 0.5,
              rvol=(v / vma_cmp) if vma_cmp > 0 else float("nan"),
@@ -583,9 +609,15 @@ def main() -> int:
     # broke out cannot be anticipated.
     ant_rows, ant_picks, ant_dropped = [], [], 0
     if not args.no_anticipate:
-        pending = [s for s in snaps if not state.already_alerted(week_s, s.symbol)]
-        log.info("anticipation: screening %d name(s) not yet fired ...",
-                 len(pending))
+        # The pool is now the WHOLE snapshot, not just names that have never
+        # fired. Excluding alerted names would discard exactly the above-level
+        # half that measured better (+0.819% vs +0.580%). Names that broke out
+        # TODAY are still excluded - those belong to the CONFIRMED list above
+        # and must not appear twice.
+        fired_today = {x.symbol for x in fired}
+        pending = [s for s in snaps if s.symbol not in fired_today]
+        log.info("anticipation: screening %d name(s) (both sides of the "
+                 "level) ...", len(pending))
 
         def one_ant(s):
             df, frac = candle(s)
@@ -603,8 +635,10 @@ def main() -> int:
                 ant_rows.append(m)
 
         aq = [r for r in ant_rows if r.get("ok")]
-        # nearest to its level first - it needs the smallest move to trigger
-        aq.sort(key=lambda r: r["gap_pct"])
+        # ABOVE-level names first - measured +0.819% vs +0.580% for below -
+        # then, within each side, nearest to the level.
+        aq.sort(key=lambda r: (0 if r.get("side") == "above" else 1,
+                               abs(r["gap_pct"])))
         ant_picks = aq[:ANTICIPATE_TOP_N]
         for i, r in enumerate(ant_picks, start=1):
             r["rank"] = i
@@ -620,6 +654,7 @@ def main() -> int:
                 "pre": int(r.get("pre", 0)),
                 "level": round(float(r["level"]), 2), "which": r["which"],
                 "gap_pct": round(float(r["gap_pct"]), 2),
+                "side": r.get("side", "below"),
                 "close_pos": round(float(r["close_pos"]), 3),
                 "day_ret": round(float(r["day_ret"]), 2),
                 "rvol": round(float(r.get("rvol") or 0), 2),
@@ -682,8 +717,9 @@ def main() -> int:
     if not args.no_anticipate:
         lines += ["", "━━━━━━━━━━━━━━━━━━━━",
                   f"🔭 <b>ANTICIPATE — about to break out</b>",
-                  f"<i>within {ANTICIPATE_NEAR:g}% of the level · closed in the "
-                  f"top {int((1-ANTICIPATE_CLOSE_POS)*100)}% of today's range · "
+                  f"<i>🚀 above the level (to +{ANTICIPATE_ABOVE_MAX:g}%) or "
+                  f"🔭 within {ANTICIPATE_NEAR:g}% below · closed in the top "
+                  f"{int((1-ANTICIPATE_CLOSE_POS)*100)}% of today's range · "
                   f"PRE ≥{MIN_PRE_CONFIRM} · {len(ant_rows)} screened</i>", ""]
         if not ant_picks:
             lines.append("<i>Nothing qualified. Normal — this fires ~5x a "
@@ -693,11 +729,16 @@ def main() -> int:
             prov = " <i>(forming)</i>" if float(
                 r.get("partial_frac", 1.0)) < 0.999 else ""
             lines += [
-                f"<b>#{r['rank']}</b> 🔭 <b>{r.get('pre', 0)}/8</b> "
+                f"<b>#{r['rank']}</b> "
+                f"{'🚀' if r.get('side') == 'above' else '🔭'} "
+                f"<b>{r.get('pre', 0)}/8</b> "
                 f"<b>{_esc(r['symbol'])}</b>  {_fmt(r['close'])}{cap}{prov}",
-                f"    <b>{r['gap_pct']:.2f}%</b> below the {r['which']} level "
-                f"<code>{_fmt(r['level'])}</code> · closed at "
-                f"<b>{r['close_pos']*100:.0f}%</b> of range · "
+                (f"    <b>{abs(r['gap_pct']):.2f}% above</b> the {r['which']} "
+                 f"level <code>{_fmt(r['level'])}</code>"
+                 if r.get("side") == "above" else
+                 f"    <b>{r['gap_pct']:.2f}% below</b> the {r['which']} level "
+                 f"<code>{_fmt(r['level'])}</code>") +
+                f" · closed at <b>{r['close_pos']*100:.0f}%</b> of range · "
                 f"day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x",
                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
                 f"<i>· exit tomorrow's close</i>", ""]
@@ -706,7 +747,8 @@ def main() -> int:
                          f"{ANTICIPATE_TOP_N}</i>")
         lines.append("<i>close_pos≥0.90 + PRE≥6 measured +1.72%/trade "
                      "(t 7.2, n=1,488), +1.70% out of sample — vs +0.42% for "
-                     "the score alone. Still ~55% do not break out next day.</i>")
+                     "the score alone. 🚀 above-level measured better than 🔭 "
+                     "below (+0.82% vs +0.58%). Most still do not run.</i>")
 
     lines += ["", "━━━━━━━━━━━━━━━━━━━━",
         "<i>Tier A measured +1.75%/trade (t 5.2, n=417) over 5 years; "

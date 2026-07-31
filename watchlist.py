@@ -1,6 +1,33 @@
 #!/usr/bin/env python3
 """
-Daily watchlist - the stocks worth watching for the CURRENT week.
+Daily SHORTLIST - narrows the cash segment to the names worth checking at 15:20.
+
+WHAT THIS IS, STATED HONESTLY (revised 01-Aug-2026)
+    This is a NARROWING PASS, not a signal. Its job is to cut ~2,100 symbols
+    to a few dozen so the 15:20 BTST scan has less work to do. It is not a
+    list of setups and it should not be traded from.
+
+    Measured over 18,231 tradeable signals, the best this list can achieve:
+
+        selector                      mean/trade   out-of-sample
+        no filter                       +0.194%       -0.197%
+        PRE score >= 6                  +0.423%       +0.094%
+        PRE score >= 7                  +0.577%       +0.364%
+        close_pos >= 0.90 (15:20 only)  +1.040%       +0.877%
+        PRE>=6 AND close_pos>=0.90      +1.719%       +1.701%
+
+    The strongest factor found in the entire study - where the stock CLOSES
+    within its daily range - is structurally invisible at 08:45 because the
+    candle has not formed. One factor this list cannot see beats its whole
+    8-point score by 4x.
+
+    Confirmation from the live book: on 30-Jul-2026 the top 15 spanned 55x in
+    price and 33x in market cap, and ZERO of them met close_pos >= 0.90. Of
+    the 19 biggest movers the following day, 13 had ALREADY broken out and
+    only 1 was on this list. There is no coherent "setup" here, and expecting
+    one is expecting information that does not exist yet in the morning.
+
+    TOP_N is therefore 8, not 15: ranking beyond that is noise.
 
 The 26W breakout level and the weekly momentum state are FROZEN when the week
 opens (that is what weekly_snapshot.csv holds), so a pre-market digest can be
@@ -122,7 +149,7 @@ log = logging.getLogger("watchlist")
 
 # How many APPROACHING names to print. The complete table is attached as a CSV,
 # so this is purely about keeping the message readable on a phone.
-TOP_N = 15
+TOP_N = 8
 
 # ---- HARD GATES ------------------------------------------------------------
 # Measured thresholds. See the module docstring and RALLY_FILTERS.md.
@@ -578,7 +605,7 @@ def build_message(week: str, rows: list[dict], counts: dict,
     scr = counts.get("screened", 0)
     uns = counts.get("unscreened", 0)
     lines = [
-        f"📋 <b>Watchlist — week of {week}</b>",
+        f"📋 <b>Shortlist — week of {week}</b>",
         f"<i>{datetime.now(IST):%d-%b-%Y %H:%M} IST · "
         f"{counts['universe']} symbols · {counts.get('eligible', 0)} eligible"
         + (f" · {counts['capped']} with mcap" if counts.get("capped") else "")
@@ -590,10 +617,15 @@ def build_message(week: str, rows: list[dict], counts: dict,
 
     if watch:
         shown = watch[:top_n]
-        lines += ["", f"👀 <b>CLOSEST TO BREAKOUT (top {len(shown)})</b>",
+        lines += ["", f"👀 <b>CANDIDATES FOR TODAY'S 15:20 SCAN "
+                      f"(top {len(shown)})</b>",
                   f"<i>within {near_pct:g}% · turnover ≥{MIN_TURNOVER_CR:g}Cr · "
                   f"ATR ≥{MIN_ATR_PCT:g}% · ranked by PRE score, then 12m "
                   f"momentum</i>",
+                  "<i>⚠ This is a NARROWING PASS, not a signal. Measured, the "
+                  "best this list can do is +0.09%/trade out of sample — the "
+                  "factor that matters (closing at the high of the day) "
+                  "cannot be seen at 08:45. Act on the 15:20 scan.</i>",
                   "<i>🌙 = capable of a BTST-grade move (high ATR, strong "
                   "12m trend, extended above the 200DMA)</i>"]
         for r in shown:
@@ -639,7 +671,8 @@ def build_message(week: str, rows: list[dict], counts: dict,
         lines += ["", f"<i>{' · '.join(bits)}</i>"]
 
     lines += ["", "<i>Levels are frozen all week. Alerts fire on the first 5m "
-                  "close above the 26W high.</i>"]
+                  "close above the 26W high. Decisions belong to the 15:20 "
+                  "BTST scan, not to this list.</i>"]
     return "\n".join(lines)
 
 
