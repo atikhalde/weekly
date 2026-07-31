@@ -1,0 +1,95 @@
+name: BTST Scan (15:20 IST)
+
+# 09:50 UTC = 15:20 IST - TEN MINUTES BEFORE THE CLOSE, so the position can be
+# entered TODAY at today's close. That timing is the whole point: scanning
+# after the bell leaves only tomorrow's open, which forfeits the overnight move
+# this model exists to capture.
+#
+# Today's daily candle does not exist yet at 15:20, so btst.py builds it from
+# today's 5-minute bars and pro-rates the volume test for the elapsed session.
+# Measured at this cutoff, 82% of flagged names still qualify at the close, and
+# the entry is 0.14% CHEAPER than the close (these names ramp into the bell).
+#
+# GitHub cron is only best-effort and often runs 3-4 minutes late, which at
+# this hour matters. If a pick is consistently arriving after 15:25, drive this
+# workflow from cron-job.org the same way scan.yml is - the schedule below is
+# the fallback, not a guarantee.
+#
+# Read-only: it never commits, never places orders, and never touches
+# state.json, so it cannot interfere with the live scanner.
+on:
+  schedule:
+    - cron: "50 9 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "List every breakout with its tier, not just A/B"
+        type: boolean
+        default: false
+      after_close:
+        description: "Post-close review: only judge completed daily candles"
+        type: boolean
+        default: false
+
+concurrency:
+  group: btst
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  btst:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Scan for BTST setups
+        env:
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN_2: ${{ secrets.TELEGRAM_BOT_TOKEN_2 }}
+          TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
+        run: |
+          python btst.py \
+            ${{ inputs.all && '--all' || '' }} \
+            ${{ inputs.after_close && '--after-close' || '' }}
+
+      - name: Upload the BTST CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btst
+          path: "btst_*.csv"
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
+            echo "Telegram secrets not set - skipping failure notice"
+            exit 0
+          fi
+          MSG=$'⚠️ <b>BTST scan failed</b>\n'"Check the log: ${RUN_URL}"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "text=${MSG}" > /dev/null
