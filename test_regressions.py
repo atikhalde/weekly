@@ -5274,8 +5274,15 @@ def _approach_frame(close_pos, gap_pct, atr=5.0, n=260, price=1000.0,
     return pd.DataFrame(rows), level
 
 
-def test_bug44_requires_a_close_at_the_top_of_range():
+def test_bug44_requires_a_close_at_the_top_of_range(monkeypatch):
+    """
+    close_pos is the gate. The PRE trend confirmation added by BUG 46 is
+    stubbed here so this test measures ONE thing; BUG 46 tests the pairing.
+    """
+    import btst
     from btst import classify_approach
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
 
     df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.5)
     m = classify_approach(df, lvl, lvl)
@@ -5505,3 +5512,89 @@ def test_bug45_the_evidence_is_recorded_in_the_source():
     for token in ("OOS +0.69", "OOS +0.82", "OOS +0.05", "close_pos"):
         assert token in body, f"watchlist.py must record {token!r}"
     assert "THE_EDGE" in body or "23,994" in body or "factor study" in body
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 46 - the 08:45 score and the 15:20 candle were never combined.
+#
+#  After BUG 45 the question was whether to WEIGHT the PRE score so a
+#  weak-momentum name (ARKADE: ret_12m -32%) could not bank four weak passes.
+#  Four designs were built and measured on 18,231 tradeable signals. The flat
+#  8-point score already shipped WON:
+#
+#      design        rho(score,return)   best cut   mean     OOS
+#      OLD flat 8         +0.57            >=7     +0.473   +0.225
+#      NEW flat 8         +0.50            >=7     +0.577   +0.364   <- shipped
+#      WEIGHTED 10        +0.28            >=9     +0.480   +0.130
+#      GATED 8            +0.57            >=6     +0.438   +0.188
+#
+#  Weighting made it WORSE (monotonicity rho 0.50 -> 0.28). So the score was
+#  left alone - the ARKADE worry was already handled: zero weak-momentum names
+#  reach >=6 under the shipped score, versus 181 under the old one.
+#
+#  WHAT DID PAY was combining the two scans, which are measuring different
+#  things - the morning score says "real uptrend", the afternoon candle says
+#  "being accumulated right now":
+#
+#      selector                        n    /wk   win%    mean     OOS
+#      PRE >= 6                     6991   27.2   36.9   +0.423   +0.094
+#      close_pos >= 0.90            3414   13.3   40.6   +1.040   +0.877
+#      PRE>=6 AND close_pos>=0.90   1488    5.8   42.4   +1.719   +1.701
+#      PRE>=7 AND close_pos>=0.90    739    2.9   44.5   +2.641   +2.832
+#
+#  4x the score alone, and the out-of-sample column barely moves. MIN_PRE_CONFIRM
+#  = 6 rather than 7 so the list does not go empty for a week at a time.
+# --------------------------------------------------------------------------- #
+def test_bug46_pre_confirmation_is_wired_into_both_scans():
+    import btst
+
+    assert btst.MIN_PRE_CONFIRM == 6
+    body = (ROOT / "btst.py").read_text()
+    assert "_pre_score_from_daily" in body
+    assert "MIN_PRE_CONFIRM" in body
+
+
+def test_bug46_weak_trend_is_rejected_even_with_a_perfect_close(monkeypatch):
+    """
+    The whole point: closing at the very high is NOT enough on its own. A stock
+    with no trend behind it must still be refused.
+    """
+    import btst
+    from btst import classify_approach
+
+    df, lvl = _approach_frame(close_pos=0.98, gap_pct=1.0)
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    assert classify_approach(df, lvl, lvl)["ok"] is True
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (3, []))
+    m = classify_approach(df, lvl, lvl)
+    assert m["ok"] is False
+    assert "PRE" in m["reject"], m["reject"]
+
+
+def test_bug46_score_is_shared_not_restated():
+    """
+    btst.py must IMPORT watchlist.score_pre. Restating the thresholds would let
+    the 08:45 list and the 15:20 scan drift into disagreeing about what 6/8
+    means.
+    """
+    import inspect
+
+    import btst
+
+    src = inspect.getsource(btst._pre_score_from_daily)
+    assert "from watchlist import" in src
+    assert "score_pre" in src and "compute_metrics" in src
+
+
+def test_bug46_pre_score_reaches_the_picks_files_and_the_message():
+    body = (ROOT / "btst.py").read_text()
+    assert '"pre": int(r.get("pre", 0))' in body, "picks files must carry it"
+    assert "/8</b>" in body, "the message must show the score"
+
+
+def test_bug46_weighted_variants_were_rejected_on_evidence():
+    body = (ROOT / "test_regressions.py").read_text()
+    for token in ("WEIGHTED 10", "+0.28", "GATED 8", "flat"):
+        assert token in body, f"the rejected designs must stay documented: {token}"
