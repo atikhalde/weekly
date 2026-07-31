@@ -350,15 +350,50 @@ def score_pre(m: dict | None) -> tuple[int, list[str]]:
             return False
         return not math.isnan(v) and v <= thr
 
+    # ---- REVISED 31-Jul-2026 after the full 23,994-signal factor study -----
+    # THE_EDGE.md re-tested every factor against the exit that actually ships
+    # (30d cap, 7% stop, 5% trailing) with a strict in/out-of-sample split.
+    # Two conditions that used to sit here FAILED and are removed:
+    #
+    #     atr_pct     IS -0.16  OOS +0.69   sign flip -> not predictive
+    #     base_tight  IS -0.10  OOS +0.82   sign flip -> not predictive
+    #
+    # They were selected in RALLY_FILTERS.md against a DIFFERENT outcome
+    # (P(MFE>=+30%)) and were never re-verified when the exit rule changed.
+    # atr_pct survives only as a TRADEABILITY gate (see MIN_ATR_PCT) - it
+    # screens stocks that cannot move, which is not the same as predicting
+    # which ones will.
+    #
+    # brk_rvol (breakout-day volume) also failed (IS -0.50, OOS +0.05) and is
+    # deliberately NOT scored anywhere, however intuitive it feels.
+    #
+    # What survived, ranked by out-of-sample quintile spread in net return:
+    #     close_pos      +1.29   <- strongest single factor, scored in BRK
+    #     ret_12m        +1.13
+    #     gap_pct        +1.07
+    #     base_depth     -1.01   (shallow base better)
+    #     entry price    -0.75   (cheaper better)
+    #     dma200_slope   +0.69
+    #     ext_pct        +0.67   (scored at the alert, not pre-market)
+    #     ret_1m         +0.66
+    #     dist_200dma    +0.52
+    #     spike_level    +0.40
+    #     dist_50dma     +0.39
+    #     ret_3m         +0.37
+    #
+    # The momentum block is ONE bet (rho up to 0.82 between ret_12m, ret_3m,
+    # ret_1m, dist_50dma, dist_200dma, dma200_slope), so it is represented
+    # once at full weight (ret_12m) and once at the shorter horizon, rather
+    # than six times.
     checks = {
-        "atr>=3.5": ge("atr_pct", 3.5),
-        "tight>=4": ge("base_tight", 4.0),
-        "ret12m>=25": ge("ret_12m", 25.0),
+        "ret12m>=40": ge("ret_12m", 40.0),       # strongest momentum threshold
+        "ret1m>=10": ge("ret_1m", 10.0),
+        "dist200>=25": ge("dist_200dma", 25.0),
         "dist50>=12": ge("dist_50dma", 12.0),
+        "200slope>=2": ge("dma200_slope", 2.0),
         "depth>=-45": ge("base_depth_pct", -45.0),
         "spike>=3": ge("spike_level", 3.0),
-        "200slope>=2": ge("dma200_slope", 2.0),
-        "px<=800": le("px", 800.0),
+        "px<=500": le("px", 500.0),              # was 800; -0.75 OOS spread
     }
     passed = [k for k, ok in checks.items() if ok]
     return len(passed), passed
@@ -386,12 +421,22 @@ def btst_ready(m: dict | None) -> bool:
     try:
         atr = float(m.get("atr_pct") or 0)
         r12 = float(m.get("ret_12m") or 0)
-        tight = float(m.get("base_tight") or 0)
+        d200 = float(m.get("dist_200dma") or 0)
     except (TypeError, ValueError):
         return False
-    if math.isnan(atr) or math.isnan(tight):
+    if math.isnan(atr):
         return False
-    return atr >= 4.0 and tight >= 4.0 and (math.isnan(r12) or r12 >= 25.0)
+    # REVISED 31-Jul-2026. base_tight was dropped: it failed out of sample
+    # (IS -0.10, OOS +0.82). atr stays as a CAPABILITY test only - a 1.5%-ATR
+    # stock cannot print the move regardless of anything else - and the
+    # predictive half is now carried by the two robust momentum factors.
+    if atr < 4.0:
+        return False
+    if not math.isnan(r12) and r12 < 40.0:
+        return False
+    if not math.isnan(d200) and d200 < 25.0:
+        return False
+    return True
 
 
 def score_brk(daily: pd.DataFrame | None, level: float) -> tuple[int | None, list[str]]:
@@ -416,12 +461,17 @@ def score_brk(daily: pd.DataFrame | None, level: float) -> tuple[int | None, lis
     if c <= 0:
         return None, []
 
+    # REVISED 31-Jul-2026 (THE_EDGE.md). close_pos is the single strongest
+    # factor in the whole study (OOS quintile spread +1.29) so it is weighted
+    # twice - once at 0.85 and again at the 0.90 threshold that defines the
+    # shipped edge rule. range_pct and brk_rvol both FAILED out of sample
+    # (range IS -0.10/OOS +0.24, rvol IS -0.50/OOS +0.05) and are dropped.
     checks = {
-        "range>=4%": (rng / c * 100.0) >= 4.0,
-        "ext>=2%": ((c / level - 1) * 100.0) >= 2.0,
-        "rvol>=1.8": vma > 0 and (v / vma) >= 1.8,
         "close@high": rng > 0 and ((c - lo) / rng) >= 0.85,
-        "gap>=1%": pc > 0 and ((o / pc - 1) * 100.0) >= 1.0,
+        "close@0.90": rng > 0 and ((c - lo) / rng) >= 0.90,   # the edge line
+        "ext>=3%": ((c / level - 1) * 100.0) >= 3.0,          # was 2%; +0.67 OOS
+        "gap>=1%": pc > 0 and ((o / pc - 1) * 100.0) >= 1.0,  # +1.07 OOS
+        "range>=4%": (rng / c * 100.0) >= 4.0,   # kept for colour, not robust
     }
     passed = [k for k, ok in checks.items() if ok]
     return len(passed), passed
@@ -508,10 +558,22 @@ def build_message(week: str, rows: list[dict], counts: dict,
     # score uses the factors that measurably separated rallies (out-of-sample
     # P(+30%) runs 2.5% at score 1 to 22.8% at score 8), so the ordering now
     # carries information. UNSCREENED names sort last: score None -> -1.
-    watch = sorted((r for r in rows if r["bucket"] == "WATCH"),
-                   key=lambda x: (-(x.get("pre_score")
-                                    if x.get("pre_score") is not None else -1),
-                                  x["gap"]))
+    # Rank: PRE score, then 12-month momentum, then distance.
+    # ret_12m is the second-strongest robust factor (OOS spread +1.13) and it
+    # breaks PRE-score ties with information rather than with proximity, which
+    # measured as noise (buying on distance alone: -0.195%/trade, t -4.57).
+    def _rank(x):
+        pre = x.get("pre_score")
+        r12 = x.get("ret_12m")
+        try:
+            r12 = float(r12)
+        except (TypeError, ValueError):
+            r12 = float("-inf")
+        if r12 != r12:                      # NaN
+            r12 = float("-inf")
+        return (-(pre if pre is not None else -1), -r12, x["gap"])
+
+    watch = sorted((r for r in rows if r["bucket"] == "WATCH"), key=_rank)
 
     scr = counts.get("screened", 0)
     uns = counts.get("unscreened", 0)
@@ -530,9 +592,10 @@ def build_message(week: str, rows: list[dict], counts: dict,
         shown = watch[:top_n]
         lines += ["", f"👀 <b>CLOSEST TO BREAKOUT (top {len(shown)})</b>",
                   f"<i>within {near_pct:g}% · turnover ≥{MIN_TURNOVER_CR:g}Cr · "
-                  f"ATR ≥{MIN_ATR_PCT:g}% · ranked by PRE score</i>",
-                  "<i>🌙 = capable of a BTST-grade move (high ATR, lively, "
-                  "trending)</i>"]
+                  f"ATR ≥{MIN_ATR_PCT:g}% · ranked by PRE score, then 12m "
+                  f"momentum</i>",
+                  "<i>🌙 = capable of a BTST-grade move (high ATR, strong "
+                  "12m trend, extended above the 200DMA)</i>"]
         for r in shown:
             tag = r.get("which") or ""
             cap = r.get("mcap_cr")

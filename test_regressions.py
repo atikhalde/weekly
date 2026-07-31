@@ -3925,9 +3925,17 @@ def test_bug36_pre_score_direction_matches_the_measurement():
     full, passed = score_pre(_metrics())
     assert full == 8, passed
 
-    # volatility: quiet must score LOWER, not higher
-    assert score_pre(_metrics(atr_pct=2.0))[0] < full
-    assert score_pre(_metrics(base_tight=2.0))[0] < full
+    # SUPERSEDED BY BUG 45 (THE_EDGE.md, 31-Jul-2026).
+    # atr_pct and base_tight were SCORED here until the full 23,994-signal
+    # study re-tested every factor against the exit that actually ships. Both
+    # flipped sign out of sample (atr IS -0.16 / OOS +0.69; base_tight
+    # IS -0.10 / OOS +0.82) and were removed from the score. atr_pct remains a
+    # TRADEABILITY gate, which is a different job. Asserting that they no
+    # longer move the score is the point of these two lines.
+    assert score_pre(_metrics(atr_pct=2.0))[0] == full, (
+        "atr_pct must NOT be scored - it failed out of sample")
+    assert score_pre(_metrics(base_tight=2.0))[0] == full, (
+        "base_tight must NOT be scored - it failed out of sample")
 
     # momentum: weaker must score lower
     assert score_pre(_metrics(ret_12m=5.0))[0] < full
@@ -4468,13 +4476,18 @@ def test_bug38_btst_never_places_orders_and_is_read_only():
 def test_bug38_watchlist_flags_btst_capable_names():
     from watchlist import btst_ready
 
-    # YASHO-like: high ATR, lively base, strong 12m trend
-    assert btst_ready(dict(atr_pct=4.9, base_tight=4.6, ret_12m=80.0)) is True
-    # too quiet to ever print a +15% day
-    assert btst_ready(dict(atr_pct=2.1, base_tight=4.6, ret_12m=80.0)) is False
-    assert btst_ready(dict(atr_pct=4.9, base_tight=2.0, ret_12m=80.0)) is False
+    # REVISED BY BUG 45: base_tight dropped (failed OOS), dist_200dma added.
+    # YASHO-like: high ATR, strong 12m trend, well above the 200DMA
+    assert btst_ready(dict(atr_pct=4.9, ret_12m=80.0, dist_200dma=40.0)) is True
+    # too quiet to ever print a +15% day - capability test, still enforced
+    assert btst_ready(dict(atr_pct=2.1, ret_12m=80.0, dist_200dma=40.0)) is False
     # no trend
-    assert btst_ready(dict(atr_pct=4.9, base_tight=4.6, ret_12m=2.0)) is False
+    assert btst_ready(dict(atr_pct=4.9, ret_12m=2.0, dist_200dma=40.0)) is False
+    # not extended above the 200DMA
+    assert btst_ready(dict(atr_pct=4.9, ret_12m=80.0, dist_200dma=5.0)) is False
+    # base_tight must no longer matter either way
+    assert btst_ready(dict(atr_pct=4.9, ret_12m=80.0, dist_200dma=40.0,
+                           base_tight=1.0)) is True
     assert btst_ready(None) is False
 
 
@@ -5352,3 +5365,143 @@ def test_bug44_workflow_commits_both_pick_files():
     wf = (ROOT / ".github/workflows/btst.yml").read_text()
     assert "anticipate_picks.csv" in wf
     assert "btst_picks.csv" in wf
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 45 - the PRE score was built on two factors that do not survive.
+#
+#  User, 31-Jul: "deeply analyze watchlist logic based on all the successful
+#  past trades... I want to find the edge".
+#
+#  METHOD NOTE THAT MATTERS. The request was to study the WINNERS. Doing only
+#  that finds edges that are not there, so the loser set was kept as control -
+#  and that decided the result. The 16 symbols the user named as winners
+#  (THYROCARE, TBZ, MARICO, OAL, GANESHBE, THANGAMAYL, AETHER, SMLMAH,
+#  BAJFINANCE, RADICO, KMEW, TMB, SENCO, MONARCH, NAZARA, RRKABEL) produced
+#  219 signals over 5 years and averaged +0.172% against +0.808% for everyone
+#  else. Their feature medians are indistinguishable from the population
+#  (close_pos ratio 0.98, spike_level 1.00, ret_12m 0.85). The edge is not in
+#  WHICH STOCKS; it is in WHICH SIGNALS.
+#
+#  THE RETRACTION. RALLY_FILTERS.md selected atr_pct and base_tight against
+#  P(MFE >= +30%). Re-tested on 23,994 signals against the exit that actually
+#  ships (30d cap / 7% stop / 5% trail), both flip sign out of sample:
+#      atr_pct      IS -0.16   OOS +0.69
+#      base_tight   IS -0.10   OOS +0.82
+#      brk_rvol     IS -0.50   OOS +0.05     (volume - the intuitive one)
+#  They are removed from the score. atr_pct stays as a TRADEABILITY gate: it
+#  screens stocks that cannot move, which is not the same as predicting which
+#  ones will.
+#
+#  WHAT SURVIVED, by out-of-sample quintile spread:
+#      close_pos +1.29 | ret_12m +1.13 | gap_pct +1.07 | base_depth -1.01
+#      entry -0.75 | dma200_slope +0.69 | ext_pct +0.67 | ret_1m +0.66
+#      dist_200dma +0.52 | spike_level +0.40 | dist_50dma +0.39 | ret_3m +0.37
+#
+#  THE RULE: close_pos>=0.90 & ret_12m>=40 & ext_pct>=3
+#      n 1,210   4.7/wk   43.8% win   +1.758%/trade   PF 1.96   t 6.87
+#      out-of-sample +1.715%   vs a baseline that is NEGATIVE OOS (-0.197%)
+#      positive in all 9 walk-forward windows; excess over same-date signals
+#      +1.463% (t 6.42); remove the top 1% of trades and it is still +1.228%
+#      while the unfiltered baseline becomes -0.131%.
+#  A FOURTH condition collapses it (n 191, +0.226%) - that is the overfitting
+#  boundary and it is visible in the data.
+# --------------------------------------------------------------------------- #
+def test_bug45_failed_factors_are_not_scored():
+    """atr_pct, base_tight and brk_rvol must not influence any score."""
+    from watchlist import score_pre
+
+    base = _metrics()
+    full = score_pre(base)[0]
+    for k, v in (("atr_pct", 1.0), ("base_tight", 1.0), ("brk_rvol", 0.1)):
+        m = dict(base); m[k] = v
+        assert score_pre(m)[0] == full, (
+            f"{k} changed the PRE score - it failed out of sample "
+            "(see THE_EDGE.md) and must not be scored")
+
+
+def test_bug45_atr_survives_only_as_a_tradeability_gate():
+    from watchlist import MIN_ATR_PCT, gate_reasons, score_pre
+
+    # still gates
+    assert any("atr" in r for r in gate_reasons(_metrics(atr_pct=1.5)))
+    assert MIN_ATR_PCT == 3.0
+    # but does not score
+    assert score_pre(_metrics(atr_pct=9.0))[0] == score_pre(_metrics(atr_pct=3.1))[0]
+
+
+def test_bug45_pre_score_uses_the_surviving_factors():
+    from watchlist import PRE_MAX, score_pre
+
+    assert PRE_MAX == 8
+    full = score_pre(_metrics())[0]
+    assert full == 8
+    # each robust factor must be able to cost a point
+    for k, v in (("ret_12m", 5.0), ("ret_1m", 0.0), ("dist_200dma", 1.0),
+                 ("dist_50dma", 1.0), ("dma200_slope", -2.0),
+                 ("base_depth_pct", -80.0), ("spike_level", 0.1),
+                 ("px", 4000.0)):
+        m = _metrics(); m[k] = v
+        assert score_pre(m)[0] < full, f"{k} must be scored"
+
+
+def test_bug45_close_pos_is_weighted_twice_in_the_brk_score():
+    """close_pos is the strongest factor in the study (OOS +1.29), so it is
+    scored at both 0.85 and the 0.90 line that defines the edge rule."""
+    import pandas as pd
+
+    from watchlist import score_brk
+
+    def frame(cp):
+        rows = [dict(open=100.0, high=100.0, low=100.0, close=100.0,
+                     volume=1000.0) for _ in range(50)]
+        lo, hi = 100.0, 110.0
+        c = lo + (hi - lo) * cp
+        rows.append(dict(open=101.0, high=hi, low=lo, close=c, volume=5000.0))
+        return pd.DataFrame(rows)
+
+    weak = score_brk(frame(0.50), 100.0)[0]
+    mid = score_brk(frame(0.87), 100.0)[0]
+    strong = score_brk(frame(0.97), 100.0)[0]
+    assert weak < mid < strong, (weak, mid, strong)
+
+
+def test_bug45_watchlist_ranks_on_momentum_not_just_proximity():
+    """
+    Distance alone measured as noise (-0.195%/trade, t -4.57). With PRE scores
+    tied, the stronger 12-month trend must win even if it is further away.
+    """
+    from watchlist import build_message
+
+    rows = [
+        dict(symbol="NEARWEAK", ltp=99.9, level=100.0, which="C", mcap_cr=5000.0,
+             pre_score=6, pre_max=8, ret_12m=10.0, atr_pct=4.0,
+             pct=-0.1, gap=0.1, bucket="WATCH", screened_ok=True),
+        dict(symbol="FARSTRONG", ltp=99.0, level=100.0, which="C", mcap_cr=5000.0,
+             pre_score=6, pre_max=8, ret_12m=150.0, atr_pct=4.0,
+             pct=-1.0, gap=1.0, bucket="WATCH", screened_ok=True),
+    ]
+    msg = build_message("2026-07-27", rows,
+                        {"universe": 2, "eligible": 2, "capped": 2}, 3.0)
+    assert msg.index("FARSTRONG") < msg.index("NEARWEAK"), (
+        "on equal PRE score the stronger 12m trend must rank first")
+
+
+def test_bug45_btst_ready_drops_base_tight_and_adds_dist200():
+    from watchlist import btst_ready
+
+    good = dict(atr_pct=4.9, ret_12m=80.0, dist_200dma=40.0)
+    assert btst_ready(good) is True
+    # base_tight must be irrelevant now
+    assert btst_ready({**good, "base_tight": 0.5}) is True
+    assert btst_ready({**good, "base_tight": 9.0}) is True
+    # the robust factors must still bind
+    assert btst_ready({**good, "ret_12m": 10.0}) is False
+    assert btst_ready({**good, "dist_200dma": 2.0}) is False
+
+
+def test_bug45_the_evidence_is_recorded_in_the_source():
+    body = (ROOT / "watchlist.py").read_text()
+    for token in ("OOS +0.69", "OOS +0.82", "OOS +0.05", "close_pos"):
+        assert token in body, f"watchlist.py must record {token!r}"
+    assert "THE_EDGE" in body or "23,994" in body or "factor study" in body
