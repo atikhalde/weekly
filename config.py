@@ -116,6 +116,14 @@ class Strategy:
     btst_only: bool = False
     btst_top_n: int = 0
 
+    # --- Anticipation gate (Model F) -----------------------------------------
+    # anticipate_only makes a model trade the PRE-breakout list written by
+    # btst.py (anticipate_picks.csv) instead of the breakout list. Measured:
+    # buying on proximity alone is -0.195%/trade (t -4.57), but requiring the
+    # stock to close in the top 10% of its daily range turns that into
+    # +0.688% (t 7.73, +0.701% out of sample). Inert unless a model sets it.
+    anticipate_only: bool = False
+
     # --- Gate rows that MEASURED NEGATIVE at a multi-day horizon -------------
     # Both default to True (Pine behaviour, unchanged for the live scanner).
     # Model C turns them off because, over 3,166 breakouts with a 5-day hold,

@@ -4965,3 +4965,390 @@ def test_bug41_intraday_fetch_only_covers_today():
     assert "intraday_candles" in body
     assert "dtime(9, 15)" in body, "the intraday window must start at the open"
     assert "BARS_PER_SESSION = 75" in body
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 42 - Model E and the 15:20 BTST alert were two separate decisions that
+#  could name different stocks at different prices.
+#
+#  User, 31-Jul: "BTST trade (Model E) also 15:20 IST (before the close) and
+#  take entry for next day, take entry in top 5 BTST watchlist stocks".
+#
+#  THREE GAPS, all real:
+#    1. btst.py ALERTED an uncapped list. The "top 5" existed only inside
+#       ab_paper.py, so the message could show eight names while the ledger
+#       traded five - and not necessarily the same five.
+#    2. Model E entered at the COMPLETED daily close, a price that does not
+#       exist when the 15:20 alert lands. The alert said "buy ~1350", the
+#       ledger recorded 1357.20.
+#    3. Model E re-derived its own tier from the post-close candle. Since
+#       82% of 15:20 picks still qualify at the bell, ~1 in 5 ledger rows
+#       would be a stock the alert never sent, and vice versa.
+#
+#  FIX: btst.py caps at TOP_N, records the 15:20 price, and writes
+#  btst_picks.csv (committed by the workflow). Model E READS that file and
+#  trades exactly it. Reconstruction from the close still exists for backfill
+#  but is tagged btst_source="reconstructed" so the two are never confused.
+#
+#  The distinction between "this day has a picks file and the symbol is absent"
+#  (not taken) and "no file for this day" (backfill) is what stops a missing
+#  file from silently trading everything. Tested below.
+# --------------------------------------------------------------------------- #
+def test_bug42_btst_caps_the_alert_at_top_n():
+    import btst
+
+    assert btst.TOP_N == 5, "the user asked for the top 5"
+    body = (ROOT / "btst.py").read_text()
+    assert "qualified[:TOP_N]" in body, "the ALERT itself must be capped"
+    assert "PICKS_FILE" in body and "btst_picks.csv" in body
+
+
+def test_bug42_picks_file_records_the_1520_entry_price(tmp_path):
+    """The entry written must be the price at the SCAN, not the close - the
+    close does not exist yet when the alert is sent."""
+    body = (ROOT / "btst.py").read_text()
+    chunk = body.split("this IS the trade list", 1)[1][:1200]
+    assert '"scan_time"' in chunk
+    assert '"entry": round(float(r["close"])' in chunk, (
+        "entry must come from the partial candle's current price")
+    assert '"rank"' in chunk and '"tier"' in chunk
+
+
+def test_bug42_model_e_trades_the_picks_file(tmp_path):
+    import pandas as pd
+
+    from ab_paper import load_btst_picks
+
+    p = tmp_path / "btst_picks.csv"
+    p.write_text(
+        "date,scan_time,rank,symbol,tier,entry,level,day_ret,close_pos,"
+        "rvol,atr_pct,mcap_cr,partial_frac\n"
+        "2026-07-31,15:20,1,YASHO,A,3800.00,3262.80,17.5,0.98,7.4,4.9,3762,0.93\n"
+        "2026-07-31,15:20,2,NAZARA,B,317.00,310.00,10.6,0.95,8.3,2.9,10000,0.93\n")
+    lookup, days = load_btst_picks(p)
+
+    assert ("2026-07-31", "YASHO") in lookup
+    assert lookup[("2026-07-31", "YASHO")]["entry"] == 3800.00
+    assert lookup[("2026-07-31", "YASHO")]["rank"] == 1
+    assert days.get("2026-07-31") is True
+    assert ("2026-07-31", "SOMETHINGELSE") not in lookup
+
+
+def test_bug42_missing_picks_file_does_not_trade_everything():
+    """
+    The dangerous failure: no file -> every breakout silently becomes a BTST
+    trade. load_btst_picks must return an EMPTY day-map so the caller can tell
+    "not taken" from "no data", and the caller must only skip when the day is
+    actually covered.
+    """
+    from ab_paper import load_btst_picks
+
+    lookup, days = load_btst_picks("/nonexistent/btst_picks.csv")
+    assert lookup == {} and days == {}
+
+    src = (ROOT / "ab_paper.py").read_text()
+    assert "picks_have_day.get(day_key)" in src, (
+        "a name absent from a COVERED day must be skipped, not reconstructed")
+    assert 'btst_source = "reconstructed"' in src
+    assert 'btst_source = "picks"' in src
+
+
+def test_bug42_ledger_records_which_source_was_used():
+    from ab_paper import LEDGER_COLS
+
+    assert "btst_source" in LEDGER_COLS
+    assert "btst_rank" in LEDGER_COLS
+
+
+def test_bug42_top_n_cap_preserves_the_alert_ranking():
+    """
+    Re-ranking on post-close data could keep a different five than the alert
+    sent. When btst_rank is present it must drive the order.
+    """
+    src = (ROOT / "ab_paper.py").read_text()
+    chunk = src.split("BTST top-N cap", 1)[1][:1600]
+    assert "btst_rank" in chunk, "the cap must honour the 15:20 rank"
+
+
+def test_bug42_workflow_commits_the_picks_file():
+    wf = (ROOT / ".github/workflows/btst.yml").read_text()
+    assert "contents: write" in wf, "the job must be able to commit"
+    assert "btst_picks.csv" in wf
+    assert "git commit" in wf and "rebase" in wf, (
+        "state.json is committed by the 5m scan - the picks push must rebase, "
+        "not clobber")
+
+
+def test_bug42_btst_and_model_e_agree_on_the_same_day():
+    """
+    End-to-end contract: for a given date the alert's picks and Model E's
+    trades must be the same symbols at the same prices. Enforced by Model E
+    reading the file rather than re-deriving - assert that wiring exists.
+    """
+    src = (ROOT / "ab_paper.py").read_text()
+    assert "picks_lookup.get((day_key, sig.symbol))" in src
+    assert 'sig.price = float(pick["entry"])' in src, (
+        "the ledger must use the 15:20 price, not the completed close")
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 43 - BTST listed stocks whose breakout was DAYS old.
+#
+#  User, 31-Jul: "something is wrong showing those stocks for btst which
+#  already gave a move".
+#
+#  The live 15:20 message carried:
+#      YASHO     broke out 31-Jul 12:20  -> age 0, ext  18.3%   correct
+#      NELCO     broke out 31-Jul 12:50  -> age 0, ext   2.2%   correct
+#      DEEPINDS  broke out 29-Jul 10:05  -> age 2, ext   9.8%   WRONG
+#
+#  CAUSE: candidates were selected with already_alerted(week, symbol), which
+#  matches the WHOLE WEEK. A Monday breakout was still a candidate on Friday;
+#  the day-character test then passed on an unrelated later candle and the
+#  name was presented as a fresh BTST setup.
+#
+#  This is not a preference - it is a mismatch with what was measured. The
+#  5-year study only ever tested the breakout day. Re-measured over 1,548
+#  qualifying stock-days, next-day return net of costs:
+#
+#      age 0   n=1174   +0.807%   t 5.00    mean extension  7.1%
+#      age 1   n= 164   +0.373%   t 0.87    mean extension 15.6%
+#      age 2   n= 107   +1.311%   t 2.45    mean extension 18.6%
+#      age 4   n=  29   -0.808%   t -1.01   mean extension 26.9%
+#
+#      Tier A  age 0    n=401   +1.736%   t 5.03
+#      Tier A  age >=1  n= 83   +0.155%   t 0.20   <- the edge is GONE
+#
+#  Tier A is the reason the scanner exists and it does not survive ageing.
+#  Later-day Tier B is positive but thin, drifts further above the level every
+#  day, and was never part of the original measurement.
+#
+#  FIX: only names whose breakout alert is dated TODAY are candidates.
+#  AlertState.alert_record()/alert_date() expose the timestamp that
+#  already_alerted() throws away.
+# --------------------------------------------------------------------------- #
+def test_bug43_alert_state_exposes_the_alert_date(tmp_path):
+    from datetime import datetime as _dt
+
+    from state import AlertState
+
+    p = tmp_path / "state.json"
+    st = AlertState(p)
+    st.mark("2026-07-27", "YASHO", _dt(2026, 7, 31, 12, 20), 3690.9)
+    st.mark("2026-07-27", "DEEPINDS", _dt(2026, 7, 29, 10, 5), 546.55)
+    st.save()
+
+    st2 = AlertState(p)
+    assert st2.alert_date("2026-07-27", "YASHO") == "2026-07-31"
+    assert st2.alert_date("2026-07-27", "DEEPINDS") == "2026-07-29"
+    assert st2.alert_date("2026-07-27", "MISSING") is None
+    assert st2.alert_record("2026-07-27", "MISSING") is None
+    # already_alerted must keep its old week-wide meaning for de-duplication
+    assert st2.already_alerted("2026-07-27", "DEEPINDS") is True
+
+
+def test_bug43_btst_only_accepts_breakouts_dated_today():
+    body = (ROOT / "btst.py").read_text()
+    assert "alert_record(" in body, "btst must read the alert TIMESTAMP"
+    assert "today_str" in body and "bar == today_str" in body, (
+        "candidates must be filtered to breakouts dated TODAY")
+    # The BTST (confirmation) pool must not use week-wide selection - that is
+    # what let a Monday breakout show on Friday. The ANTICIPATION pool legally
+    # uses `not already_alerted(...)`: a name that fired at any point this week
+    # is no longer "about to break out", so the week-wide sense is correct
+    # there. Assert the negated form is the only one present.
+    import re
+    hits = re.findall(r"(not\s+)?state\.already_alerted\(week_s, s\.symbol\)",
+                      body)
+    assert hits, "the anticipation pool still needs already_alerted"
+    for neg in hits:
+        assert neg and neg.strip() == "not", (
+            "bare week-wide selection found - the BTST pool must filter on "
+            "the alert DATE, not merely 'fired sometime this week'")
+
+
+def test_bug43_stale_names_are_counted_and_explained():
+    """A name dropped for being old must be reported, not silently vanish -
+    otherwise the next person assumes the scan missed it."""
+    body = (ROOT / "btst.py").read_text()
+    assert "stale" in body
+    assert "+1.74%" in body and "+0.16%" in body, (
+        "the message must state WHY an aged breakout is excluded")
+
+
+def test_bug43_the_measured_decay_is_recorded():
+    body = (ROOT / "btst.py").read_text()
+    for token in ("age 0", "Tier A  age >=1", "t 5.03", "t 0.20"):
+        assert token in body, f"btst.py must document {token!r}"
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 44 - MODEL F, anticipation. "how i can catch them 1 day ago".
+#
+#  THE 31-JUL EVIDENCE. Twelve names fired that day. Buying all twelve at the
+#  30-Jul close returns +5.47%/trade with 10 winners - and that number is
+#  survivorship, because only ONE of the twelve was on the 30-Jul watchlist:
+#      5 were more than 3% away      (NELCO 6.4%, IIFL 7.1%, TORNTPHARM 4.2%)
+#      4 failed a frozen gate        (NAZARA, BAJFINANCE, EMCURE, SILVERTUC)
+#      2 were ALREADY ABOVE level    (QUESS -0.52%, BLSE -2.44%)
+#      1 was on the list             (YASHO)
+#  On that day 34 names were approaching and exactly one fired: a 2.9% hit
+#  rate, with the other 33 averaging -0.09%.
+#
+#  PROXIMITY ALONE LOSES MONEY - 234,518 approaching-days, top-5 per day, net:
+#      <=3%  -0.195%  t -4.57   OOS -0.217%
+#      <=5%  -0.160%  t -3.68   OOS -0.118%
+#      <=10% -0.138%  t -3.08   OOS -0.143%
+#
+#  THE ONE FILTER THAT WORKS - close position in the daily range:
+#      close_pos >= 0.9 -> 26.7% break out next day ; below -> 15.9%
+#      <=3% + close_pos>=0.9 : n 1423, 5.4/wk, 52.0% win, +0.688%, t 7.73,
+#                              out-of-sample +0.701%
+#
+#  Model F ships that rule. It runs ALONGSIDE E (overlap 0.1%), never instead.
+#
+#  HONESTY: 73% of F's picks do not break out next day, and on 30-Jul none of
+#  the top-5 had close_pos >= 0.9 (YASHO was 0.62) - F would have bought
+#  nothing and missed the +20%. Only 16.3% of approaching names break out next
+#  day at all; that is the ceiling on any 1-day-early rule.
+# --------------------------------------------------------------------------- #
+def test_bug44_model_f_exists_and_e_and_d_are_untouched():
+    from ab_paper import load_models
+
+    _d, models = load_models()
+    by = {m.key: m for m in models}
+    assert "F_anticipate" in by
+
+    f = by["F_anticipate"]
+    assert f.strategy["anticipate_only"] is True
+    assert f.strategy["btst_top_n"] == 5
+    assert f.exit["rule"] == "btst"
+    assert f.exit["stop_pct"] == 1.0 and f.exit["take_pct"] == 2.0
+
+    # D and E must be exactly as before
+    d = by["D_early"]
+    assert d.exit["stop_pct"] == 7.0 and d.strategy["trigger_level"] == "hi_short2"
+    e = by["E_btst"]
+    assert e.exit["stop_pct"] == 1.0 and e.strategy["btst_only"] is True
+    assert not e.strategy.get("anticipate_only", False)
+
+
+def test_bug44_anticipate_thresholds_match_the_measurement():
+    import btst
+
+    assert btst.ANTICIPATE_NEAR == 3.0, "<=3% measured best and held OOS"
+    assert btst.ANTICIPATE_CLOSE_POS == 0.90, (
+        "0.9 is the threshold that doubled the breakout rate (26.7% vs 15.9%)")
+    assert btst.ANTICIPATE_TOP_N == 5
+    assert btst.ANTICIPATE_FILE == "anticipate_picks.csv"
+
+
+def _approach_frame(close_pos, gap_pct, atr=5.0, n=260, price=1000.0,
+                    base=500000.0, day=1.0):
+    """A candle that closes `gap_pct` below the level at `close_pos` of range."""
+    import pandas as pd
+
+    level = price
+    c = level * (1 - gap_pct / 100.0)
+    o = c / (1 + day / 100.0)
+    rng = max(abs(c - o) / max(close_pos, 0.01), c * 0.02)
+    low = c - rng * close_pos
+    high = low + rng
+    rows = [dict(open=price * .995, high=price * (1 + atr / 200),
+                 low=price * (1 - atr / 200), close=price, volume=base)
+            for _ in range(n - 1)]
+    rows.append(dict(open=o, high=high, low=low, close=c, volume=base * 1.5))
+    return pd.DataFrame(rows), level
+
+
+def test_bug44_requires_a_close_at_the_top_of_range():
+    from btst import classify_approach
+
+    df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.5)
+    m = classify_approach(df, lvl, lvl)
+    assert m is not None and m["ok"] is True, m
+
+    # same distance, weak close -> rejected. This is the entire edge.
+    df2, lvl2 = _approach_frame(close_pos=0.45, gap_pct=1.5)
+    m2 = classify_approach(df2, lvl2, lvl2)
+    assert m2 is not None and m2["ok"] is False
+    assert "close_pos" in m2["reject"]
+
+
+def test_bug44_rejects_names_already_above_the_level():
+    """QUESS and BLSE were already ABOVE their level on 30-Jul. A name that has
+    broken out cannot be anticipated."""
+    import pandas as pd
+
+    from btst import classify_approach
+
+    df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.5)
+    # push the last close above the level
+    df.loc[df.index[-1], "close"] = lvl * 1.02
+    df.loc[df.index[-1], "high"] = lvl * 1.03
+    assert classify_approach(df, lvl, lvl) is None
+
+
+def test_bug44_respects_the_distance_window_and_tradeability():
+    from btst import classify_approach
+
+    # too far from the level
+    df, lvl = _approach_frame(close_pos=0.97, gap_pct=7.0)
+    assert classify_approach(df, lvl, lvl) is None
+
+    # too quiet to move - tradeability gate
+    df2, lvl2 = _approach_frame(close_pos=0.97, gap_pct=1.5, atr=1.0)
+    m = classify_approach(df2, lvl2, lvl2)
+    assert m is not None and m["ok"] is False
+    assert m["reject"] == "not tradeable"
+
+
+def test_bug44_uses_the_nearer_of_the_two_levels():
+    """
+    watchlist.py quotes the nearer of entry_level and hi_short2. Reconstructing
+    only entry_level measured a DIFFERENT trade - that is how the 30-Jul top-5
+    failed to reproduce (MUTHOOTMF was 2.03% from its D level, not 3.94% from
+    its C level).
+    """
+    from btst import classify_approach
+
+    df, lvl_c = _approach_frame(close_pos=0.97, gap_pct=1.0)
+    lvl_d = lvl_c * 0.995          # a nearer D level, still above price
+    m = classify_approach(df, lvl_c, lvl_d)
+    assert m is not None
+    assert abs(m["level"] - lvl_d) < 1e-6, "must quote the NEARER level"
+    assert m["which"] == "D"
+
+
+def test_bug44_watchlist_shows_the_two_lists_separately():
+    """The user asked to 'show separate stocks of recommendation'. Confirmation
+    and anticipation must be distinct sections, not merged."""
+    body = (ROOT / "btst.py").read_text()
+    assert "CONFIRMED — broke out TODAY" in body
+    assert "ANTICIPATE — about to break out" in body
+    assert "classify_approach" in body
+
+
+def test_bug44_model_f_never_reconstructs():
+    """
+    F's signal is 'closed at the high while still BELOW the level'. That cannot
+    be inferred from a breakout replay, so unlike E there is no fallback - if
+    the 15:20 file has no row, there is no trade.
+    """
+    src = (ROOT / "ab_paper.py").read_text()
+    chunk = src.split("anticipate_only", 1)[1][:900]
+    assert "ant_lookup.get((day_key, sig.symbol))" in chunk
+    assert "if ap_ is None:" in chunk and "continue" in chunk
+    assert 'btst_source = "anticipate"' in src
+
+
+def test_bug44_evidence_against_plain_proximity_is_recorded():
+    doc = (ROOT / "models.yaml").read_text()
+    for token in ("-0.195", "t -4.57", "26.7%", "15.9%", "0.1%", "73%"):
+        assert token in doc, f"models.yaml must record {token!r}"
+
+
+def test_bug44_workflow_commits_both_pick_files():
+    wf = (ROOT / ".github/workflows/btst.yml").read_text()
+    assert "anticipate_picks.csv" in wf
+    assert "btst_picks.csv" in wf

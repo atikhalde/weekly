@@ -113,6 +113,51 @@ MIN_ATR_PCT = 3.0
 HISTORY_DAYS = 260
 BARS_PER_SESSION = 75      # NSE: 09:15-15:30 in 5-minute candles
 
+# How many picks are actually taken. This is THE top-5: btst.py caps the list
+# here and writes it to btst_picks.csv, and Model E trades that file rather
+# than re-deriving its own list. One source of truth, so the 15:20 alert and
+# the paper ledger can never name different stocks.
+TOP_N = 5
+PICKS_FILE = "btst_picks.csv"
+
+# --------------------------------------------------------------------------- #
+#  ANTICIPATION (Model F) - buy the day BEFORE the breakout
+#
+#  The user asked: "how i can catch them 1 day ago". Measured over 5 years and
+#  234,518 approaching-days, the plain answer is you mostly cannot - only
+#  16.3% of names sitting within 5% of their level break out the next day, and
+#  buying the watchlist top-5 on proximity alone loses money (-0.195%/trade,
+#  t -4.57, negative out of sample).
+#
+#  ONE thing separates them: where the stock CLOSED in its daily range.
+#
+#      close_pos >= 0.9  ->  26.7% break out next day
+#      close_pos <  0.9  ->  15.9%
+#
+#  A stock finishing at the very top of its range, still under the level, is
+#  being accumulated into the close. Measured, buying the top 5 of those:
+#
+#      window   n     /wk   win%    mean     PF     t     out-of-sample
+#      <=3%   1423    5.4   52.0   +0.688   1.73   7.73     +0.701%
+#      <=5%   2184    8.4   50.5   +0.511   1.50   6.47     +0.465%
+#      <=8%   3030   11.6   49.3   +0.443   1.43   7.44     +0.380%
+#
+#  <=3% is used: strongest per trade and it holds out of sample.
+#
+#  WHY IT IS SEPARATE FROM THE BTST TIERS. Overlap with Tier A is 0.1% - two
+#  picks out of 1,423. Anticipation fires the day BEFORE a breakout, the tiers
+#  fire the day OF one. They are complementary, not duplicates, so they are
+#  reported as two lists and traded as two models.
+#
+#  HONEST CEILING: even filtered, 73% of these do NOT break out the next day.
+#  Per trade the confirmation tiers are ~2.5x better (+1.74% Tier A vs +0.69%).
+#  This exists to cover the days the tiers are silent, not to replace them.
+# --------------------------------------------------------------------------- #
+ANTICIPATE_NEAR = 3.0        # max % below the level
+ANTICIPATE_CLOSE_POS = 0.90  # must finish at the top of its own range
+ANTICIPATE_TOP_N = 5
+ANTICIPATE_FILE = "anticipate_picks.csv"
+
 
 # Thresholds live here and are imported by ab_paper.py's Model E, so the paper
 # model and the nightly scanner can never drift apart.
@@ -198,6 +243,72 @@ def classify(daily: pd.DataFrame, level: float,
     return m
 
 
+def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
+                      partial_frac: float = 1.0) -> dict | None:
+    """
+    Score a name that has NOT yet broken out, for the anticipation model.
+
+    Uses the nearer of the two levels still above price - the same dual-level
+    rule watchlist.py applies - because that is the one a breakout reaches
+    first. Reconstructing only entry_level measured a different trade than the
+    one the user actually sees (found when the 30-Jul top-5 could not be
+    reproduced: MUTHOOTMF was 2.03% from its D level, not 3.94% from its C).
+    """
+    if daily is None or len(daily) < 60:
+        return None
+    d = daily.dropna(subset=["open", "high", "low", "close"])
+    if len(d) < 60:
+        return None
+    t = d.iloc[-1]
+    o, h, lo, c = float(t.open), float(t.high), float(t.low), float(t.close)
+    v = float(t.volume) if "volume" in d else 0.0
+    if c <= 0 or o <= 0:
+        return None
+
+    cand = [x for x in (level_c, level_d) if x and x > 0]
+    if not cand:
+        return None
+    above = [x for x in cand if c <= x]
+    if not above:
+        return None                      # already broken out - not our trade
+    level = min(above)
+    which = "C+D" if level_c == level_d else ("D" if level == level_d else "C")
+    gap = (level - c) / level * 100.0
+    if not (0.0 <= gap <= ANTICIPATE_NEAR):
+        return None
+
+    prev = d.iloc[:-1]
+    vma = float(prev["volume"].tail(50).mean()) if "volume" in d else 0.0
+    frac = min(max(float(partial_frac), 0.05), 1.0)
+    vma_cmp = vma * frac
+    rng = h - lo
+
+    hi = d["high"].to_numpy(float); low = d["low"].to_numpy(float)
+    cl = d["close"].to_numpy(float)
+    pc = np.roll(cl, 1); pc[0] = cl[0]
+    tr = np.maximum(hi - low, np.maximum(np.abs(hi - pc), np.abs(low - pc)))
+    atr_pct = float(np.mean(tr[-14:]) / c * 100.0)
+    turnover = float((cl[-20:] * d["volume"].to_numpy(float)[-20:]).mean() / 1e7) \
+        if "volume" in d else 0.0
+
+    m = dict(symbol="", close=c, level=level, which=which, gap_pct=gap,
+             day_ret=(c / o - 1) * 100.0,
+             close_pos=((c - lo) / rng) if rng > 0 else 0.5,
+             rvol=(v / vma_cmp) if vma_cmp > 0 else float("nan"),
+             atr_pct=atr_pct, turnover_cr=turnover, partial_frac=frac)
+
+    if not (m["turnover_cr"] >= MIN_TURNOVER_CR and c >= MIN_PRICE
+            and m["atr_pct"] >= MIN_ATR_PCT):
+        m["ok"] = False
+        m["reject"] = "not tradeable"
+        return m
+    # THE filter. Everything else measured negative.
+    m["ok"] = bool(m["close_pos"] >= ANTICIPATE_CLOSE_POS)
+    if not m["ok"]:
+        m["reject"] = f"close_pos {m['close_pos']:.2f} < {ANTICIPATE_CLOSE_POS}"
+    return m
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -207,6 +318,8 @@ def main() -> int:
                     help="only judge a COMPLETED daily candle; skips names "
                          "whose bar is still forming. Use for a post-close "
                          "review - the 15:20 job must NOT set this.")
+    ap.add_argument("--no-anticipate", action="store_true",
+                    help="skip the anticipation (Model F) section")
     ap.add_argument("--config", default=None)
     args = ap.parse_args()
 
@@ -222,14 +335,57 @@ def main() -> int:
         log.error("DHAN_ACCESS_TOKEN not set")
         return 0
 
-    # Only names that ALERTED this week are candidates - BTST is a follow-up to
-    # a real breakout, not an independent screen.
+    # ---- BUG 43: THE BREAKOUT MUST BE **TODAY** ----------------------------
+    # already_alerted() matches the whole WEEK, so a Monday breakout still came
+    # back as a candidate on Friday. The day-character test would then pass on
+    # an unrelated later candle and the name would be presented as a fresh
+    # BTST setup when most of the move had already happened.
+    #
+    # That is not a preference, it is a mismatch with what was measured. The
+    # 5-year study only ever tested the breakout day itself. Re-measured across
+    # 1,548 qualifying stock-days, next-day return net of costs:
+    #
+    #     age 0 (breakout day)   n=1174   +0.807%   t 5.00   mean ext  7.1%
+    #     age 1                  n= 164   +0.373%   t 0.87   mean ext 15.6%
+    #     age 2                  n= 107   +1.311%   t 2.45   mean ext 18.6%
+    #     age 3                  n=  74   +0.984%   t 1.64   mean ext 20.4%
+    #     age 4                  n=  29   -0.808%   t -1.01  mean ext 26.9%
+    #
+    # and split by tier, which is where it is unambiguous:
+    #
+    #     Tier A  age 0    n=401   +1.736%   t 5.03
+    #     Tier A  age >=1  n= 83   +0.155%   t 0.20   <- the edge is GONE
+    #
+    # Tier A is the whole reason this scanner exists and it does not survive
+    # ageing. The later-day Tier B numbers are positive but thin, drifting
+    # (mean extension 15-27% above the level) and were never part of the
+    # original measurement, so they are not traded on that basis.
+    #
+    # Live example that exposed it - 31-Jul-2026:
+    #     YASHO     broke out 31-Jul 12:20   age 0   ext  18.3%   valid
+    #     NELCO     broke out 31-Jul 12:50   age 0   ext   2.2%   valid
+    #     DEEPINDS  broke out 29-Jul 10:05   age 2   ext   9.8%   STALE
     state = AlertState(cfg.paths["state"])
-    fired = [s for s in snaps if state.already_alerted(week_s, s.symbol)]
+    today_str = f"{now:%Y-%m-%d}"
+    fired, stale = [], []
+    for s in snaps:
+        rec = state.alert_record(week_s, s.symbol)
+        if not rec:
+            continue
+        bar = str(rec.get("bar_time", ""))[:10]
+        if bar == today_str:
+            fired.append(s)
+        else:
+            stale.append((s.symbol, bar))
+    if stale:
+        log.info("%d name(s) broke out earlier this week and are NOT BTST "
+                 "candidates today: %s", len(stale),
+                 ", ".join(f"{sym}({bar})" for sym, bar in stale[:12]))
     if not fired:
-        log.info("nothing fired this week - no BTST candidates")
+        log.info("nothing broke out TODAY - no BTST candidates "
+                 "(%d older breakout(s) skipped)", len(stale))
         return 0
-    log.info("%d names fired this week; checking today's candle ...", len(fired))
+    log.info("%d name(s) broke out today; checking the candle ...", len(fired))
 
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
@@ -277,6 +433,40 @@ def main() -> int:
             frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
         return s, classify(df, s.entry_level, partial_frac=frac)
 
+    def candle(s):
+        """(daily frame incl. today's partial bar, elapsed fraction) or None."""
+        try:
+            df = client.daily_candles(str(s.security_id), s.exchange_segment,
+                                      start, now.date())
+        except DhanError:
+            return None, 1.0
+        if df.empty:
+            return None, 1.0
+        frac = 1.0
+        if pd.Timestamp(df.iloc[-1]["datetime"]).date() != now.date():
+            if args.after_close:
+                return None, 1.0
+            try:
+                m5 = client.intraday_candles(
+                    str(s.security_id), s.exchange_segment,
+                    datetime.combine(now.date(), dtime(9, 15)),
+                    now.replace(tzinfo=None), interval=5)
+            except DhanError:
+                return None, 1.0
+            if m5 is None or m5.empty:
+                return None, 1.0
+            m5 = m5.sort_values("datetime")
+            df = pd.concat([df, pd.DataFrame([{
+                "datetime": pd.Timestamp(now.date()),
+                "open": float(m5.iloc[0]["open"]),
+                "high": float(m5["high"].max()),
+                "low": float(m5["low"].min()),
+                "close": float(m5.iloc[-1]["close"]),
+                "volume": float(m5["volume"].sum()),
+            }])], ignore_index=True)
+            frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
+        return df, frac
+
     rows = []
     with ThreadPoolExecutor(max_workers=max(1, cfg.runtime.max_workers)) as ex:
         for s, m in ex.map(one, fired):
@@ -287,9 +477,41 @@ def main() -> int:
             m["mcap_cr"] = caps.get(s.symbol.upper())
             rows.append(m)
 
-    picks = [r for r in rows if r.get("tier")]
-    picks.sort(key=lambda r: (r["tier"], -r["day_ret"]))
-    log.info("checked %d candles, %d qualified", len(rows), len(picks))
+    qualified = [r for r in rows if r.get("tier")]
+    # Tier A before Tier B, then the largest day move.
+    qualified.sort(key=lambda r: (r["tier"], -r["day_ret"]))
+    picks = qualified[:TOP_N]
+    for i, r in enumerate(picks, start=1):
+        r["rank"] = i
+    dropped = len(qualified) - len(picks)
+    log.info("checked %d candles, %d qualified, taking top %d%s",
+             len(rows), len(qualified), len(picks),
+             f" ({dropped} beyond the cap)" if dropped else "")
+
+    # ---- write the picks file: this IS the trade list ----------------------
+    # Entry price is the price AT THIS SCAN (15:20), not the close, because
+    # that is the price actually available when the alert lands.
+    if picks:
+        out = pd.DataFrame([{
+            "date": f"{now:%Y-%m-%d}", "scan_time": f"{now:%H:%M}",
+            "rank": r["rank"], "symbol": r["symbol"], "tier": r["tier"],
+            "entry": round(float(r["close"]), 2),
+            "level": round(float(r["level"]), 2),
+            "day_ret": round(float(r["day_ret"]), 2),
+            "close_pos": round(float(r["close_pos"]), 3),
+            "rvol": round(float(r.get("rvol") or 0), 2),
+            "atr_pct": round(float(r["atr_pct"]), 2),
+            "mcap_cr": r.get("mcap_cr"),
+            "partial_frac": round(float(r.get("partial_frac", 1.0)), 3),
+        } for r in picks])
+        pfile = cfg.paths["root"] / PICKS_FILE
+        if pfile.exists():
+            old = pd.read_csv(pfile)
+            out = (pd.concat([old, out], ignore_index=True)
+                     .drop_duplicates(subset=["date", "symbol"], keep="last"))
+        out.to_csv(pfile, index=False)
+        log.info("wrote %s (%d row(s) today, %d total)",
+                 pfile.name, len(picks), len(out))
 
     if rows:
         pd.DataFrame(rows).to_csv(f"btst_{now:%Y-%m-%d}.csv", index=False)
@@ -297,13 +519,81 @@ def main() -> int:
     partial = [r for r in picks if float(r.get("partial_frac", 1.0)) < 0.999]
     when = "buy into TODAY's close" if partial or now.time() < dtime(15, 30) \
         else "buy at close"
+    # ======================================================================
+    #  SECOND PASS - ANTICIPATION (Model F): names about to break out
+    # ======================================================================
+    # Candidate pool is the OPPOSITE of the BTST pool: names that have NOT
+    # alerted this week and are still below their level. A name that already
+    # broke out cannot be anticipated.
+    ant_rows, ant_picks, ant_dropped = [], [], 0
+    if not args.no_anticipate:
+        pending = [s for s in snaps if not state.already_alerted(week_s, s.symbol)]
+        log.info("anticipation: screening %d name(s) not yet fired ...",
+                 len(pending))
+
+        def one_ant(s):
+            df, frac = candle(s)
+            if df is None:
+                return s, None
+            return s, classify_approach(df, s.entry_level, s.hi_short2,
+                                        partial_frac=frac)
+
+        with ThreadPoolExecutor(max_workers=max(1, cfg.runtime.max_workers)) as ex:
+            for s, m in ex.map(one_ant, pending):
+                if not m:
+                    continue
+                m["symbol"] = s.symbol
+                m["mcap_cr"] = caps.get(s.symbol.upper())
+                ant_rows.append(m)
+
+        aq = [r for r in ant_rows if r.get("ok")]
+        # nearest to its level first - it needs the smallest move to trigger
+        aq.sort(key=lambda r: r["gap_pct"])
+        ant_picks = aq[:ANTICIPATE_TOP_N]
+        for i, r in enumerate(ant_picks, start=1):
+            r["rank"] = i
+        ant_dropped = len(aq) - len(ant_picks)
+        log.info("anticipation: %d screened, %d qualified, taking top %d",
+                 len(ant_rows), len(aq), len(ant_picks))
+
+        if ant_picks:
+            aout = pd.DataFrame([{
+                "date": f"{now:%Y-%m-%d}", "scan_time": f"{now:%H:%M}",
+                "rank": r["rank"], "symbol": r["symbol"],
+                "entry": round(float(r["close"]), 2),
+                "level": round(float(r["level"]), 2), "which": r["which"],
+                "gap_pct": round(float(r["gap_pct"]), 2),
+                "close_pos": round(float(r["close_pos"]), 3),
+                "day_ret": round(float(r["day_ret"]), 2),
+                "rvol": round(float(r.get("rvol") or 0), 2),
+                "atr_pct": round(float(r["atr_pct"]), 2),
+                "mcap_cr": r.get("mcap_cr"),
+                "partial_frac": round(float(r.get("partial_frac", 1.0)), 3),
+            } for r in ant_picks])
+            afile = cfg.paths["root"] / ANTICIPATE_FILE
+            if afile.exists():
+                aold = pd.read_csv(afile)
+                aout = (pd.concat([aold, aout], ignore_index=True)
+                          .drop_duplicates(subset=["date", "symbol"], keep="last"))
+            aout.to_csv(afile, index=False)
+            log.info("wrote %s (%d today, %d total)",
+                     afile.name, len(ant_picks), len(aout))
+
     lines = [f"🌙 <b>BTST — {now:%d-%b-%Y} {now:%H:%M} IST</b>",
-             f"<i>{when}, exit tomorrow · {len(rows)} breakouts checked</i>", ""]
+             f"<i>{when}, exit tomorrow · {len(rows)} candle(s) checked "
+             f"· broke out TODAY only</i>", ""]
+    lines.insert(2, "🔥 <b>CONFIRMED — broke out TODAY</b>")
+    lines.insert(3, "")
     if not picks:
         lines.append("<i>No setup qualified today. That is the normal case — "
                      "the tiers fire ~2-4 times a week combined.</i>")
+    if stale:
+        lines.append(f"<i>{len(stale)} name(s) broke out earlier this week and "
+                     f"are not eligible today (Tier A measured +1.74% on the "
+                     f"breakout day, +0.16% after).</i>")
     for r in picks:
-        badge = "🔥 <b>TIER A</b>" if r["tier"] == "A" else "⭐ <b>TIER B</b>"
+        badge = ("🔥 <b>TIER A</b>" if r["tier"] == "A" else "⭐ <b>TIER B</b>")
+        badge = f"<b>#{r['rank']}</b> {badge}"
         cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
         prov = " <i>(candle still forming)</i>" if float(
             r.get("partial_frac", 1.0)) < 0.999 else ""
@@ -313,7 +603,15 @@ def main() -> int:
             f"<b>{r['close_pos']*100:.0f}%</b> of range · "
             f"rvol <b>{r['rvol']:.1f}x</b> · atr {r['atr_pct']:.1f}%",
             f"    <i>{r['ext_pct']:+.1f}% above the 26W level "
-            f"{_fmt(r['level'])}</i>", ""]
+            f"{_fmt(r['level'])}</i>",
+            f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
+            f"<i>· broke out today · exit tomorrow's close if &gt;+2%</i>", ""]
+
+    if dropped:
+        extra = ", ".join(_esc(r["symbol"]) for r in qualified[TOP_N:])
+        lines.append(f"<i>{dropped} more qualified but the cap is top "
+                     f"{TOP_N}: {extra}</i>")
+        lines.append("")
 
     if args.all:
         rest = [r for r in rows if not r.get("tier")]
@@ -321,7 +619,37 @@ def main() -> int:
             lines += [f"<i>no tier ({len(rest)}): "
                       + ", ".join(_esc(r["symbol"]) for r in rest[:40]) + "</i>", ""]
 
-    lines += [
+    # ---- SECTION 2: anticipation, kept visually separate ------------------
+    if not args.no_anticipate:
+        lines += ["", "━━━━━━━━━━━━━━━━━━━━",
+                  f"🔭 <b>ANTICIPATE — about to break out</b>",
+                  f"<i>within {ANTICIPATE_NEAR:g}% of the level · closed in the "
+                  f"top {int((1-ANTICIPATE_CLOSE_POS)*100)}% of today's range · "
+                  f"{len(ant_rows)} screened</i>", ""]
+        if not ant_picks:
+            lines.append("<i>Nothing qualified. Normal — this fires ~5x a "
+                         "week.</i>")
+        for r in ant_picks:
+            cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
+            prov = " <i>(forming)</i>" if float(
+                r.get("partial_frac", 1.0)) < 0.999 else ""
+            lines += [
+                f"<b>#{r['rank']}</b> 🔭 <b>{_esc(r['symbol'])}</b>  "
+                f"{_fmt(r['close'])}{cap}{prov}",
+                f"    <b>{r['gap_pct']:.2f}%</b> below the {r['which']} level "
+                f"<code>{_fmt(r['level'])}</code> · closed at "
+                f"<b>{r['close_pos']*100:.0f}%</b> of range · "
+                f"day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x",
+                f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
+                f"<i>· exit tomorrow's close</i>", ""]
+        if ant_dropped:
+            lines.append(f"<i>{ant_dropped} more qualified, cap is top "
+                         f"{ANTICIPATE_TOP_N}</i>")
+        lines.append("<i>Measured +0.69%/trade (t 7.7, n=1,423), "
+                     "+0.70% out of sample. But 73% do NOT break out next day "
+                     "— it wins on the ones that do.</i>")
+
+    lines += ["", "━━━━━━━━━━━━━━━━━━━━",
         "<i>Tier A measured +1.75%/trade (t 5.2, n=417) over 5 years; "
         "Tier B +0.83% (t 5.0, n=1086). Win rate ~50% — it pays through the "
         "tail, not the hit rate. Exit at tomorrow's close.</i>"]

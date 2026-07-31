@@ -285,3 +285,78 @@ models:
       stop_pct: 5.0
       take_pct: 2.0
       hold_days: 5
+
+  # ---------------------------------------------------------------------------
+  #  MODEL F - "ANTICIPATE"   (user request, 31-Jul-2026)
+  #
+  #  Buy the day BEFORE the breakout. Entry at the 15:20 price of a name that is
+  #  within 3% of its level and closing at the top of its own daily range.
+  #
+  #  ORIGIN. "deeply analyze all the triggered signal which fired today, how i
+  #  can catch them 1 day ago take entry for btst trade."
+  #
+  #  WHAT THE 12 SIGNALS OF 31-JUL SHOWED. Buying all twelve at the 30-Jul close
+  #  would have returned +5.47%/trade, 10 winners of 12. That number is
+  #  survivorship: only 1 of the 12 was on the 30-Jul watchlist at all (5 were
+  #  >3% away, 4 failed a frozen gate, 2 were already ABOVE their level). And
+  #  34 names were approaching that day - exactly ONE fired. The 33 that did
+  #  not averaged -0.09%.
+  #
+  #  BUYING ON PROXIMITY ALONE LOSES MONEY. 234,518 approaching-days, 5 years,
+  #  top-5 per day ranked by PRE score then distance, net of 0.22%:
+  #      window <=3%   -0.195%/trade  t -4.57   out-of-sample -0.217%
+  #      window <=5%   -0.160%        t -3.68                 -0.118%
+  #      window <=10%  -0.138%        t -3.08                 -0.143%
+  #  Widening the window does not fix it; nor does relaxing the frozen gates
+  #  (-0.160% -> -0.132%). The PRE score does not separate either: 8/8 scored
+  #  -0.201%, 1/8 scored -0.115%.
+  #
+  #  ONE FILTER WORKS - where the stock CLOSED in its daily range:
+  #      close_pos >= 0.9  ->  26.7% break out the next day
+  #      close_pos <  0.9  ->  15.9%
+  #  and as a trade, top-5 per day:
+  #      <=3%, close_pos>=0.9   n 1423   5.4/wk   52.0% win   +0.688%   t 7.73
+  #                             out-of-sample +0.701%
+  #      <=5%, close_pos>=0.9   n 2184   8.4/wk   50.5%       +0.511%   t 6.47
+  #      <=8%, close_pos>=0.9   n 3030  11.6/wk   49.3%       +0.443%   t 7.44
+  #  <=3% chosen: best per trade and it holds out of sample.
+  #
+  #  WHY IT RUNS ALONGSIDE E RATHER THAN REPLACING IT. Overlap with BTST Tier A
+  #  is 0.1% - two picks out of 1,423. F fires the day BEFORE a breakout, E the
+  #  day OF one. Per trade E is better (+1.74% Tier A vs +0.69%), but F covers
+  #  the days E is silent.
+  #
+  #  STATED PLAINLY: 73% of F's picks do NOT break out the next day. The user's
+  #  own example is the warning - on 30-Jul none of the watchlist top-5 had
+  #  close_pos >= 0.9 (YASHO closed at 0.62), so F would have bought NOTHING
+  #  that day and missed the +20%. This is not a way to catch every breakout
+  #  early; only 16.3% of approaching names break out next day at all, and that
+  #  is the hard ceiling on any 1-day-early rule.
+  #
+  #  Exit mirrors E so the comparison is fair: 1% stop, take a close >= +2%,
+  #  otherwise carry, max 5 sessions.
+  # ---------------------------------------------------------------------------
+  F_anticipate:
+    label: "F · ANTICIPATE (pre-breakout, closed at high, 1% stop)"
+    horizon: swing
+    hold_days: 5
+    strategy:
+      strict_entry: true
+      drop_c09: true
+      gate_tolerance: 0
+      volume_mode: "off"
+      require_c03: false
+      require_c11: false
+      rvol_mode: "off"
+      bar_rvol_min: 0.0
+      min_atr_pct: 0.0
+      max_ext_above_level: 0.0
+      min_weekly_vol_x: 0.0
+      one_per_week: true
+      anticipate_only: true     # trade anticipate_picks.csv, not breakouts
+      btst_top_n: 5
+    exit:
+      rule: "btst"
+      stop_pct: 1.0
+      take_pct: 2.0
+      hold_days: 5

@@ -398,6 +398,36 @@ def btst_tier_for(day_bar, prev_bars, atr_pct: float) -> str | None:
     return None
 
 
+def load_btst_picks(path: Path | str | None = None) -> tuple[dict, dict]:
+    """
+    The top-5 list btst.py wrote at 15:20.
+
+    Returns ({(date, symbol): row}, {date: True}). The second map matters: it
+    lets the caller tell "this day has a picks file and the name is not in it"
+    (so it was NOT taken) apart from "no file for this day at all" (so fall
+    back to reconstruction). Without that distinction a missing file would
+    silently trade everything.
+    """
+    import btst as _b
+
+    p = Path(path) if path else (ROOT / _b.PICKS_FILE)
+    if not p.exists():
+        return {}, {}
+    try:
+        df = pd.read_csv(p)
+    except Exception:
+        return {}, {}
+    lookup, days = {}, {}
+    for r in df.to_dict("records"):
+        d = str(r.get("date", "")).strip()
+        sym = str(r.get("symbol", "")).strip()
+        if not d or not sym:
+            continue
+        lookup[(d, sym)] = r
+        days[d] = True
+    return lookup, days
+
+
 def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
                   exit_rule: dict, hold_days: int = 10,
                   cost_round_trip: float = COST_ROUND_TRIP) -> PaperTrade:
@@ -505,8 +535,11 @@ LEDGER_COLS = ["model", "model_label", "horizon", "symbol", "week", "signal_date
                "exit_date", "exit_time", "exit", "exit_reason", "exit_note",
                "bars_held", "gross_pnl", "costs", "pnl", "pnl_pct",
                "r_multiple", "mfe_pct", "mae_pct",
-               # BTST (Model E) only; blank for every other model
-               "btst_tier", "btst_day_ret"]
+               # BTST (Model E) only; blank for every other model.
+               # btst_source records whether the trade came from the 15:20
+               # picks file ("picks") or was rebuilt after the close
+               # ("reconstructed") - the two are NOT equally trustworthy.
+               "btst_tier", "btst_day_ret", "btst_rank", "btst_source"]
 
 
 def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int]:
@@ -867,6 +900,19 @@ def main() -> int:
                   f"stop = entry candle low - {SL_BUFFER*100:.2f}%")
     print(f"  {len(symbols)} symbol(s), last {args.days} session(s)\n")
 
+    # ---- the 15:20 picks file: Model E's trade list ------------------------
+    picks_lookup, picks_have_day = load_btst_picks()
+    ant_lookup, ant_have_day = load_btst_picks(ROOT / "anticipate_picks.csv")
+    if ant_lookup:
+        print(f"  anticipate picks: {len(ant_lookup)} entry(ies) across "
+              f"{len(ant_have_day)} session(s) - Model F trades THAT list")
+    if picks_lookup:
+        print(f"  btst picks: {len(picks_lookup)} entry(ies) across "
+              f"{len(picks_have_day)} session(s) - Model E will trade THAT list")
+    elif any(str(m.exit.get("rule", "")).lower() == "btst" for m in models):
+        print("  btst picks: none found - BTST models will RECONSTRUCT from "
+              "completed candles (marked btst_source=reconstructed)")
+
     # ---- data source
     today = datetime.now(IST).date()
     start_day = today - timedelta(days=max(args.days * 2, args.days + 4))
@@ -958,24 +1004,73 @@ def main() -> int:
                                 sig_day = pd.Timestamp(sig.bar_time).normalize().tz_localize(None)
                                 dafter = d[d["_day"] > sig_day]
                                 if str(m.exit.get("rule", "")).lower() == "btst":
-                                    # BTST enters at the breakout-day CLOSE, so
-                                    # the signal price is that close, not the
-                                    # 5m bar that happened to trigger.
                                     day_row = d[d["_day"] == sig_day]
                                     if day_row.empty:
                                         continue
-                                    sig.price = float(day_row.iloc[-1]["close"])
-                                    if m.strategy.get("btst_only"):
-                                        prior = d[d["_day"] < sig_day]
-                                        atrp = _atr_pct(prior)
-                                        tier = btst_tier_for(day_row.iloc[-1],
-                                                             prior, atrp)
-                                        if tier is None:
+                                    day_key = str(sig_day.date())
+                                    if m.strategy.get("anticipate_only"):
+                                        # Model F trades the PRE-breakout list.
+                                        # It never reconstructs: the whole
+                                        # signal is "closed at the high while
+                                        # still below the level", which cannot
+                                        # be inferred from a breakout replay.
+                                        ap_ = ant_lookup.get((day_key, sig.symbol))
+                                        if ap_ is None:
                                             continue
-                                        sig.btst_tier = tier
-                                        sig.btst_day_ret = (
-                                            float(day_row.iloc[-1]["close"])
-                                            / float(day_row.iloc[-1]["open"]) - 1) * 100
+                                        sig.price = float(ap_["entry"])
+                                        sig.btst_tier = "F"
+                                        sig.btst_day_ret = float(ap_.get("day_ret") or 0.0)
+                                        sig.btst_rank = int(ap_.get("rank") or 0)
+                                        sig.btst_source = "anticipate"
+                                        tr = simulate_btst(sig, dafter, capital,
+                                                           m.exit, m.hold_days, cost)
+                                        rec = dict(tr.__dict__)
+                                        rec["model"] = m.key
+                                        rec["model_label"] = m.label
+                                        rec["horizon"] = m.horizon
+                                        rec["btst_tier"] = "F"
+                                        rec["btst_day_ret"] = sig.btst_day_ret
+                                        rec["btst_rank"] = sig.btst_rank
+                                        rec["btst_source"] = "anticipate"
+                                        rows.append(rec)
+                                        per_model_counts[m.key] += 1
+                                        continue
+                                    # ---- PREFER THE 15:20 PICKS FILE -------
+                                    # btst.py already decided, at 15:20, which
+                                    # five names are taken and at what price.
+                                    # Model E must trade THAT list at THAT
+                                    # price - otherwise the alert and the
+                                    # ledger describe different trades.
+                                    pick = picks_lookup.get((day_key, sig.symbol))
+                                    if pick is not None:
+                                        sig.price = float(pick["entry"])
+                                        sig.btst_tier = str(pick.get("tier") or "")
+                                        sig.btst_day_ret = float(pick.get("day_ret") or 0.0)
+                                        sig.btst_rank = int(pick.get("rank") or 0)
+                                        sig.btst_source = "picks"
+                                    elif picks_have_day.get(day_key):
+                                        # The picks file covers this day and
+                                        # this name is not in it -> it was not
+                                        # taken. Do NOT invent a trade.
+                                        continue
+                                    else:
+                                        # No 15:20 file for this day (backfill,
+                                        # or the job did not run). Reconstruct
+                                        # from the completed candle and SAY SO.
+                                        sig.price = float(day_row.iloc[-1]["close"])
+                                        if m.strategy.get("btst_only"):
+                                            prior = d[d["_day"] < sig_day]
+                                            atrp = _atr_pct(prior)
+                                            tier = btst_tier_for(day_row.iloc[-1],
+                                                                 prior, atrp)
+                                            if tier is None:
+                                                continue
+                                            sig.btst_tier = tier
+                                            sig.btst_day_ret = (
+                                                float(day_row.iloc[-1]["close"])
+                                                / float(day_row.iloc[-1]["open"]) - 1) * 100
+                                        sig.btst_rank = 0
+                                        sig.btst_source = "reconstructed"
                                     tr = simulate_btst(sig, dafter, capital,
                                                        m.exit, m.hold_days, cost)
                                 else:
@@ -994,6 +1089,8 @@ def main() -> int:
                             # carried through so the top-N cap can rank on it
                             rec["btst_tier"] = getattr(sig, "btst_tier", None)
                             rec["btst_day_ret"] = getattr(sig, "btst_day_ret", None)
+                            rec["btst_rank"] = getattr(sig, "btst_rank", None)
+                            rec["btst_source"] = getattr(sig, "btst_source", None)
                             rows.append(rec)
                             per_model_counts[m.key] += 1
                             if tr.exit_date:
@@ -1032,8 +1129,20 @@ def main() -> int:
     for (mk, day), group in by_model_day.items():
         mdl = next((mm for mm in models if mm.key == mk), None)
         top_n = int(mdl.strategy.get("btst_top_n") or 0)
-        group.sort(key=lambda r: (0 if r.get("btst_tier") == "A" else 1,
-                                  -float(r.get("btst_day_ret") or 0.0)))
+        # When the 15:20 file decided the order, KEEP that order - re-ranking
+        # here on post-close data could pick a different five than the alert
+        # you actually received.
+        def _rank(r):
+            rk = r.get("btst_rank")
+            try:
+                rk = int(rk)
+            except (TypeError, ValueError):
+                rk = 0
+            if rk > 0:
+                return (0, rk, 0.0)
+            return (1, 0, -float(r.get("btst_day_ret") or 0.0)
+                    + (0.0 if r.get("btst_tier") == "A" else 1e6))
+        group.sort(key=_rank)
         kept = group[:top_n]
         capped.extend(kept)
         dropped = len(group) - len(kept)

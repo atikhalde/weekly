@@ -49,6 +49,27 @@ class AlertState:
     def already_alerted(self, week: str, symbol: str) -> bool:
         return symbol in self._data.get("weeks", {}).get(week, {})
 
+    def alert_record(self, week: str, symbol: str) -> dict | None:
+        """
+        The stored {bar_time, price} for an alert, or None.
+
+        already_alerted() answers "did this fire at any point this week", which
+        is the right question for de-duplication and the WRONG one for anything
+        that cares WHEN. btst.py needs the date: a Monday breakout is not a
+        Friday BTST setup (measured: Tier A +1.74% on the breakout day,
+        +0.16% on any later day).
+        """
+        rec = self._data.get("weeks", {}).get(week, {}).get(symbol)
+        return rec if isinstance(rec, dict) else None
+
+    def alert_date(self, week: str, symbol: str) -> str | None:
+        """YYYY-MM-DD of the alert, or None. Convenience over alert_record."""
+        rec = self.alert_record(week, symbol)
+        if not rec:
+            return None
+        bar = str(rec.get("bar_time", ""))
+        return bar[:10] or None
+
     def mark(self, week: str, symbol: str, bar_time: datetime, price: float) -> None:
         wk = self._data.setdefault("weeks", {}).setdefault(week, {})
         wk[symbol] = {"bar_time": bar_time.isoformat(timespec="minutes"), "price": price}
