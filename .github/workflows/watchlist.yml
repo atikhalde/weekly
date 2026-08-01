@@ -16,9 +16,9 @@ on:
         type: string
         default: "3"
       top:
-        description: "How many names to list (the CSV always has them all)"
+        description: "How many names to list (blank = the code default, 8)"
         type: string
-        default: "15"
+        default: ""
 
 concurrency:
   group: watchlist
@@ -52,9 +52,14 @@ jobs:
           TELEGRAM_BOT_TOKEN_2: ${{ secrets.TELEGRAM_BOT_TOKEN_2 }}
           TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
         run: |
+          # Do NOT hardcode --top here. watchlist.TOP_N is the single source
+          # of truth (8 since BUG 47 - ranking beyond ~8 is noise, and the
+          # list's measured ceiling is +0.09%/trade OOS). Passing 15 from the
+          # workflow silently overrode the code and the message kept printing
+          # "top 15" after the constant was changed.
           python watchlist.py \
             --near "${{ inputs.near || '3' }}" \
-            --top "${{ inputs.top || '15' }}"
+            ${{ inputs.top && format('--top {0}', inputs.top) || '' }}
 
       - name: Upload the watchlist CSV
         if: always()
