@@ -5752,3 +5752,58 @@ def test_bug47_shortlist_message_warns_it_is_not_a_signal():
     assert "Shortlist" in msg
     assert "15:20" in msg, "it must point at where decisions are made"
     assert "not a signal" in msg.lower()
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 48 - the workflow hardcoded --top 15 and silently overrode TOP_N.
+#
+#  BUG 47 set watchlist.TOP_N = 8 ("ranking beyond ~8 is noise"). The live
+#  01-Aug message still printed "CANDIDATES FOR TODAY'S 15:20 SCAN (top 15)"
+#  because watchlist.yml passed `--top "${{ inputs.top || '15' }}"` on every
+#  scheduled run. The constant was right; the caller ignored it.
+#
+#  This is the second time a hardcoded caller has beaten a measured default
+#  (see BUG 37, where scan.py read a frozen market cap instead of the live
+#  table). The rule being relearned: if a value is derived from a measurement,
+#  exactly ONE place may define it, and every caller must fall through to it.
+#
+#  Fix: the workflow only passes --top when the operator explicitly types a
+#  value into workflow_dispatch. The scheduled run passes nothing.
+# --------------------------------------------------------------------------- #
+def test_bug48_workflow_does_not_hardcode_top():
+    wf = (ROOT / ".github/workflows/watchlist.yml").read_text()
+    assert "'15'" not in wf and '"15"' not in wf, (
+        "the workflow must not hardcode a list size - TOP_N is the source of "
+        "truth")
+    run = wf.split("python watchlist.py", 1)[1].split("\n\n", 1)[0]
+    assert "inputs.top &&" in run, (
+        "--top must only be passed when explicitly supplied, so the scheduled "
+        "run falls through to watchlist.TOP_N")
+
+
+def test_bug48_default_list_size_is_the_measured_one():
+    import inspect
+
+    from watchlist import TOP_N, main
+
+    assert TOP_N == 8
+    src = inspect.getsource(main)
+    assert "default=TOP_N" in src, (
+        "argparse must default to the constant, not to a literal")
+
+
+def test_bug48_message_prints_the_actual_count():
+    """The header must reflect what was really shown, not a fixed number."""
+    from watchlist import build_message
+
+    rows = [dict(symbol=f"S{i:02d}", ltp=99.0 - i * 0.01, level=100.0,
+                 which="C", mcap_cr=5000.0, pre_score=7, pre_max=8,
+                 ret_12m=100.0 - i, atr_pct=4.0, pct=-1.0, gap=1.0 + i * 0.01,
+                 bucket="WATCH", screened_ok=True)
+            for i in range(20)]
+    msg = build_message("2026-07-27", rows,
+                        {"universe": 20, "eligible": 20, "capped": 20}, 3.0)
+    assert "(top 8)" in msg, msg.split("\n")[5]
+    listed = [ln for ln in msg.splitlines() if ln.startswith("• ")]
+    assert len(listed) == 8, f"expected 8 rows, got {len(listed)}"
+    assert "12 more in the CSV" in msg
