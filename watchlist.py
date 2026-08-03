@@ -457,11 +457,18 @@ def btst_ready(m: dict | None) -> bool:
     # (IS -0.10, OOS +0.82). atr stays as a CAPABILITY test only - a 1.5%-ATR
     # stock cannot print the move regardless of anything else - and the
     # predictive half is now carried by the two robust momentum factors.
+    # BUG 51: aligned with the 15:20 trend floor (btst.MIN_RET_12M /
+    # MIN_DIST_200DMA). A 🌙 that the afternoon scan would reject on trend is
+    # a false promise, so the two thresholds are now the same number.
+    #
+    # NaN fails. "No 12-month history" is a young listing with no established
+    # trend, not an unknown deserving the benefit of the doubt - SWANDEF, with
+    # no 12m history, lost on 03-Aug.
     if atr < 4.0:
         return False
-    if not math.isnan(r12) and r12 < 40.0:
+    if math.isnan(r12) or r12 < 50.0:
         return False
-    if not math.isnan(d200) and d200 < 25.0:
+    if math.isnan(d200) or d200 < 25.0:
         return False
     return True
 
@@ -626,8 +633,8 @@ def build_message(week: str, rows: list[dict], counts: dict,
                   "best this list can do is +0.09%/trade out of sample — the "
                   "factor that matters (closing at the high of the day) "
                   "cannot be seen at 08:45. Act on the 15:20 scan.</i>",
-                  "<i>🌙 = capable of a BTST-grade move (high ATR, strong "
-                  "12m trend, extended above the 200DMA)</i>"]
+                  "<i>🌙 = clears the 15:20 trend floor (ATR ≥4%, 12m ≥50%, "
+                  "≥25% over the 200DMA) — the rest cannot qualify tonight</i>"]
         for r in shown:
             tag = r.get("which") or ""
             cap = r.get("mcap_cr")

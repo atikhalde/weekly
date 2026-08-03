@@ -5309,6 +5309,26 @@ def _approach_frame(close_pos, gap_pct, atr=5.0, n=260, price=1000.0,
     return pd.DataFrame(rows), level
 
 
+def _stub_trend(monkeypatch, ret_12m=120.0, dist_200dma=40.0):
+    """
+    classify_approach reads the trend from watchlist.compute_metrics (BUG 51).
+    Synthetic fixtures have no real 200-day history, so tests that are about
+    close_pos or PRE must pin the trend to a passing value - otherwise they
+    fail for a reason they are not testing.
+    """
+    import watchlist
+
+    real = watchlist.compute_metrics
+
+    def patched(d, level, px=None):
+        m = real(d, level, px) or {}
+        m["ret_12m"] = ret_12m
+        m["dist_200dma"] = dist_200dma
+        return m
+
+    monkeypatch.setattr(watchlist, "compute_metrics", patched)
+
+
 def test_bug44_requires_a_close_at_the_top_of_range(monkeypatch):
     """
     close_pos is the gate. The PRE trend confirmation added by BUG 46 is
@@ -5318,6 +5338,7 @@ def test_bug44_requires_a_close_at_the_top_of_range(monkeypatch):
     from btst import classify_approach
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    _stub_trend(monkeypatch)
 
     df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.5)
     m = classify_approach(df, lvl, lvl)
@@ -5342,6 +5363,7 @@ def test_bug44_above_level_names_are_now_scanned(monkeypatch):
     from btst import classify_approach
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    _stub_trend(monkeypatch)
 
     df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.5)
     df.loc[df.index[-1], "close"] = lvl * 1.02
@@ -5614,6 +5636,7 @@ def test_bug46_weak_trend_is_rejected_even_with_a_perfect_close(monkeypatch):
     df, lvl = _approach_frame(close_pos=0.98, gap_pct=1.0)
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    _stub_trend(monkeypatch)
     assert classify_approach(df, lvl, lvl)["ok"] is True
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (3, []))
@@ -5686,6 +5709,7 @@ def test_bug47_above_level_names_are_scanned_and_tagged(monkeypatch):
     from btst import classify_approach
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    _stub_trend(monkeypatch)
 
     # below the level -> tagged "below", positive gap
     df, lvl = _approach_frame(close_pos=0.96, gap_pct=1.2)
@@ -5706,6 +5730,7 @@ def test_bug47_extension_cap_still_refuses_a_chase(monkeypatch):
     from btst import classify_approach
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    _stub_trend(monkeypatch)
     assert btst.ANTICIPATE_ABOVE_MAX == 10.0
 
     df, lvl = _approach_frame(close_pos=0.96, gap_pct=1.0)
@@ -5722,6 +5747,7 @@ def test_bug47_close_pos_still_gates_both_sides(monkeypatch):
     import pandas as pd
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    _stub_trend(monkeypatch)
 
     def frame(close_pos, mult, n=260, price=1000.0, base=5e5):
         """Build the last candle directly so close_pos is exactly as asked -
@@ -6074,3 +6100,123 @@ def test_bug50_reasoning_is_recorded():
     assert "BUG 50" in wf
     cfg = (ROOT / "config.yaml").read_text()
     assert "429" in cfg and "GLOBAL pause" in cfg
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 51 - the anticipation gate had no trend floor.
+#
+#  Of 11 live alerts on 03-Aug-2026, the four clean losers were precisely the
+#  four names with no established uptrend:
+#
+#      symbol      ret_12m   dist200   outcome
+#      BHAGCHEM      -9.8%     13.1%    -2.64%
+#      TBOTEK        +8.0%      5.5%    -3.48%
+#      SPORTKING    +51.9%     54.4%    -1.24%   (gapped +15% overnight)
+#      SWANDEF      no 12m      79.7%   -0.40%
+#
+#  while all six winners had ret_12m >= 53% and dist200 >= 25%.
+#
+#  n=11 proves nothing, so it was re-tested on 18,202 tradeable signals over
+#  5 years. The effect is real and monotonic:
+#      ret_12m < 10   n 1,693   -0.339%   OOS -0.397%
+#      ret_12m 10-50  n 6,145   -0.099%   OOS -0.568%
+#      ret_12m >= 50  n10,364   +0.456%   OOS +0.151%
+#      ret_12m >=100  n 5,273   +0.711%   OOS +0.489%
+#  and stacked on the shipped filter:
+#      close_pos>=0.9                      n 3,405  +1.043%  OOS +0.881%
+#      + ret_12m>=40 (previous)            n 2,376  +1.404%  OOS +1.341%
+#      + ret_12m>=50 & dist200>=25 (now)   n 1,822  +1.610%  OOS +1.647%
+#
+#  DELIBERATELY NOT ADOPTED: a gap cap. On 03-Aug it looked decisive -
+#  SPORTKING gapped +15% and BHAGCHEM +8.5%, both lost - but over 5 years
+#  gap_pct<=4 measured +0.160% against a +0.194% baseline, i.e. WORSE. Two
+#  observations are an anecdote. This is recorded so it is not "fixed" later.
+# --------------------------------------------------------------------------- #
+def test_bug51_trend_floor_matches_the_measurement():
+    import btst
+
+    assert btst.MIN_RET_12M == 50.0
+    assert btst.MIN_DIST_200DMA == 25.0
+
+
+def test_bug51_rejects_the_four_losers_of_03_aug(monkeypatch):
+    """The exact trend readings of the four names that lost money that day."""
+    import btst
+    from btst import classify_approach
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+
+    losers = {
+        "BHAGCHEM": (-9.8, 13.1),
+        "TBOTEK": (8.0, 5.5),
+        "SWANDEF": (float("nan"), 79.7),   # no 12-month history
+    }
+    for name, (r12, d200) in losers.items():
+        _stub_trend(monkeypatch, ret_12m=r12, dist_200dma=d200)
+        df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.0)
+        m = classify_approach(df, lvl, lvl)
+        assert m is not None and m["ok"] is False, f"{name} must be rejected"
+
+    # ...and admits a genuine uptrend on the same candle
+    _stub_trend(monkeypatch, ret_12m=75.8, dist_200dma=49.1)   # UNIVCABLES
+    df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.0)
+    assert classify_approach(df, lvl, lvl)["ok"] is True
+
+
+def test_bug51_unknown_trend_fails_rather_than_passes(monkeypatch):
+    """
+    Opposite of the c12 market-cap rule, and deliberately so. An unknown market
+    cap is a data gap; an unknown 12-month return means the stock has not
+    traded a year and has no trend to speak of. SWANDEF was exactly that.
+    """
+    import btst
+    from btst import classify_approach
+
+    monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
+    _stub_trend(monkeypatch, ret_12m=float("nan"), dist_200dma=40.0)
+    df, lvl = _approach_frame(close_pos=0.97, gap_pct=1.0)
+    m = classify_approach(df, lvl, lvl)
+    assert m["ok"] is False
+    assert "unknown" in m["reject"]
+
+
+def test_bug51_gap_cap_was_rejected_on_evidence():
+    body = (ROOT / "btst.py").read_text()
+    assert "NOT ADOPTED" in body and "gap cap" in body, (
+        "the rejected gap filter must stay documented so it is not re-added")
+    # and it must not actually be implemented
+    assert "MAX_GAP" not in body
+
+
+def test_bug51_watchlist_moon_matches_the_1520_floor():
+    """
+    A 🌙 the afternoon scan would reject on trend is a false promise. The two
+    thresholds must be the same number.
+    """
+    import btst
+    from watchlist import btst_ready
+
+    ok = dict(atr_pct=4.9, ret_12m=btst.MIN_RET_12M + 1,
+              dist_200dma=btst.MIN_DIST_200DMA + 1)
+    assert btst_ready(ok) is True
+    assert btst_ready({**ok, "ret_12m": btst.MIN_RET_12M - 1}) is False
+    assert btst_ready({**ok, "dist_200dma": btst.MIN_DIST_200DMA - 1}) is False
+    assert btst_ready({**ok, "ret_12m": float("nan")}) is False, (
+        "no 12-month history must not earn a moon")
+
+
+def test_bug51_trend_reaches_the_picks_file_and_message():
+    body = (ROOT / "btst.py").read_text()
+    assert '"ret_12m": round(' in body, "picks must record the trend"
+    assert '"dist_200dma": round(' in body
+    assert "over the 200DMA" in body, "the message must show it"
+
+
+def test_bug51_trend_is_read_from_the_shared_metrics():
+    """Recomputing it here would let the two scans drift apart."""
+    import inspect
+
+    import btst
+
+    src = inspect.getsource(btst.classify_approach)
+    assert "from watchlist import compute_metrics" in src

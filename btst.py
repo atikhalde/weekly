@@ -157,6 +157,41 @@ ANTICIPATE_NEAR = 3.0        # max % BELOW the level
 ANTICIPATE_ABOVE_MAX = 10.0  # max % ABOVE the level before it is a chase
 ANTICIPATE_CLOSE_POS = 0.90  # must finish at the top of its own range
 ANTICIPATE_TOP_N = 5
+
+# --------------------------------------------------------------------------- #
+#  TREND FLOOR (BUG 51, 03-Aug-2026)
+#
+#  Of 11 live alerts on 03-Aug, the four clean losers were the four names with
+#  no established uptrend:
+#      BHAGCHEM  ret_12m  -9.8%   dist200 13.1%   ->  -2.64%
+#      TBOTEK    ret_12m  +8.0%   dist200  5.5%   ->  -3.48%
+#      SPORTKING ret_12m +51.9%   gapped +15%     ->  -1.24%
+#      SWANDEF   no 12m history                   ->  -0.40%
+#  while all six winners had ret_12m >= 53% and dist200 >= 25%.
+#
+#  n=11 is far too small to act on, so it was re-tested on 18,202 tradeable
+#  signals over 5 years. The trend effect is real and monotonic:
+#
+#      ret_12m bucket     n       win%    mean      OOS
+#      < 10 (no trend)    1,693   33.3%   -0.339%   -0.397%
+#      10-50              6,145   35.3%   -0.099%   -0.568%
+#      >= 50             10,364   37.2%   +0.456%   +0.151%
+#      >= 100             5,273   38.3%   +0.711%   +0.489%
+#
+#  and stacked on the shipped close_pos filter:
+#
+#      close_pos>=0.9                       n 3,405  +1.043%  OOS +0.881%
+#      + ret_12m>=40  (previous)            n 2,376  +1.404%  OOS +1.341%
+#      + ret_12m>=50 & dist200>=25  (now)   n 1,822  +1.610%  OOS +1.647%
+#
+#  OOS improves +1.341% -> +1.647% and still leaves ~7 setups a week.
+#
+#  NOT ADOPTED: a gap cap. It looked decisive on 03-Aug (SPORTKING gapped
+#  +15%, BHAGCHEM +8.5%, both lost) but over 5 years gap_pct<=4 measured
+#  +0.160% against a +0.194% baseline - slightly WORSE. Two observations are
+#  not evidence.
+MIN_RET_12M = 50.0     # percent, trailing twelve months
+MIN_DIST_200DMA = 25.0  # percent above the 200-day moving average
 ANTICIPATE_FILE = "anticipate_picks.csv"
 
 # --------------------------------------------------------------------------- #
@@ -363,8 +398,18 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
         if "volume" in d else 0.0
 
     pre, _ = _pre_score_from_daily(d, level, c)
+    # Reuse watchlist.compute_metrics rather than recomputing the trend here,
+    # so the 08:45 shortlist and this scan can never disagree about a number.
+    trend = {}
+    try:
+        from watchlist import compute_metrics as _cm
+        trend = _cm(d, level, c) or {}
+    except Exception:
+        trend = {}
     m = dict(symbol="", close=c, level=level, which=which, gap_pct=gap,
              side=side, pre=pre,
+             ret_12m=float(trend.get("ret_12m", float("nan"))),
+             dist_200dma=float(trend.get("dist_200dma", float("nan"))),
              day_ret=(c / o - 1) * 100.0,
              close_pos=((c - lo) / rng) if rng > 0 else 0.5,
              rvol=(v / vma_cmp) if vma_cmp > 0 else float("nan"),
@@ -386,6 +431,22 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
     if m["pre"] < MIN_PRE_CONFIRM:
         m["ok"] = False
         m["reject"] = f"PRE {m['pre']}/8 < {MIN_PRE_CONFIRM} (weak trend)"
+        return m
+    # BUG 51 trend floor. NaN FAILS here rather than passing - unlike the
+    # market-cap rule, "no 12-month history" is not an unknown to be given the
+    # benefit of the doubt, it is a young listing with no established trend.
+    # SWANDEF (no 12m history) lost on 03-Aug.
+    r12 = m.get("ret_12m", float("nan"))
+    if not (r12 == r12) or r12 < MIN_RET_12M:
+        m["ok"] = False
+        shown = f"{r12:.0f}%" if r12 == r12 else "unknown"
+        m["reject"] = f"ret_12m {shown} < {MIN_RET_12M:.0f}% (no uptrend)"
+        return m
+    d200 = m.get("dist_200dma", float("nan"))
+    if not (d200 == d200) or d200 < MIN_DIST_200DMA:
+        m["ok"] = False
+        shown = f"{d200:.0f}%" if d200 == d200 else "unknown"
+        m["reject"] = f"dist200 {shown} < {MIN_DIST_200DMA:.0f}%"
         return m
     m["ok"] = True
     return m
@@ -658,6 +719,8 @@ def main() -> int:
                 "level": round(float(r["level"]), 2), "which": r["which"],
                 "gap_pct": round(float(r["gap_pct"]), 2),
                 "side": r.get("side", "below"),
+                "ret_12m": round(float(r.get("ret_12m") or 0), 1),
+                "dist_200dma": round(float(r.get("dist_200dma") or 0), 1),
                 "close_pos": round(float(r["close_pos"]), 3),
                 "day_ret": round(float(r["day_ret"]), 2),
                 "rvol": round(float(r.get("rvol") or 0), 2),
@@ -723,7 +786,9 @@ def main() -> int:
                   f"<i>🚀 above the level (to +{ANTICIPATE_ABOVE_MAX:g}%) or "
                   f"🔭 within {ANTICIPATE_NEAR:g}% below · closed in the top "
                   f"{int((1-ANTICIPATE_CLOSE_POS)*100)}% of today's range · "
-                  f"PRE ≥{MIN_PRE_CONFIRM} · {len(ant_rows)} screened</i>", ""]
+                  f"PRE ≥{MIN_PRE_CONFIRM} · 12m ≥{MIN_RET_12M:.0f}% · "
+                  f"≥{MIN_DIST_200DMA:.0f}% over 200DMA · "
+                  f"{len(ant_rows)} screened</i>", ""]
         if not ant_picks:
             lines.append("<i>Nothing qualified. Normal — this fires ~5x a "
                          "week.</i>")
@@ -743,15 +808,17 @@ def main() -> int:
                  f"<code>{_fmt(r['level'])}</code>") +
                 f" · closed at <b>{r['close_pos']*100:.0f}%</b> of range · "
                 f"day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x",
+                f"    <i>12m {r.get('ret_12m', 0):+.0f}% · "
+                f"{r.get('dist_200dma', 0):+.0f}% over the 200DMA</i>",
                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
                 f"<i>· exit tomorrow's close</i>", ""]
         if ant_dropped:
             lines.append(f"<i>{ant_dropped} more qualified, cap is top "
                          f"{ANTICIPATE_TOP_N}</i>")
-        lines.append("<i>close_pos≥0.90 + PRE≥6 measured +1.72%/trade "
-                     "(t 7.2, n=1,488), +1.70% out of sample — vs +0.42% for "
-                     "the score alone. 🚀 above-level measured better than 🔭 "
-                     "below (+0.82% vs +0.58%). Most still do not run.</i>")
+        lines.append("<i>close_pos≥0.90 + 12m≥50% + 200DMA≥25% measured "
+                     "+1.61%/trade (t 7.8, n=1,822), +1.65% out of sample. "
+                     "🚀 above-level beat 🔭 below (+0.82% vs +0.58%). "
+                     "Most still do not run — it pays through the tail.</i>")
 
     lines += ["", "━━━━━━━━━━━━━━━━━━━━",
         "<i>Tier A measured +1.75%/trade (t 5.2, n=417) over 5 years; "
