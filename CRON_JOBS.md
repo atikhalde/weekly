@@ -1,100 +1,98 @@
-# Which files need an external cron job
+# Which files to create cron jobs for
 
-**Answer as of 04-Aug-2026: FOUR jobs — `scan`, `btst`, `report`, `ab`.**
-
----
-
-## RETRACTION (BUG 55)
-
-This file used to say:
-
-> "cron-job.org is only needed for `scan.yml`. Everything else can stay on
-> GitHub's own schedule." … "On the post-market jobs, being 15 minutes late
-> changes nothing."
-
-**That was wrong, and 03-Aug-2026 proved it three separate ways:**
-
-| workflow | what actually happened on 03-Aug |
-|---|---|
-| `btst.yml` | ran **15:48 IST** — 28 min late, *after* the 15:30 close. The alert still said "BUY NOW" on an entry that no longer existed. |
-| `report.yml` | **zero scheduled runs.** No paper report after the market. |
-| `ab.yml` | **zero scheduled runs.** |
-
-Two errors in the old reasoning:
-
-1. **"Being 15 minutes late changes nothing"** is false for `btst.yml`. It has
-   a **ten-minute entry window** (15:20 → 15:30). Late is not degraded, it is
-   *worthless*.
-2. **"Late" was the wrong risk.** The real failure was **not running at all**.
-   GitHub's `schedule:` silently drops ticks under load — you get no run, no
-   failure, and no notification.
+Short answer: **cron-job.org is only needed for `scan.yml`.** Everything else
+can stay on GitHub's own schedule.
 
 ---
 
-## The four jobs
+## Why only scan.yml
 
-All four workflows now accept `repository_dispatch`, so cron-job.org can fire
-them directly instead of hoping GitHub's scheduler wakes up. The `schedule:`
-crons are kept as a **fallback**.
+GitHub's `schedule:` is **best-effort**. Under load it runs late — commonly
+3–4 minutes, sometimes skipping ticks entirely. That matters differently for
+each workflow:
 
-| workflow | IST time | event_type | why it needs this |
+| workflow | GitHub schedule (IST) | does lateness hurt? | needs external cron? |
 |---|---|---|---|
-| `scan.yml` | every 5 min, 08:45–15:55 | *(existing setup)* | 4-min delay on a 5-min candle = alert after the move |
-| **`btst.yml`** | **15:18** | `btst` | ten-minute entry window; late = untradeable |
-| **`report.yml`** | **16:00** | `report` | didn't fire at all on 03-Aug |
-| **`ab.yml`** | **16:15** | `ab` | didn't fire at all on 03-Aug |
+| **scan.yml** | 08:45–15:55, every 5 min | **YES** — a 4-min delay on a 5-min candle means you get the alert after the move | **YES** |
+| snapshot.yml | Mon 08:15, Sun 18:00 | No — it just has to finish before Monday's open | No |
+| report.yml | 16:00 Mon–Fri | No — post-market summary | No |
+| ab.yml | 16:15 Mon–Fri | No — post-market summary | No |
+| tests.yml | on push only | n/a | No |
 
-`snapshot.yml` and `healthcheck.yml` genuinely don't need it — the snapshot
-only has to finish before Monday's open, and the health check is itself the
-thing that reports failures.
+You are hunting moves that happen in minutes. On `scan.yml` an external
+trigger fires in ~80–90 s instead of 3–4 min. On the post-market jobs, being
+15 minutes late changes nothing.
 
----
-
-## Setup, per job
-
-Create a **PAT** with `repo` scope (Settings → Developer settings → Personal
-access tokens). Then on cron-job.org create one job per row above:
-
-- **URL** `https://api.github.com/repos/atikhalde/weekly/dispatches`
-- **Method** `POST`
-- **Headers**
-  ```
-  Authorization: Bearer <YOUR_PAT>
-  Accept: application/vnd.github+json
-  Content-Type: application/json
-  ```
-- **Body** — one of:
-  ```json
-  {"event_type":"btst"}
-  {"event_type":"report"}
-  {"event_type":"ab"}
-  ```
-- **Schedule** the IST time from the table, **Mon–Fri**. Set the job's timezone
-  to `Asia/Kolkata` so you don't have to do UTC arithmetic.
-
-A successful dispatch returns **HTTP 204** with an empty body. If you get 401
-the PAT is wrong or expired; 404 usually also means the PAT lacks `repo` scope.
-
-### Why 15:18 and not 15:20
-
-The dispatch itself takes a few seconds and the runner needs ~40–60 s to boot
-and install dependencies. Firing at 15:18 puts the scan itself at ~15:20.
+**So: one cron job, pointed at `scan.yml`.** That is what `CRONJOB_SETUP.md`
+already documents, and it is still the right call.
 
 ---
 
-## The safety net
+## The single job to create
 
-Even with all of this, `btst.py` now refuses to lie about a late run
-(**BUG 55**):
+<https://console.cron-job.org/jobs> → CREATE CRONJOB
 
-- **after 15:30** → header reads `⛔ TOO LATE`, every pick shows `MISSED`
-  instead of `BUY NOW`, and the picks file records `tradeable=0` so Model E
-  does not book a fill that could never have happened
-- **before 15:00** → header reads `⏳ PROVISIONAL` (tier precision is only
-  ~70% that early, vs 82% at 15:20)
+| Field | Value |
+|---|---|
+| Title | `NSE 5m breakout scan` |
+| URL | `https://api.github.com/repos/atikhalde/weekly/actions/workflows/scan.yml/dispatches` |
+| Method | **POST** |
+| Request body | `{"ref":"main"}` |
 
-The alert is still **sent** and the picks are still **written** in both cases.
-Suppressing them would hide the outage, which is the mistake BUG 49 was about.
+Headers:
 
-So if a schedule slips again you will *see* it, in the message, at the top —
-rather than acting on an unfillable price.
+```
+Accept: application/vnd.github+json
+Authorization: Bearer <YOUR_PAT>
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+```
+
+Schedule — **set timezone to Asia/Kolkata FIRST**, then:
+
+| Field | Value |
+|---|---|
+| Days of month | Every day |
+| Months | Every month |
+| Days of week | Mon–Fri |
+| Hours | 9, 10, 11, 12, 13, 14, 15 |
+| Minutes | 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55 |
+
+= 84 fires/day. Success is **HTTP 204** with no body.
+
+Full step-by-step, including the PAT setup and the error-code table, is in
+`CRONJOB_SETUP.md` in the repo.
+
+---
+
+## Do NOT disable the GitHub schedules
+
+Keep both running. They cannot double-alert:
+
+- `state.json` de-duplicates every signal
+- `concurrency: scan` in the workflow stops overlapping runs
+
+The GitHub schedule is your fallback if cron-job.org is down.
+
+---
+
+## Optional second job
+
+If you want the A/B standings to land promptly each day you *could* add a
+second job pointed at `ab.yml` (same headers/body, 16:15 IST, Mon–Fri). It is
+genuinely optional — the workflow already runs itself, and being a few minutes
+late on a post-market report costs nothing.
+
+I would not bother. One job, one thing to renew, one thing to monitor.
+
+---
+
+## One thing to diarise
+
+The GitHub PAT expires (90 days if you followed the guide). **An expired token
+means no external trigger and no error** — cron-job.org will just log 401s
+while GitHub's slower schedule quietly carries the load. Set a calendar
+reminder to rotate it.
+
+To check it is working: cron-job.org → your job → history should show a wall
+of **204**s. Anything else, see the error table in `CRONJOB_SETUP.md`.
