@@ -15,8 +15,17 @@ name: BTST Scan (15:20 IST)
 # workflow from cron-job.org the same way scan.yml is - the schedule below is
 # the fallback, not a guarantee.
 #
-# Read-only: it never commits, never places orders, and never touches
-# state.json, so it cannot interfere with the live scanner.
+# It runs TWO scans and commits TWO lists:
+#   btst_picks.csv        confirmed - broke out TODAY (Models E / E-wide)
+#   anticipate_picks.csv  pre-breakout - within 3% and closed at the top of
+#                         its range (Model F)
+# Overlap between them is 0.1%, so they are reported and traded separately.
+#
+# It COMMITS btst_picks.csv - the top-5 list with the 15:20 entry price. That
+# file is Model E's trade list: the 16:15 paper job reads it instead of
+# re-deriving its own picks from the completed candle, so the alert you receive
+# and the ledger entry are guaranteed to be the same trade at the same price.
+# It never places orders and never touches state.json.
 on:
   schedule:
     - cron: "50 9 * * 1-5"
@@ -36,7 +45,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write        # to commit btst_picks.csv
 
 jobs:
   btst:
@@ -67,12 +76,39 @@ jobs:
             ${{ inputs.all && '--all' || '' }} \
             ${{ inputs.after_close && '--after-close' || '' }}
 
+      - name: Commit the picks file
+        if: success()
+        run: |
+          if [[ ! -f btst_picks.csv && ! -f anticipate_picks.csv ]]; then
+            echo "no picks today - nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add btst_picks.csv anticipate_picks.csv 2>/dev/null || git add btst_picks.csv
+          if git diff --cached --quiet; then
+            echo "picks unchanged"
+            exit 0
+          fi
+          git commit -m "BTST picks $(date -u +%Y-%m-%d)"
+          # the 5m scan commits state.json on the same repo; rebase rather
+          # than clobber it
+          for i in 1 2 3; do
+            git pull --rebase --autostash && git push && exit 0
+            sleep 5
+          done
+          echo "could not push the picks file" >&2
+          exit 1
+
       - name: Upload the BTST CSV
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: btst
-          path: "btst_*.csv"
+          path: |
+            btst_*.csv
+            btst_picks.csv
+            anticipate_picks.csv
           if-no-files-found: ignore
           retention-days: 30
 
