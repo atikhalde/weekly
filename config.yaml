@@ -179,8 +179,17 @@ runtime:
   min_weekly_bars: 60
   prefilter: true                 # bulk-quote funnel before the per-symbol replay
   prefilter_headroom_pct: 0.0     # >0 keeps names slightly below the level too
-  max_workers: 4
-  data_rate_per_sec: 4            # Dhan allows 5/s; stay just under to leave
+  # BUG 50 (03-Aug-2026). The Monday rebuild degraded from 1.8 s/symbol to
+  # 4.1 s/symbol once Dhan started returning 429s, projecting ~2.6 hours for
+  # 2,372 symbols. Every 429 triggers a GLOBAL pause (RateLimiter.pause), so
+  # four threads racing the same bucket make the whole build slower, not
+  # faster - one thread's 429 stalls all of them.
+  #
+  # 3 workers x 3/sec is below Dhan's 5/sec ceiling with real headroom. It is
+  # SLOWER in the best case and much faster in the realistic case, because it
+  # avoids the backoff spiral.
+  max_workers: 3
+  data_rate_per_sec: 3            # Dhan allows 5/s; stay well under - see the
                                   # headroom - at exactly 5 any jitter or retry
                                   # trips 429 (70 symbols were lost that way).
   quote_rate_per_sec: 1           # Dhan Quote API limit

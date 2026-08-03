@@ -743,10 +743,21 @@ def test_snapshot_build_resumes_from_partial_file():
 
 
 def test_snapshot_timeout_is_realistic():
-    """330 min let a stuck run burn hours; the work is ~10 min of API time."""
+    """
+    SUPERSEDED BY BUG 50. The old assertion (<=120 min) rested on an estimate
+    of "~10 min of API time". The 03-Aug log disproved it: under Dhan 429
+    backoff the build ran at 4.1 s/symbol, projecting ~154 min for 2,372
+    symbols. A 120-minute cap would kill a healthy build at ~1,900 names.
+
+    The timeout must now be generous enough to finish a THROTTLED build and
+    still bounded enough to surface a genuine hang.
+    """
     wf = load_workflow("snapshot.yml")
     job = next(iter(wf["jobs"].values()))
-    assert job.get("timeout-minutes", 999) <= 120
+    t = job.get("timeout-minutes", 999)
+    assert 180 <= t <= 360, (
+        f"timeout {t} min - must clear the measured ~154 min worst case "
+        "without being unbounded")
 
 
 # --------------------------------------------------------------------------- #
@@ -5946,14 +5957,24 @@ def test_bug49_healthcheck_workflow_exists_and_runs_premarket():
     assert "exit 1" in wf, "an unhealthy check must fail the workflow"
 
 
-def test_bug49_snapshot_workflow_cannot_hang_indefinitely():
-    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
+def test_bug49_snapshot_workflow_is_bounded():
+    """
+    SUPERSEDED BY BUG 50. This originally required timeout <= 60 and
+    cancel-in-progress: true, on the belief that the 03-Aug build had hung.
+    The log later showed it was rate-limited and crawling toward a legitimate
+    ~154-minute finish, so both requirements were wrong and would have
+    guaranteed the outage they were meant to prevent.
+
+    What still matters, and is asserted here, is that the job is BOUNDED at
+    all - an unbounded build hides a real hang. The specific bound is pinned
+    by test_bug50_snapshot_timeout_fits_a_ratelimited_build.
+    """
     import re
+
+    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
     m = re.search(r"timeout-minutes:\s*(\d+)", wf)
-    assert m and int(m.group(1)) <= 60, (
-        "a hung build occupied the runner for 4.5h on 03-Aug - cap it")
-    assert "cancel-in-progress: true" in wf, (
-        "a newer snapshot build must supersede a hung one")
+    assert m, "the snapshot job must declare a timeout"
+    assert int(m.group(1)) <= 360
 
 
 def test_bug49_failure_message_does_not_promise_a_fallback():
@@ -5965,3 +5986,91 @@ def test_bug49_failure_message_does_not_promise_a_fallback():
     wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
     assert "keep using last week" not in wf
     assert "does NOT fall back" in wf
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 50 - I diagnosed a rate-limited build as a HUNG build and "fixed" it by
+#  making the timeout SHORTER. That would have guaranteed the failure.
+#
+#  WHAT THE 03-AUG LOG ACTUALLY SHOWED
+#      07:20  200/2372  ok=174 err=1     363s   -> 1.81 s/symbol
+#      07:33  400/2372  ok=346 err=8    1182s   -> 4.09 s/symbol for 200-400
+#  with repeated "429 rate limited" warnings. Projected total: ~154 min.
+#
+#  The build was not hung. It was throttled and crawling, and the 4.5 hours it
+#  had been running was consistent with finishing. My change from 90 -> 45 min
+#  would have killed it at ~770 of 2,372 symbols; even 90 min only reaches
+#  ~1,430. Both produce an unusable snapshot and the same outage.
+#
+#  I also set cancel-in-progress: true, which for a RESUMABLE long build is
+#  strictly harmful - it throws away a healthy run in progress.
+#
+#  CORRECTED
+#    * timeout 330 min, sized from the measured degraded rate with headroom
+#    * cancel-in-progress back to false
+#    * a continuation step: the commit already runs on always(), and
+#      build_snapshot.py resumes from a partial file for the same week and
+#      logic_version, so a killed run is not wasted - it is continued
+#    * max_workers 4 -> 3 and data_rate 4 -> 3/sec. A 429 triggers a GLOBAL
+#      pause, so more threads on the same bucket make the build SLOWER.
+#
+#  The lesson, and the reason this block is long: I inferred "hung" from
+#  elapsed time alone without reading the log. The elapsed time was the only
+#  evidence I had, and it was consistent with two very different causes.
+# --------------------------------------------------------------------------- #
+def test_bug50_snapshot_timeout_fits_a_ratelimited_build():
+    import re
+
+    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
+    m = re.search(r"timeout-minutes:\s*(\d+)", wf)
+    assert m, "the snapshot job must have a timeout"
+    mins = int(m.group(1))
+    # measured worst case ~154 min; anything under ~180 risks killing a
+    # healthy but throttled build
+    assert mins >= 180, (
+        f"timeout {mins} min is below the measured worst case (~154 min at "
+        "4.1 s/symbol under 429 backoff) - this is the BUG 50 mistake")
+    assert mins <= 360, "an unbounded timeout hides a genuine hang"
+
+
+def test_bug50_slow_build_is_not_cancelled():
+    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
+    assert "cancel-in-progress: false" in wf, (
+        "a resumable multi-hour build must never be cancelled by a newer run")
+
+
+def test_bug50_partial_progress_is_committed_and_continued():
+    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
+    commit = wf.split("name: Commit snapshot", 1)[1][:400]
+    assert "if: always()" in commit, (
+        "partial progress must be committed even when the build is killed")
+    assert "Continue if the snapshot is incomplete" in wf
+    assert "run_attempt" in wf, "the continuation must not loop forever"
+
+
+def test_bug50_build_snapshot_resumes_from_a_partial_file():
+    """The continuation only works because the builder resumes. Pin that."""
+    src = (ROOT / "build_snapshot.py").read_text()
+    assert "resuming:" in src
+    assert "done_symbols" in src
+    assert "logic_version" in src, (
+        "resume must be scoped to the same logic version or it silently keeps "
+        "stale formulas")
+
+
+def test_bug50_rate_limits_leave_headroom():
+    from config import load_config
+
+    cfg = load_config(None)
+    assert cfg.runtime.data_rate_per_sec <= 3, (
+        "Dhan allows 5/s but a 429 pauses ALL threads - stay well under")
+    assert cfg.runtime.max_workers <= 3, (
+        "more workers on one rate bucket makes a throttled build slower")
+
+
+def test_bug50_reasoning_is_recorded():
+    """So the timeout is not 'tidied down' again by someone reading it cold."""
+    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
+    assert "BUG 50" in wf
+    cfg = (ROOT / "config.yaml").read_text()
+    assert "429" in cfg and "GLOBAL pause" in cfg
