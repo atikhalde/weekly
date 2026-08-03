@@ -539,7 +539,13 @@ LEDGER_COLS = ["model", "model_label", "horizon", "symbol", "week", "signal_date
                # btst_source records whether the trade came from the 15:20
                # picks file ("picks") or was rebuilt after the close
                # ("reconstructed") - the two are NOT equally trustworthy.
-               "btst_tier", "btst_day_ret", "btst_rank", "btst_source"]
+               "btst_tier", "btst_day_ret", "btst_rank", "btst_source",
+               # BUG 53: which arm the pick came from - fresh_A / fresh_B /
+               # aged_B - and how old the breakout was. Recorded so the arms
+               # can be scored SEPARATELY on forward data instead of blended.
+               # Aged tier B is the newest and least forward-verified arm; if
+               # it underperforms live this column is how that gets caught.
+               "btst_arm", "btst_age"]
 
 
 def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int]:
@@ -1042,12 +1048,29 @@ def main() -> int:
                                     # price - otherwise the alert and the
                                     # ledger describe different trades.
                                     pick = picks_lookup.get((day_key, sig.symbol))
+                                    # BUG 55: a pick the 15:20 job produced
+                                    # AFTER the close was never enterable.
+                                    # Booking it would make the paper ledger
+                                    # claim a fill that could not have
+                                    # happened - exactly the drift the picks
+                                    # file exists to prevent. Older files have
+                                    # no such column; those all predate the
+                                    # guard and are treated as tradeable.
+                                    if pick is not None and not bool(
+                                            int(float(pick.get("tradeable", 1) or 0))):
+                                        continue
                                     if pick is not None:
                                         sig.price = float(pick["entry"])
                                         sig.btst_tier = str(pick.get("tier") or "")
                                         sig.btst_day_ret = float(pick.get("day_ret") or 0.0)
                                         sig.btst_rank = int(pick.get("rank") or 0)
                                         sig.btst_source = "picks"
+                                        # BUG 53: carry the arm through from
+                                        # the 15:20 file. Older picks files
+                                        # have no such column - default to
+                                        # fresh, which is what they all were.
+                                        sig.btst_arm = str(pick.get("arm") or "")
+                                        sig.btst_age = int(float(pick.get("age") or 0))
                                     elif picks_have_day.get(day_key):
                                         # The picks file covers this day and
                                         # this name is not in it -> it was not
@@ -1091,6 +1114,8 @@ def main() -> int:
                             rec["btst_day_ret"] = getattr(sig, "btst_day_ret", None)
                             rec["btst_rank"] = getattr(sig, "btst_rank", None)
                             rec["btst_source"] = getattr(sig, "btst_source", None)
+                            rec["btst_arm"] = getattr(sig, "btst_arm", None)
+                            rec["btst_age"] = getattr(sig, "btst_age", None)
                             rows.append(rec)
                             per_model_counts[m.key] += 1
                             if tr.exit_date:

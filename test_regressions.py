@@ -4458,8 +4458,12 @@ def _btst_frame(day_ret, close_pos, rvol, atr_pct=5.0, n=260, price=100.0):
 def test_bug38_btst_tier_a_is_the_yasho_shape():
     from btst import classify
 
+    # age=0 is explicit: _btst_frame() builds a series that is ALREADY above
+    # `level` on every bar, so there is no cross in it to date and
+    # breakout_age() correctly returns 999. The live scanner passes age=0 for
+    # anything whose alert fired today (BUG 53).
     m = classify(_btst_frame(day_ret=18.4, close_pos=1.0, rvol=8.0, atr_pct=4.9),
-                 level=95.0)
+                 level=95.0, age=0)
     assert m is not None
     assert m["tier"] == "A", m
     assert m["day_ret"] > 15 and m["close_pos"] >= 0.85
@@ -4702,8 +4706,11 @@ def test_bug39_tier_logic_is_shared_with_the_nightly_scanner():
     assert "import btst" in src and "TIER_A_DAY" in src, \
         "the paper model must import the thresholds, not restate them"
     assert btst.TIER_A_DAY == 15.0
-    assert btst.TIER_A_CLOSE_POS == 0.85
     assert btst.TIER_B_RVOL == 3.0
+    # The POINT of this test is that the two modules share ONE definition, so
+    # it asserts the shared-source invariant rather than pinning the numbers
+    # (which BUG 54 moved). The exact floors are asserted in their own test.
+    assert 0.5 <= btst.TIER_A_CLOSE_POS <= 1.0
 
     # a YASHO-shaped day is Tier A in both
     day = dict(open=100.0, high=118.5, low=99.5, close=118.4, volume=8e6)
@@ -4962,8 +4969,8 @@ def test_bug41_partial_candle_is_accepted_and_volume_prorated():
 
     # 2.8x a full day's average, but only 93% of the session has elapsed
     df = frame(vol_today=500000.0 * 2.8)
-    full = classify(df, level=950.0, partial_frac=1.0)
-    part = classify(df, level=950.0, partial_frac=0.93)
+    full = classify(df, level=950.0, partial_frac=1.0, age=0)
+    part = classify(df, level=950.0, partial_frac=0.93, age=0)
     assert part["rvol"] > full["rvol"], "a partial session must lift rvol"
     assert part["tier"] == "B", part
     assert part["partial_frac"] == 0.93
@@ -5050,7 +5057,10 @@ def test_bug42_picks_file_records_the_1520_entry_price(tmp_path):
     """The entry written must be the price at the SCAN, not the close - the
     close does not exist yet when the alert is sent."""
     body = (ROOT / "btst.py").read_text()
-    chunk = body.split("this IS the trade list", 1)[1][:1200]
+    # slice to the END of the picks-file dict rather than a fixed character
+    # count - new columns (BUG 53 arm/age, BUG 55 tradeable) kept pushing the
+    # entry line past an arbitrary window and failing for no real reason.
+    chunk = body.split("this IS the trade list", 1)[1].split("pfile =", 1)[0]
     assert '"scan_time"' in chunk
     assert '"entry": round(float(r["close"])' in chunk, (
         "entry must come from the partial candle's current price")
@@ -5220,14 +5230,298 @@ def test_bug43_stale_names_are_counted_and_explained():
     otherwise the next person assumes the scan missed it."""
     body = (ROOT / "btst.py").read_text()
     assert "stale" in body
-    assert "+1.74%" in body and "+0.16%" in body, (
-        "the message must state WHY an aged breakout is excluded")
+    # REVISED BY BUG 53. This used to require the message to quote
+    # "+1.74% / +0.16%" as the reason an aged breakout was excluded. Aged
+    # breakouts are no longer excluded wholesale - only aged TIER A is - so
+    # the message says which tiers age out instead of a blanket exclusion.
+    assert "tier B candidates only" in body, (
+        "the log must say aged names are still tier B candidates")
+    assert "Tier B holds with age; Tier A does not" in body, (
+        "the alert must explain which tier survives ageing")
 
 
 def test_bug43_the_measured_decay_is_recorded():
+    """The ORIGINAL BUG 43 measurement must stay in the file even though its
+    conclusion was narrowed by BUG 53 - the numbers are why tier A is still
+    same-day only."""
     body = (ROOT / "btst.py").read_text()
-    for token in ("age 0", "Tier A  age >=1", "t 5.03", "t 0.20"):
+    for token in ("age 0", "t 5.03", "t 0.20"):
         assert token in body, f"btst.py must document {token!r}"
+    assert "AGE_GATE_TIERS" in body
+
+
+def test_bug53_age_gate_applies_to_tier_a_only():
+    """
+    THE FINDING. Measured on 892,858 tradeable stock-days (not just breakout
+    days, which is what BUG 43 had and why it over-generalised):
+
+        aged tier A   IS +0.795 -> OOS -0.843   dead, stays excluded
+        aged tier B   IS +0.999 -> OOS +0.885   most stable arm measured
+
+    Tier A is a magnitude test and magnitude expires; tier B is a character
+    test and character does not.
+    """
+    from btst import classify, AGED_EXT_MIN, AGED_EXT_MAX
+
+    # ---- an aged TIER A shape must NOT qualify
+    m = classify(_btst_frame(day_ret=18.4, close_pos=1.0, rvol=8.0, atr_pct=4.9),
+                 level=95.0, age=3)
+    assert m["tier"] is None, m
+    assert "aged" in m["reject"].lower() or "old" in m["reject"].lower()
+
+    # ---- the SAME shape fresh is still tier A
+    assert classify(_btst_frame(day_ret=18.4, close_pos=1.0, rvol=8.0,
+                                atr_pct=4.9), level=95.0, age=0)["tier"] == "A"
+
+
+def test_bug53_aged_tier_b_qualifies_inside_the_band():
+    """Aged tier B is tradeable, but only while it is still near its level -
+    the band is both an edge filter and the 15:20 API-time budget (BUG 52)."""
+    import pandas as pd
+
+    from btst import classify, AGED_EXT_MAX
+
+    def frame(level_mult, n=260, base=500000.0):
+        """A tier-B day (closes at its high on 4x volume) sitting
+        `level_mult` above the level."""
+        price = 1000.0
+        rows = [dict(open=price * .995, high=price * 1.03, low=price * .97,
+                     close=price, volume=base) for _ in range(n - 1)]
+        rows.append(dict(open=price, high=price * 1.06, low=price * .999,
+                         close=price * 1.059, volume=base * 4.0))
+        return pd.DataFrame(rows)
+
+    df = frame(1.0)
+    close = float(df.iloc[-1]["close"])
+
+    # inside the band (a few % above the level) -> tier B even at age 40
+    lvl_in = close / (1 + (AGED_EXT_MAX - 5) / 100.0)
+    m = classify(df, level=lvl_in, age=40)
+    assert m["tier"] == "B", m
+    assert m["age"] == 40 and m["fresh"] is False
+
+    # far above the band -> rejected as a chase
+    lvl_far = close / (1 + (AGED_EXT_MAX + 25) / 100.0)
+    assert classify(df, level=lvl_far, age=40)["tier"] is None
+
+    # no cross at all in the lookback -> not a breakout to age
+    assert classify(df, level=lvl_in, age=999)["tier"] is None
+
+
+def test_bug53_breakout_age_counts_sessions_since_the_cross():
+    import pandas as pd
+
+    from btst import breakout_age
+
+    def f(closes):
+        return pd.DataFrame([dict(open=c, high=c, low=c, close=c, volume=1.0)
+                             for c in closes])
+
+    # crossed 100 on the last bar
+    assert breakout_age(f([90, 95, 99, 101]), 100.0) == 0
+    # crossed two bars ago and stayed above
+    assert breakout_age(f([90, 99, 101, 103, 104]), 100.0) == 2
+    # never crossed
+    assert breakout_age(f([90, 91, 92, 93]), 100.0) == 999
+    # above the whole time -> no cross event exists
+    assert breakout_age(f([101, 102, 103]), 100.0) == 999
+
+
+def test_bug54_close_pos_floors_are_098_for_both_tiers():
+    """
+    SUPERSEDES the BUG 53 version of this test, which asserted 0.95 for tier B
+    and 0.85 for tier A. Both were wrong:
+
+      * the 0.95-0.99 band that a 0.95 floor admits measures -0.222% (n=235,
+        win 41.7%) - a losing bucket hidden inside a monotonic curve
+      * tier A rows with close_pos 0.85-0.98 measure +0.101% over 5 years
+        (n=193, win 42.5%) - noise occupying real slots
+
+    0.98 rather than 0.99 because the live scan judges close_pos on a PARTIAL
+    15:20 candle and 0.99 is knife-edge against a bar with ten minutes left.
+    """
+    import btst
+
+    assert btst.TIER_B_CLOSE_POS == 0.98
+    assert btst.TIER_A_CLOSE_POS == 0.98, (
+        "BUG 54: the tier A floor was measured, not assumed - the discarded "
+        "0.85-0.98 slice is worthless (+0.101%, 42.5% win)")
+
+    # a 0.96 close no longer makes tier B
+    m = btst.classify(_btst_frame(day_ret=6.0, close_pos=0.96, rvol=6.0,
+                                  atr_pct=5.0), level=95.0, age=0)
+    assert m["tier"] is None, m
+    m = btst.classify(_btst_frame(day_ret=6.0, close_pos=0.99, rvol=6.0,
+                                  atr_pct=5.0), level=95.0, age=0)
+    assert m["tier"] == "B", m
+
+    # a +18% day that FADED (closed mid-range) is no longer tier A
+    m = btst.classify(_btst_frame(day_ret=18.0, close_pos=0.90, rvol=8.0,
+                                  atr_pct=5.0), level=95.0, age=0)
+    assert m["tier"] != "A", m
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 55 - THE 15:48 ALERT. "entry time should have between 15:20 to 15:30,
+#  but currently it's showings 15:48 which impossible after market trade"
+#
+#  The scan was correct; it simply had no concept of being too late. GitHub's
+#  scheduler queued the 15:20 job 28 minutes late and the code still printed
+#  "BUY NOW" on an entry that no longer existed.
+# --------------------------------------------------------------------------- #
+def test_bug55_entry_window_is_enforced():
+    """A run after 15:30 must not tell anyone to buy at today's close."""
+    body = (ROOT / "btst.py").read_text()
+    assert "entry_close = dtime(15, 30)" in body
+    assert "entry_open = dtime(15, 0)" in body
+    assert "too_late" in body and "too_early" in body
+    # the alert must degrade, not lie
+    assert "MISSED" in body, "a late pick must be labelled MISSED"
+    assert "TOO LATE" in body
+    # and it must still SEND - suppressing it would hide the outage (BUG 49)
+    seg = body.split("too_late = ", 1)[1][:1500]
+    assert "return" not in seg.split("if too_late:", 1)[1][:400], (
+        "a late run must still send and still write picks - silence is the "
+        "failure mode BUG 49 was about")
+
+
+def test_bug55_late_picks_are_marked_untradeable_and_model_e_skips_them():
+    """The paper ledger must not book a fill that could never have happened."""
+    body = (ROOT / "btst.py").read_text()
+    chunk = body.split("this IS the trade list", 1)[1].split("pfile =", 1)[0]
+    assert '"tradeable": 0 if too_late else 1' in chunk, (
+        "the picks file must record whether the pick was enterable")
+
+    ab = (ROOT / "ab_paper.py").read_text()
+    assert 'pick.get("tradeable", 1)' in ab, (
+        "Model E must honour the tradeable flag")
+    # default 1 so pre-BUG-55 picks files keep working
+    seg = ab.split('pick.get("tradeable"', 1)[1][:80]
+    assert "1" in seg, "older picks files must default to tradeable"
+
+
+def test_bug55_the_schedule_is_no_longer_cron_only():
+    """
+    GitHub cron is best-effort. On 03-Aug btst/report/ab ALL had zero
+    scheduled runs. Each must accept an external trigger so cron-job.org can
+    drive it on time, the way scan.yml already is.
+    """
+    for wf in ("btst.yml", "report.yml", "ab.yml"):
+        body = (ROOT / ".github" / "workflows" / wf).read_text()
+        assert "repository_dispatch:" in body, (
+            f"{wf} must accept repository_dispatch - GitHub cron alone "
+            f"demonstrably does not fire")
+    btst_wf = (ROOT / ".github" / "workflows" / "btst.yml").read_text()
+    assert "types: [btst]" in btst_wf
+
+
+def test_bug55_top_n_is_a_cap_not_a_target():
+    """
+    The user expected 5 BTST entries and got 1. That is CORRECT behaviour and
+    must stay correct: measured over 5 years, 63.7% of firing days produce
+    exactly one qualifying name and only 2.1% produce five. Nothing may pad
+    the list to reach TOP_N.
+    """
+    import btst
+
+    assert btst.TOP_N == 5
+    body = (ROOT / "btst.py").read_text()
+    assert "qualified[:TOP_N]" in body, "TOP_N must slice, never extend"
+    # there must be no 'fill up to N' logic anywhere near the picks
+    seg = body.split("qualified.sort(key=rank_key)", 1)[1][:600]
+    for bad in ("while len(picks) <", "pad", "top_up", "extend(qualified"):
+        assert bad not in seg, f"picks must never be padded - found {bad!r}"
+
+
+def test_bug54_conviction_scores_the_fat_tail_and_never_gates():
+    """
+    The conviction score answers "which pick is the BIG one". It must be a
+    RANK: measured as a filter it costs coverage and RAISES drawdown
+    (conv>=3: CAGR 176% DD -47.6% vs all: CAGR 494% DD -29.4%) while the mean
+    barely moves. It orders P(+5%) 4.3% -> 31.2% monotonically, which is the
+    thing it is actually for.
+    """
+    import btst
+
+    assert btst.CONVICTION_MAX == 4
+
+    # maximum conviction: fresh tier A, high atr, big day, unexhausted trend
+    hi, why = btst.conviction(dict(fresh=True, tier="A", atr_pct=6.0,
+                                   day_ret=18.0, ret_12m=120.0))
+    assert hi == 4, why
+
+    # an exhausted trend loses the point even though everything else is there
+    ex, _ = btst.conviction(dict(fresh=True, tier="A", atr_pct=6.0,
+                                 day_ret=18.0, ret_12m=450.0))
+    assert ex == 3
+
+    # a steady aged tier B scores low - correct, it is not an explosive setup
+    lo, _ = btst.conviction(dict(fresh=False, tier="B", atr_pct=3.5,
+                                 day_ret=2.0, ret_12m=300.0))
+    assert lo == 0
+
+    # NaN must not raise and must not score
+    n, _ = btst.conviction(dict(fresh=True, tier="A", atr_pct=float("nan"),
+                                day_ret=float("nan"), ret_12m=float("nan")))
+    assert n == 1  # only the fresh-tier-A point
+
+    # IT MUST NEVER REMOVE A TRADE. The scan may sort on conviction but must
+    # not filter on it.
+    body = (ROOT / "btst.py").read_text()
+    scan = body.split("qualified = [r for r in tiered", 1)[1][:2000]
+    assert "conviction" in scan, "conviction must be computed for picks"
+    for bad in ("if r[\"conviction\"] >", "conviction\") >=", "conviction >= "):
+        assert bad not in scan, (
+            f"conviction must be a RANK, not a gate - found {bad!r}")
+
+
+def test_bug53_trend_floor_applies_to_confirmed_tiers_too():
+    """
+    BUG 51 added the trend floor but wired it only into classify_approach(),
+    so the 03-Aug losers it was written to stop could still reach the BTST
+    list through the tier route. Every tier number in btst.py was measured
+    WITH the floor applied.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "def trend_ok" in body, "confirmed picks must check the trend floor"
+    head, tail = body.split("def trend_ok", 1)
+    assert "MIN_RET_12M" in tail[:900] and "MIN_DIST_200DMA" in tail[:900]
+    # and it must actually be applied to the tiered list, not just defined
+    assert "trend_ok(r)" in body
+
+
+def test_bug53_no_double_count_between_confirmed_and_anticipate():
+    """An aged tier B name is eligible for BOTH pools. Without an explicit
+    exclusion Model E and Model F would buy it on the same day and the ledger
+    would count one trade twice."""
+    body = (ROOT / "btst.py").read_text()
+    assert "taken = {r[\"symbol\"] for r in picks}" in body
+    seg = body.split("pending = [s for s in snaps", 1)[1][:300]
+    assert "taken" in seg, (
+        "the anticipation pool must exclude names already taken as picks")
+
+
+def test_bug53_picks_file_records_the_arm():
+    """The paper ledger has to be able to score fresh and aged apart forever,
+    otherwise the two get blended and neither can be judged."""
+    body = (ROOT / "btst.py").read_text()
+    chunk = body.split("out = pd.DataFrame", 1)[1][:1400]
+    for field in ('"age"', '"arm"', '"ext_pct"'):
+        assert field in chunk, f"picks file must record {field}"
+    assert "fresh_A" in chunk and "aged_B" in chunk
+
+
+def test_bug53_message_does_not_claim_everything_broke_out_today():
+    """A name 55 days past its cross must not be presented under a headline
+    that says it broke out today."""
+    body = (ROOT / "btst.py").read_text()
+    # look at the message construction only, not the comments explaining the
+    # change (which necessarily quote the old wording).
+    msg = body.split("lines = [f\"🌙 <b>BTST", 1)[1][:2500]
+    assert "broke out TODAY only" not in msg, (
+        "the header can no longer claim every pick is same-day")
+    assert "broke out {age} session(s) ago" in msg, (
+        "aged picks must state their own age in the message")
 
 
 # --------------------------------------------------------------------------- #
@@ -5415,7 +5709,9 @@ def test_bug44_watchlist_shows_the_two_lists_separately():
     """The user asked to 'show separate stocks of recommendation'. Confirmation
     and anticipation must be distinct sections, not merged."""
     body = (ROOT / "btst.py").read_text()
-    assert "CONFIRMED — broke out TODAY" in body
+    # BUG 53 renamed this header: the confirmed list is no longer same-day
+    # only, so it can no longer claim to be.
+    assert "CONFIRMED — today's setups" in body
     assert "ANTICIPATE — about to break out" in body
     assert "classify_approach" in body
 
@@ -6220,3 +6516,61 @@ def test_bug51_trend_is_read_from_the_shared_metrics():
 
     src = inspect.getsource(btst.classify_approach)
     assert "from watchlist import compute_metrics" in src
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 52 - the 15:20 BTST scan could not finish before the close.
+#
+#  03-Aug-2026: the message was stamped 15:48 and said "171 screened". The run
+#  took 42 minutes end to end.
+#
+#  CAUSE. BUG 47 widened the anticipation pool from "names that never fired"
+#  to the WHOLE snapshot - correct for the measurement, but that is ~2,100
+#  symbols and each one costs a daily-candles call plus an intraday call. The
+#  job cannot complete in the ten minutes it has before the bell, so the
+#  ANTICIPATE list came back empty and the top-5 was drawn from a fraction of
+#  the universe.
+#
+#  A 15:20 job that finishes at 16:02 is useless no matter how good its picks.
+#
+#  FIX. The distance window is knowable from the FROZEN weekly levels plus ONE
+#  bulk quote - no per-symbol history needed. Filter on that first, then fetch
+#  history only for names plausibly in range. A 1.5% margin is added because
+#  the quote is a snapshot and price still moves into the close.
+#
+#  NOT A BUG, verified separately: only ONE pick appeared because only one
+#  name qualified. Of the 26 that broke out on 03-Aug, exactly one cleared
+#  Tier A (DALMIASUG, day +17.3%, close_pos 0.87). The next best was
+#  AVADHSUGAR at +9.6% / 0.77 - below both thresholds. The scan was right.
+# --------------------------------------------------------------------------- #
+def test_bug52_anticipation_prefilters_before_fetching_history():
+    body = (ROOT / "btst.py").read_text()
+    chunk = body.split("PRE-FILTER ON THE FROZEN LEVELS", 1)
+    assert len(chunk) == 2, "the pre-filter must exist"
+    seg = chunk[1][:2000]
+    assert "fetch_ltp" in seg, "it must use ONE bulk quote, not per-symbol calls"
+    assert "ANTICIPATE_NEAR" in seg and "ANTICIPATE_ABOVE_MAX" in seg, (
+        "the window must be derived from the shipped thresholds")
+    assert "MARGIN" in seg, (
+        "a snapshot quote needs headroom - price moves into the close")
+
+
+def test_bug52_prefilter_failure_does_not_drop_everything():
+    """
+    If the bulk quote fails the scan must fall back to screening everything -
+    slow, but not silently empty. An exception here would have produced the
+    same empty list the bug caused.
+    """
+    body = (ROOT / "btst.py").read_text()
+    seg = body.split("PRE-FILTER ON THE FROZEN LEVELS", 1)[1][:2000]
+    assert "except DhanError" in seg
+    assert "ltp = {}" in seg, "on failure it must screen unfiltered, not none"
+    assert "if ltp:" in seg, "the filter only applies when quotes were obtained"
+
+
+def test_bug52_prefilter_keeps_both_sides_of_the_level():
+    """The window must admit above-level names too - BUG 47 showed they are
+    the better half (+0.819% vs +0.580%)."""
+    body = (ROOT / "btst.py").read_text()
+    seg = body.split("PRE-FILTER ON THE FROZEN LEVELS", 1)[1][:2000]
+    assert "above" in seg and "ANTICIPATE_ABOVE_MAX" in seg

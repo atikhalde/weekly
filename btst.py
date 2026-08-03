@@ -97,6 +97,7 @@ from config import load_config
 from dhan import IST, DhanClient, DhanError
 from mcap import load_table as load_mcap_table
 from scan import load_snapshots
+from watchlist import fetch_ltp
 from state import AlertState
 from strategy import week_start_of
 from telegram import build_telegram, _esc, _fmt
@@ -119,6 +120,84 @@ BARS_PER_SESSION = 75      # NSE: 09:15-15:30 in 5-minute candles
 # the paper ledger can never name different stocks.
 TOP_N = 5
 PICKS_FILE = "btst_picks.csv"
+
+# --------------------------------------------------------------------------- #
+#  BUG 53 (04-Aug-2026) - THE AGE GATE APPLIES TO TIER A ONLY
+#
+#  BUG 43 required the breakout to have happened TODAY. That was measured on
+#  BREAKOUT DAYS ONLY, which has no control group and so could not answer
+#  "does the breakout day matter". Re-measured across the WHOLE universe -
+#  892,858 tradeable stock-days, 2,075 names, Aug-2021 to Jul-2026, entry at
+#  today's close, exit tomorrow's close, net 0.22%:
+#
+#      arm                     IS        OOS      OOS t
+#      fresh tier A         +1.171    +2.157       2.79
+#      fresh tier B         +0.179    +1.230       2.93
+#      aged  tier A         +0.795    -0.843      -1.08   <- BUG 43 was RIGHT
+#      aged  tier B         +0.999    +0.885       3.19   <- BUG 43 was WRONG
+#
+#  Tier A is a MAGNITUDE test (+15% day) and magnitude expires - three days
+#  later it is a chase, median extension 15%, and it mean-reverts. Tier B is
+#  a CHARACTER test (closed at the high, 3x volume, volatile name) and
+#  character has no expiry date. Aged tier B has the SMALLEST in/out-of-sample
+#  gap of the four arms - it is the most stable thing in the whole study.
+#
+#  The universe baseline is -0.135% (t=-43), so none of this is drift.
+#
+#  WHAT THIS BUYS, top-5/day portfolio, 5 years:
+#      shipped (fresh only)   918 trades   48.7% win   PF 1.48   maxDD -60.0%
+#      with aged tier B     1,043 trades   56.0% win   PF 1.79   maxDD -28.4%
+#
+#  HONEST NOTE ON THE PAIRED TEST. On days BOTH rules trade, the gain is
+#  +0.575%/day (t=4.26) - but most of that comes from the close_pos floor
+#  below, not from the aged arm. The aged arm's own contribution is COVERAGE:
+#  the shipped rule sits in cash on 60% of business days. Measured alone at
+#  the old thresholds it was +0.127%/day, t=1.29 - NOT significant. It is
+#  shipped for coverage and drawdown, both of which are large and consistent,
+#  not because it is a better signal per trade.
+#
+#  NOT ADOPTED: dropping the level condition entirely. Tier+trend+PRE>=6 with
+#  no level test at all measures +0.813% (t=11.2, n=5,186) - the same number.
+#  The 26W level is how these names are FOUND, not why they work. Removing it
+#  is a much bigger change than this one and is not made on that evidence.
+#
+#  ---- THE ORIGINAL BUG 43 MEASUREMENT, KEPT SO THE NARROWING IS TRACEABLE --
+#  Measured across 1,548 qualifying stock-days (breakout days only - that is
+#  the flaw), next-day return net of costs:
+#
+#      age 0 (breakout day)   n=1174   +0.807%   t 5.00   mean ext  7.1%
+#      age 1                  n= 164   +0.373%   t 0.87   mean ext 15.6%
+#      age 2                  n= 107   +1.311%   t 2.45   mean ext 18.6%
+#      age 3                  n=  74   +0.984%   t 1.64   mean ext 20.4%
+#      age 4                  n=  29   -0.808%   t -1.01  mean ext 26.9%
+#
+#      Tier A  age 0    n=401   +1.736%   t 5.03
+#      Tier A  age >=1  n= 83   +0.155%   t 0.20   <- still true, still excluded
+#
+#  The tier A rows survive re-measurement and are why AGE_GATE_TIERS exists.
+#  What did NOT survive is applying the same conclusion to tier B, which was
+#  never separately tested in that study.
+#
+#  Live example that motivated BUG 43 - 31-Jul-2026:
+#      YASHO     broke out 31-Jul 12:20   age 0   ext  18.3%   valid
+#      NELCO     broke out 31-Jul 12:50   age 0   ext   2.2%   valid
+#      DEEPINDS  broke out 29-Jul 10:05   age 2   ext   9.8%   tier B -> now
+#                                                              eligible again
+AGE_GATE_TIERS = ("A",)      # tiers that MUST have broken out today
+
+# Aged tier B is only reachable if it is near enough to its frozen level to
+# survive the bulk-LTP pre-filter (see BUG 52 - the 15:20 job has ~250-400
+# per-symbol history calls of budget before it misses the close). Measured
+# share of the aged tier B edge retained, and the pool it admits per day:
+#      band          keeps   per-trade   est. names/day
+#      -3 .. +10      36%     +1.075          115
+#      -5 .. +15      55%     +1.110          185
+#     -10 .. +20      76%     +0.935          411   <- chosen
+#     -15 .. +30      89%     +0.945          700   too many, misses the close
+# -10..+20 is the widest band that fits the measured time budget.
+AGED_EXT_MIN = -10.0
+AGED_EXT_MAX = 20.0
+AGED_MAX_AGE_DAYS = 250      # beyond this the cross is not a reference point
 
 # --------------------------------------------------------------------------- #
 #  ANTICIPATION (Model F) - buy the day BEFORE the breakout
@@ -224,16 +303,235 @@ MIN_PRE_CONFIRM = 6
 # Thresholds live here and are imported by ab_paper.py's Model E, so the paper
 # model and the nightly scanner can never drift apart.
 TIER_A_DAY = 15.0
-TIER_A_CLOSE_POS = 0.85
-TIER_B_CLOSE_POS = 0.90
+
+# --------------------------------------------------------------------------- #
+#  BUG 54 (04-Aug-2026) - TIER A GETS A CLOSE_POS FLOOR TOO
+#
+#  RETRACTION. BUG 53 said, in this file: "TIER A IS LEFT AT 0.85 ON PURPOSE
+#  ... tightening the one thing that is already performing, on the same data
+#  that says it performs, is how a good rule gets overfitted into a rare one."
+#
+#  That reasoning was sound but the conclusion was wrong, and the check that
+#  proves it is the one BUG 53 failed to run: what does the DISCARDED slice
+#  look like? Tier A signals with close_pos 0.85-0.98:
+#
+#      n=193   mean +0.101%   win 42.5%   OOS +0.275%
+#      by year: 2021 -0.06 · 2022 -0.86 · 2023 +0.61 · 2024 +0.46
+#               2025 -0.07 · 2026 +0.39
+#
+#  That is not a slice being sacrificed for purity - it is worthless. It is
+#  ~0.75 trades a week of noise sitting in the same five slots as real setups.
+#
+#  Full sweep of tier A signals only (n, mean, OOS, all-years-positive):
+#      0.85   392   +1.425   +2.157   NO
+#      0.90   318   +1.643   +2.602   NO
+#      0.95   242   +2.331   +3.927   NO
+#      0.97   215   +2.703   +4.742   yes
+#      0.98   199   +2.709   +4.499   yes   <- chosen
+#      0.99   174   +3.127   +4.143   yes
+#
+#  Monotonic, and 0.97 is the first floor where EVERY YEAR is positive.
+#
+#  WHY THIS IS NOT DOUBLE-COUNTING THE SAME BET. A tier A day is >=+15% by
+#  definition. Requiring it to ALSO finish in the top 2% of its range is a
+#  different question: it is the difference between a +15% day that HELD and
+#  a +15% day that FADED. Same logic as the tier B floor, applied consistently
+#  instead of only to the arm nobody was defending.
+#
+#  Portfolio effect (top-5/day, tier B floor at 0.98 throughout):
+#      TIER_A_CLOSE_POS   trades   per-trade   win%    PF     OOS
+#          0.85             928     +1.646     58.3   1.98   +2.243
+#          0.98             742     +2.087     62.4   2.32   +2.744
+#  Paired on the 476 common days: +0.122%/day, t=+1.83. Not significant on
+#  its own - but the discarded slice is +0.101% over five years, so this is
+#  removing noise rather than making a bet.
+#
+#  COST, STATED PLAINLY: tier A drops from 1.5 to 0.8 signals a week, and the
+#  portfolio loses 77 trading days of coverage (553 -> 476). Drawdown gets
+#  WORSE, -29.4% -> -34.5%, because tier B's steadier aged arm now fills a
+#  larger share of the slots. Taken because per-trade, win rate, PF and OOS
+#  all improve together and the discarded rows are demonstrably empty.
+TIER_A_CLOSE_POS = 0.98
+
+# --------------------------------------------------------------------------- #
+#  BUG 53b - TIER B CLOSE_POS RAISED 0.90 -> 0.95
+#
+#  close_pos was already known to be the strongest single factor (THE_EDGE.md).
+#  Swept properly on the full universe it is cleanly MONOTONIC, which is what
+#  separates a real effect from a cherry-picked cell:
+#
+#      close_pos >=   trades   per-trade   win%    PF     IS      OOS
+#          0.90        1,667     +0.951    52.2   1.56  +0.794  +1.343
+#          0.92        1,328     +1.168    54.7   1.68  +1.016  +1.533
+#          0.94        1,122     +1.443    57.0   1.85  +1.268  +1.863
+#          0.95        1,065     +1.584    58.4   1.95  +1.407  +2.017
+#          0.97          948     +1.931    61.7   2.22  +1.693  +2.535
+#          0.99          824     +2.137    63.3   2.41  +1.950  +2.623
+#
+#  It improves ALL THREE arms independently (fresh A +1.425->+2.331, fresh B
+#  +0.448->+1.235, aged B +0.964->+1.415) and it also improves the CURRENTLY
+#  SHIPPED fresh-only rule (+0.859 -> +1.758), which is independent
+#  confirmation that this is not an artifact of the new aged arm.
+#
+#  CIRCUIT-LOCK CHECK. In India a stock locked at the upper circuit closes
+#  exactly at its high and CANNOT BE BOUGHT - there is no offer. If the top
+#  bucket were full of locks the measured return would be unreachable. It is
+#  not: the 0.99-1.00 band has a median day range of 8.3% and median rvol
+#  5.4x, i.e. names that traded freely all day and closed strong. A
+#  conservative lock proxy (close_pos>=0.995 AND range < half the day's gain)
+#  flags only 0.7% of rows, and removing them changes nothing material.
+#
+#  ---- BUG 54: 0.95 WAS THE WRONG PLACE. RAISED TO 0.98 --------------------
+#  RETRACTION of the paragraph that used to sit here ("0.95 rather than
+#  0.97/0.99 deliberately ... thinner is not automatically better").
+#
+#  The sweep above is monotonic, so 0.95 looked like a reasonable
+#  frequency/quality trade. It is not, because the monotonic curve hides a
+#  DEAD BAND. Measured on the shipped pool, the slice a 0.95 floor admits and
+#  a 0.98 floor rejects:
+#
+#      close_pos 0.95-0.99 (the band 0.95 lets in)
+#          n=235   mean -0.222%   win 41.7%
+#
+#  Those trades are NEGATIVE. The gain from 0.95 -> 0.98 is not "buying
+#  quality with frequency", it is deleting a losing bucket.
+#
+#  Confirmed WITHIN each arm, so it is not an arm-mix artifact:
+#      arm        cp<0.99            cp>=0.99
+#      fresh_A    +0.067% (n=218)    +3.127% (n=174)
+#      fresh_B    -0.649% (n= 68)    +1.984% (n=171)
+#      aged_B     -0.285% (n= 99)    +1.969% (n=333)
+#
+#  DATA-ARTIFACT CHECK, because "closed exactly at the high" is suspicious.
+#  Over 509,562 random stock-days: close==high 2.97%, close==low 2.24%,
+#  ratio 1.33. Roughly symmetric, so this is real market behaviour (strong
+#  closes cluster) and not a feed rounding close into high.
+#
+#  WHY 0.98 AND NOT 0.99. 0.99 measures marginally better per trade
+#  (+1.702 vs +1.646) but drawdown jumps -29.4% -> -40.1%, and the live scan
+#  judges close_pos on a PARTIAL 15:20 candle. A 0.99 gate is knife-edge
+#  against a bar with ten minutes left to run; 0.98 leaves room for the last
+#  wobble. The 15:20 cutoff study says these names drift UP into the bell
+#  (entry vs close -0.14%, tier precision 82.3%), so the partial reading is
+#  usually conservative - but not always, and 0.98 costs almost nothing.
+TIER_B_CLOSE_POS = 0.98
 TIER_B_RVOL = 3.0
 TIER_B_ATR = 3.0
 
 
+# --------------------------------------------------------------------------- #
+#  BUG 54b - THE CONVICTION SCORE: "which of tonight's picks is the big one"
+#
+#  The user asked how to find the BIG winners, not just the good ones. This is
+#  a lift analysis - P(big winner | feature) / base rate - with every losing
+#  signal kept as the control, because profiling winners alone is what
+#  produced the "16 named winners" dead end (feature ratios all ~1.0).
+#
+#  "Big winner" = next-day close >= +5% net. Base rate on the shipped pool is
+#  18.3%. Lifts, measured over 892,858 tradeable stock-days:
+#
+#      feature                P(+5%)   lift    interpretation
+#      gap >= +8%              38.0%   2.07    strongest single lift
+#      fresh TIER A            26.8%   1.46    the +15% day itself
+#      atr_pct >= 7%           29.2%   1.59    only volatile names go far
+#      atr_pct >= 5%           23.5%   1.28
+#      day_ret >= +6%          26.0%   1.42
+#      ret_12m 50-100%         27.1%   1.48    EARLY trend, not late
+#      ret_12m >= 400%         6.4%    0.35    exhausted - avoid
+#      dist200 >= 120%         9.4%    0.51    exhausted - avoid
+#      aged tier B             10.0%   0.54    steady, NOT explosive
+#
+#  TWO COUNTERINTUITIVE ONES, both stable:
+#    * ret_12m is INVERTED for the fat tail. A stock already up 400% rarely
+#      adds another 5% overnight. The trend floor (>=50%) is still right -
+#      it removes no-trend junk - but MORE trend is not better past ~200%.
+#    * aged tier B has the BEST win rate (62.3%) and the WORST big-winner
+#      rate. It is the steady arm. That is a feature, not a fault, and it is
+#      why the answer is a RANK and not a FILTER.
+#
+#  SCORED AS A RANK, NOT A GATE. Measured as a filter it does nothing:
+#      conv >= 2   627 trades   +1.672%   CAGR 264%   DD -33.4%
+#      conv >= 3   467 trades   +1.664%   CAGR 176%   DD -47.6%
+#      all         938 trades   +1.677%   CAGR 494%   DD -29.4%
+#  Filtering on it costs coverage and RAISES drawdown for no gain in mean.
+#  But it orders the fat tail cleanly, which is what the question was:
+#      conv  n     P(+5%)   P(+10%)   mean
+#       0    141    4.3%      1.4%   +1.840
+#       1    170    8.2%      2.4%   +1.557
+#       2    160   20.6%      5.0%   +1.696
+#       3    265   27.2%      9.4%   +1.489
+#       4    202   31.2%     14.4%   +1.894
+#  P(+5%) goes 4.3% -> 31.2% and P(+10%) 1.4% -> 14.4%, monotonically, while
+#  the MEAN stays flat. Read that carefully: a high score does not predict a
+#  better average trade, it predicts a more EXPLOSIVE, less reliable one.
+#  Note conv 0 has the highest win rate (69.5%) and the lowest P(+5%).
+#
+#  So it is shown in the alert and used as a tie-break inside each arm. It
+#  never removes a trade. If the user wants to size up the fat tail, this is
+#  the number to size on - accepting a lower hit rate for a fatter tail.
+CONVICTION_MAX = 4
+
+
+def conviction(m: dict) -> tuple[int, list[str]]:
+    """0-4: how likely this setup is to be a BIG (>=+5%) winner, not just a
+    winner. See the block above - this is a RANK, never a gate."""
+    def f(k):
+        try:
+            v = float(m.get(k))
+        except (TypeError, ValueError):
+            return float("nan")
+        return v
+
+    hits = []
+    if m.get("fresh") and m.get("tier") == "A":
+        hits.append("fresh TIER A")
+    a = f("atr_pct")
+    if a == a and a >= 5.0:
+        hits.append("atr>=5%")
+    dr = f("day_ret")
+    if dr == dr and dr >= 6.0:
+        hits.append("day>=+6%")
+    r12 = f("ret_12m")
+    # early-trend, not exhausted. NaN fails, consistent with the trend floor.
+    if r12 == r12 and r12 <= 200.0:
+        hits.append("trend not exhausted")
+    return len(hits), hits
+
+
+def breakout_age(daily: pd.DataFrame, level: float,
+                 lookback: int = AGED_MAX_AGE_DAYS) -> int:
+    """
+    Trading days since the last FRESH cross of `level`. 0 == crossed today.
+
+    A cross is a close above the level immediately after a close at or below
+    it, which is the same definition replay_week uses, so "age 0" here and a
+    same-day alert mean the same event. Returns 999 when there is no cross
+    inside `lookback` - that name has been above (or below) the whole time and
+    has no breakout to age.
+
+    Uses CLOSED bars plus today's forming bar; no look-ahead.
+    """
+    if daily is None or level is None or level <= 0 or len(daily) < 2:
+        return 999
+    c = daily["close"].to_numpy(float)[-(lookback + 1):]
+    above = c > level
+    if len(above) < 2:
+        return 999
+    # walk back from today looking for the transition below -> above
+    for k in range(len(above) - 1, 0, -1):
+        if above[k] and not above[k - 1]:
+            return int(len(above) - 1 - k)
+    return 999
+
+
 def classify(daily: pd.DataFrame, level: float,
-             partial_frac: float = 1.0) -> dict | None:
+             partial_frac: float = 1.0, age: int | None = None) -> dict | None:
     """
     Score today's breakout candle. Returns None when it cannot be judged.
+
+    `age` is days since the level was crossed (0 == today). When given, the
+    BUG 53 age gate applies: tier A requires age 0, tier B does not. When
+    None the age is computed from `daily` itself.
 
     `daily` must end with TODAY's bar. When that bar is still forming (the
     15:20 scan) pass `partial_frac` = the fraction of the session elapsed, so
@@ -293,14 +591,61 @@ def classify(daily: pd.DataFrame, level: float,
         m["reject"] = "not tradeable"
         return m
 
+    # ---- BUG 53: how old is the breakout, and does this tier tolerate age?
+    if age is None:
+        age = breakout_age(d, level)
+    m["age"] = int(age)
+    m["fresh"] = bool(age == 0)
+
     rv = m["rvol"] if not np.isnan(m["rvol"]) else 0.0
     # --- TIER A: the YASHO shape. Rare, and the strongest measured.
+    #     FRESH ONLY - aged tier A measured IS +0.795 -> OOS -0.843.
+    #
+    # ORDERING NOTE (found by cross-validating this code against the study).
+    # An AGED name can have a tier-A-shaped day AND independently pass the
+    # tier B character test. Testing A first rejects it outright. Letting it
+    # through as B was measured as an alternative and it is a WASH:
+    #
+    #     rule                                trades  per-trade  win%   DD
+    #     strict (this code, A-shape aged out) 1,043    +1.370   56.0  -28.4%
+    #     loose  (rescued as tier B)           1,088    +1.378   55.9  -27.7%
+    #
+    # 45 extra trades in 5 years and no difference worth the special case, so
+    # the simpler rule stands. The decomposition is worth keeping though,
+    # because it explains WHY aged tier A dies:
+    #
+    #     aged + A-shape, NO tier B character   n=112  -0.875%  OOS -2.506%
+    #     aged + A-shape, WITH tier B character n=123  +1.424%  OOS +1.208%
+    #
+    # The toxic half is the aged big-day WITHOUT accumulation character - a
+    # spike that already happened and is not still being bought. That is the
+    # real reason for the gate, and it is a stronger statement than "age is
+    # bad". Do not reopen this on the n=54 in-band subset (t=1.54, one year
+    # at -5.71%): it is too thin to justify branching the logic.
     if m["day_ret"] >= TIER_A_DAY and m["close_pos"] >= TIER_A_CLOSE_POS:
-        m["tier"] = "A"
+        if m["fresh"]:
+            m["tier"] = "A"
+        else:
+            m["tier"] = None
+            m["reject"] = f"tier A but {age}d old (aged A measured OOS -0.84%)"
+            return m
     # --- TIER B: closed hard at the high on real volume, in a mover.
+    #     Valid at ANY age, provided it is still near its level (the aged
+    #     band is both an edge filter and the 15:20 API-time budget).
     elif (m["close_pos"] >= TIER_B_CLOSE_POS and rv >= TIER_B_RVOL
           and m["atr_pct"] >= TIER_B_ATR):
-        m["tier"] = "B"
+        ex = m["ext_pct"]
+        if m["fresh"]:
+            m["tier"] = "B"
+        elif age >= 999:
+            m["tier"] = None
+            m["reject"] = "tier B but no cross of the level in 250d"
+        elif ex == ex and AGED_EXT_MIN <= ex <= AGED_EXT_MAX:
+            m["tier"] = "B"
+        else:
+            m["tier"] = None
+            m["reject"] = (f"tier B, {age}d old, {ex:+.1f}% from level "
+                           f"(band {AGED_EXT_MIN:+.0f}..{AGED_EXT_MAX:+.0f}%)")
     else:
         m["tier"] = None
         m["reject"] = "no tier"
@@ -470,6 +815,44 @@ def main() -> int:
     now = datetime.now(IST)
     week_s = str(week_start_of(now.date()).date())
 
+    # ---- BUG 55: THE ENTRY WINDOW IS HARD ---------------------------------
+    # On 03-Aug the BTST message arrived stamped 15:48 IST and still said
+    # "BUY NOW". That is not a tradeable instruction - the market shut at
+    # 15:30. The job is scheduled for 15:20 but GitHub's scheduler is
+    # best-effort and had queued it ~28 minutes late.
+    #
+    # The scan itself was not wrong; what was wrong is that it had no concept
+    # of being too late. Nothing in the code compared the clock to the close,
+    # so a delayed run produced a confident, unfillable alert - the worst
+    # possible failure mode, because it looks exactly like a good one.
+    #
+    # The entry window is now explicit and enforced:
+    #   before 15:00  too EARLY. Measured tier precision at 15:00 is only
+    #                 70% vs 82% at 15:20 - the candle is still changing.
+    #                 Run anyway (it may be a manual/backfill run) but the
+    #                 message says the reading is provisional.
+    #   15:00-15:30   the tradeable window. Normal behaviour.
+    #   after 15:30   TOO LATE for a buy-at-close entry. The picks file is
+    #                 still written and the alert is still sent - suppressing
+    #                 it would hide the outage, which is BUG 49's lesson -
+    #                 but every "BUY NOW" becomes "MISSED", and Model E must
+    #                 not treat these as trades it took.
+    #
+    # --after-close is the deliberate post-close review and is exempt from
+    # the late warning, because being after the close is its whole purpose.
+    entry_open = dtime(15, 0)
+    entry_close = dtime(15, 30)
+    too_late = (not args.after_close) and now.time() > entry_close
+    too_early = (not args.after_close) and now.time() < entry_open
+    if too_late:
+        log.error("RAN AT %s IST - AFTER THE %s CLOSE. The buy-at-close entry "
+                  "is no longer available; picks are recorded as MISSED.",
+                  f"{now:%H:%M}", f"{entry_close:%H:%M}")
+    elif too_early:
+        log.warning("running at %s IST, before the %s entry window - the "
+                    "candle is still changing and the tier call is only ~70%% "
+                    "reliable this early", f"{now:%H:%M}", f"{entry_open:%H:%M}")
+
     snaps = load_snapshots(cfg, week_s)
     if not snaps:
         # BUG 49: fail loudly. A BTST scan that finds nothing because the
@@ -481,36 +864,28 @@ def main() -> int:
         log.error("DHAN_ACCESS_TOKEN not set")
         return 0
 
-    # ---- BUG 43: THE BREAKOUT MUST BE **TODAY** ----------------------------
-    # already_alerted() matches the whole WEEK, so a Monday breakout still came
-    # back as a candidate on Friday. The day-character test would then pass on
-    # an unrelated later candle and the name would be presented as a fresh
-    # BTST setup when most of the move had already happened.
+    # ---- BUG 43 (REVISED BY BUG 53): WHO IS A CANDIDATE --------------------
+    # BUG 43 required the breakout to have happened TODAY, for both tiers.
+    # BUG 53 re-measured that on the whole universe instead of on breakout
+    # days only and found it half right - see the AGE_GATE_TIERS block at the
+    # top of this file. Tier A must still be same-day. Tier B does not.
     #
-    # That is not a preference, it is a mismatch with what was measured. The
-    # 5-year study only ever tested the breakout day itself. Re-measured across
-    # 1,548 qualifying stock-days, next-day return net of costs:
+    # So there are now TWO candidate pools:
     #
-    #     age 0 (breakout day)   n=1174   +0.807%   t 5.00   mean ext  7.1%
-    #     age 1                  n= 164   +0.373%   t 0.87   mean ext 15.6%
-    #     age 2                  n= 107   +1.311%   t 2.45   mean ext 18.6%
-    #     age 3                  n=  74   +0.984%   t 1.64   mean ext 20.4%
-    #     age 4                  n=  29   -0.808%   t -1.01  mean ext 26.9%
+    #   FIRED   names whose alert fired TODAY. Cheap - they come straight from
+    #           the alert state. Eligible for tier A or tier B.
     #
-    # and split by tier, which is where it is unambiguous:
+    #   AGED    names that did NOT alert today but may still be a tier B
+    #           setup. These are not in the alert state at all (the best aged
+    #           signals are ~55 days old and the state only tracks the current
+    #           week), so they have to be found from the frozen snapshot level
+    #           plus ONE bulk LTP call - the same BUG 52 trick the anticipation
+    #           pass uses. Only names inside the aged band can ever pass
+    #           classify(), so filter on the quote first and fetch history
+    #           second. Eligible for tier B ONLY.
     #
-    #     Tier A  age 0    n=401   +1.736%   t 5.03
-    #     Tier A  age >=1  n= 83   +0.155%   t 0.20   <- the edge is GONE
-    #
-    # Tier A is the whole reason this scanner exists and it does not survive
-    # ageing. The later-day Tier B numbers are positive but thin, drifting
-    # (mean extension 15-27% above the level) and were never part of the
-    # original measurement, so they are not traded on that basis.
-    #
-    # Live example that exposed it - 31-Jul-2026:
-    #     YASHO     broke out 31-Jul 12:20   age 0   ext  18.3%   valid
-    #     NELCO     broke out 31-Jul 12:50   age 0   ext   2.2%   valid
-    #     DEEPINDS  broke out 29-Jul 10:05   age 2   ext   9.8%   STALE
+    # The LTP call is shared with the anticipation pass below, so this adds
+    # one bulk request, not two.
     state = AlertState(cfg.paths["state"])
     today_str = f"{now:%Y-%m-%d}"
     fired, stale = [], []
@@ -524,20 +899,48 @@ def main() -> int:
         else:
             stale.append((s.symbol, bar))
     if stale:
-        log.info("%d name(s) broke out earlier this week and are NOT BTST "
-                 "candidates today: %s", len(stale),
+        log.info("%d name(s) broke out earlier this week; "
+                 "tier B candidates only (BUG 53): %s", len(stale),
                  ", ".join(f"{sym}({bar})" for sym, bar in stale[:12]))
-    if not fired:
-        log.info("nothing broke out TODAY - no BTST candidates "
-                 "(%d older breakout(s) skipped)", len(stale))
-        return 0
-    log.info("%d name(s) broke out today; checking the candle ...", len(fired))
 
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
                         quote_rate=cfg.runtime.quote_rate_per_sec)
     caps = load_mcap_table(cfg.paths["mcap"])
     start = now.date() - timedelta(days=HISTORY_DAYS)
+
+    # ---- one bulk quote, reused by the aged pass and the anticipation pass -
+    fired_syms = {s.symbol for s in fired}
+    try:
+        ltp_all = fetch_ltp(client, snaps)
+    except DhanError as exc:
+        log.warning("bulk quote failed (%s) - aged tier B pass is SKIPPED "
+                    "and only today's breakouts are scanned", str(exc)[:120])
+        ltp_all = {}
+
+    aged_pool = []
+    if ltp_all:
+        for s in snaps:
+            if s.symbol in fired_syms:
+                continue
+            px = ltp_all.get(s.symbol)
+            lvl = s.entry_level
+            if not px or px <= 0 or not lvl or lvl <= 0:
+                continue
+            ex = (px / lvl - 1) * 100.0
+            if AGED_EXT_MIN <= ex <= AGED_EXT_MAX:
+                aged_pool.append(s)
+        log.info("aged tier B pool: %d name(s) within %+.0f..%+.0f%% of their "
+                 "26W level (of %d not fired today)",
+                 len(aged_pool), AGED_EXT_MIN, AGED_EXT_MAX,
+                 len(snaps) - len(fired))
+
+    if not fired and not aged_pool:
+        log.info("no BTST candidates today - nothing broke out and nothing "
+                 "is inside the aged band")
+        return 0
+    log.info("%d fired today + %d aged; checking the candles ...",
+             len(fired), len(aged_pool))
 
     def one(s):
         try:
@@ -577,7 +980,12 @@ def main() -> int:
             }
             df = pd.concat([df, pd.DataFrame([today_bar])], ignore_index=True)
             frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
-        return s, classify(df, s.entry_level, partial_frac=frac)
+        # A name whose alert fired today is age 0 by definition - trust the
+        # alert rather than re-deriving it, so classify() and the alert can
+        # never disagree about what "today" means. For the aged pool the age
+        # is measured from the daily closes.
+        age = 0 if s.symbol in fired_syms else breakout_age(df, s.entry_level)
+        return s, classify(df, s.entry_level, partial_frac=frac, age=age)
 
     def candle(s):
         """(daily frame incl. today's partial bar, elapsed fraction) or None."""
@@ -615,7 +1023,7 @@ def main() -> int:
 
     rows = []
     with ThreadPoolExecutor(max_workers=max(1, cfg.runtime.max_workers)) as ex:
-        for s, m in ex.map(one, fired):
+        for s, m in ex.map(one, fired + aged_pool):
             if not m:
                 continue
             m["symbol"] = s.symbol
@@ -623,9 +1031,57 @@ def main() -> int:
             m["mcap_cr"] = caps.get(s.symbol.upper())
             rows.append(m)
 
-    qualified = [r for r in rows if r.get("tier")]
-    # Tier A before Tier B, then the largest day move.
-    qualified.sort(key=lambda r: (r["tier"], -r["day_ret"]))
+    # ---- BUG 53c: THE TREND FLOOR NOW APPLIES TO THE CONFIRMED LIST TOO ----
+    # BUG 51 added MIN_RET_12M / MIN_DIST_200DMA but wired them only into
+    # classify_approach() - the anticipation path. The confirmed tiers never
+    # checked them, so the 03-Aug losers the floor was written to stop
+    # (BHAGCHEM ret_12m -9.8%, TBOTEK +8.0%, SWANDEF no history) could still
+    # reach the BTST list through the tier route. That was an oversight, not a
+    # decision. Every number quoted in this file's tier tables was measured
+    # WITH the trend floor applied, so this makes the code match the study.
+    def trend_ok(r: dict) -> bool:
+        r12 = r.get("ret_12m", float("nan"))
+        d200 = r.get("dist_200dma", float("nan"))
+        if not (r12 == r12) or r12 < MIN_RET_12M:
+            r["reject"] = (f"ret_12m {r12:.0f}% < {MIN_RET_12M:.0f}%"
+                           if r12 == r12 else "no 12m history")
+            return False
+        if not (d200 == d200) or d200 < MIN_DIST_200DMA:
+            r["reject"] = (f"dist200 {d200:.0f}% < {MIN_DIST_200DMA:.0f}%"
+                           if d200 == d200 else "no 200DMA")
+            return False
+        return True
+
+    tiered = [r for r in rows if r.get("tier")]
+    qualified = [r for r in tiered if trend_ok(r)]
+    if len(tiered) != len(qualified):
+        log.info("%d tiered name(s) failed the trend floor (ret12m>=%.0f%%, "
+                 "dist200>=%.0f%%)", len(tiered) - len(qualified),
+                 MIN_RET_12M, MIN_DIST_200DMA)
+
+    # ---- ranking: fresh tier A first, then aged tier B, then fresh tier B --
+    # Measured on the top-5/day portfolio (per-trade net, 5 years):
+    #     fresh tier A   +1.353%   49.5% win   PF 1.64   OOS +2.157%
+    #     aged  tier B   +1.478%   62.7% win   PF 2.02   OOS +1.551%
+    #     fresh tier B   +1.196%   54.6% win   PF 1.75   OOS +1.967%
+    # Tier A leads on size and is the rarest, so it must never be crowded out
+    # of the five slots. Aged tier B has the best win rate and PF and goes
+    # second. Within a group, higher rvol first.
+    #
+    # Ranking barely matters at top-5 (rvol-only 51.7% win, this 51.9%) - the
+    # cap is rarely binding. It is set explicitly so the order is a decision
+    # and not an accident of sort stability.
+    for r in qualified:
+        r["conviction"], r["conv_why"] = conviction(r)
+
+    def rank_key(r: dict) -> tuple:
+        fresh = bool(r.get("fresh", True))
+        tier = r.get("tier")
+        grp = 0 if (fresh and tier == "A") else (1 if not fresh else 2)
+        return (grp, -int(r.get("conviction", 0)),
+                -float(r.get("rvol") or 0.0), -float(r.get("day_ret") or 0.0))
+
+    qualified.sort(key=rank_key)
     picks = qualified[:TOP_N]
     for i, r in enumerate(picks, start=1):
         r["rank"] = i
@@ -640,7 +1096,21 @@ def main() -> int:
     if picks:
         out = pd.DataFrame([{
             "date": f"{now:%Y-%m-%d}", "scan_time": f"{now:%H:%M}",
+            # BUG 55: was this pick actually enterable? A run that finishes
+            # after 15:30 cannot buy at today's close, and Model E must not
+            # book a fill it could never have got. "missed" rows stay in the
+            # file - deleting them would erase the evidence of the outage.
+            "tradeable": 0 if too_late else 1,
             "rank": r["rank"], "symbol": r["symbol"], "tier": r["tier"],
+            # BUG 53: age/arm are recorded so the paper ledger can score the
+            # fresh and aged arms apart forever, instead of blending them.
+            "age": int(r.get("age", 0)),
+            "arm": ("fresh_A" if r.get("fresh") and r["tier"] == "A"
+                    else "fresh_B" if r.get("fresh") else "aged_B"),
+            "conviction": int(r.get("conviction", 0)),
+            "ext_pct": round(float(r.get("ext_pct") or 0), 2),
+            "ret_12m": round(float(r.get("ret_12m") or 0), 1),
+            "dist_200dma": round(float(r.get("dist_200dma") or 0), 1),
             "entry": round(float(r["close"]), 2), "pre": int(r.get("pre", 0)),
             "level": round(float(r["level"]), 2),
             "day_ret": round(float(r["day_ret"]), 2),
@@ -663,8 +1133,12 @@ def main() -> int:
         pd.DataFrame(rows).to_csv(f"btst_{now:%Y-%m-%d}.csv", index=False)
 
     partial = [r for r in picks if float(r.get("partial_frac", 1.0)) < 0.999]
-    when = "buy into TODAY's close" if partial or now.time() < dtime(15, 30) \
-        else "buy at close"
+    if too_late:
+        when = "MISSED - ran after the close"
+    elif partial or now.time() < entry_close:
+        when = "buy into TODAY's close"
+    else:
+        when = "buy at close"
     # ======================================================================
     #  SECOND PASS - ANTICIPATION (Model F): names about to break out
     # ======================================================================
@@ -678,8 +1152,64 @@ def main() -> int:
         # half that measured better (+0.819% vs +0.580%). Names that broke out
         # TODAY are still excluded - those belong to the CONFIRMED list above
         # and must not appear twice.
+        # BUG 53e: exclude anything ALREADY TAKEN as a confirmed pick. Before
+        # BUG 53 the two lists could not collide - confirmed was same-day
+        # breakouts and anticipate was names that had not broken out. Now an
+        # aged tier B name sits in both pools, and without this it would be
+        # bought twice on the same day by Model E and Model F, which would
+        # also double-count it in the ledger.
         fired_today = {x.symbol for x in fired}
-        pending = [s for s in snaps if s.symbol not in fired_today]
+        taken = {r["symbol"] for r in picks}
+        pending = [s for s in snaps
+                   if s.symbol not in fired_today and s.symbol not in taken]
+
+        # ---- BUG 52: PRE-FILTER ON THE FROZEN LEVELS BEFORE ANY API CALL ----
+        # BUG 47 widened this pool from "never fired" to the whole snapshot,
+        # which is right for the MEASUREMENT but was ~2,100 names x 2 requests
+        # each. On 03-Aug the job ran 42 minutes and only reached 171 of them
+        # before it was cut short - so the top-5 was drawn from a fraction of
+        # the universe and the ANTICIPATE list came back empty.
+        #
+        # A 15:20 job that finishes at 16:02 is useless however good its picks
+        # are. The distance window is knowable from the FROZEN weekly levels
+        # plus one bulk quote, with no per-symbol history, so filter first and
+        # fetch second.
+        #
+        # Only names plausibly in range can ever pass classify_approach:
+        #     within ANTICIPATE_NEAR below the nearer level, or
+        #     within ANTICIPATE_ABOVE_MAX above the higher one.
+        # A generous margin is applied because the quote is a snapshot and the
+        # close can still move.
+        MARGIN = 1.5
+        # BUG 53: the quote was already fetched once for the aged tier B pool
+        # above. Reuse it rather than paying for a second bulk request inside
+        # the ten minutes before the close.
+        ltp = ltp_all
+        if not ltp:
+            try:
+                ltp = fetch_ltp(client, pending)
+            except DhanError as exc:
+                log.warning("bulk quote failed (%s) - screening without a "
+                            "pre-filter", str(exc)[:120])
+                ltp = {}
+        if ltp:
+            def in_range(s):
+                px = ltp.get(s.symbol)
+                if px is None or px <= 0:
+                    return False
+                cand = [x for x in (s.entry_level, s.hi_short2) if x and x > 0]
+                if not cand:
+                    return False
+                above = [x for x in cand if px <= x]
+                if above:
+                    lvl = min(above)
+                    return (lvl - px) / lvl * 100.0 <= ANTICIPATE_NEAR + MARGIN
+                lvl = max(cand)
+                return (px / lvl - 1) * 100.0 <= ANTICIPATE_ABOVE_MAX + MARGIN
+            before = len(pending)
+            pending = [s for s in pending if in_range(s)]
+            log.info("anticipation pre-filter: %d -> %d name(s) in range",
+                     before, len(pending))
         log.info("anticipation: screening %d name(s) (both sides of the "
                  "level) ...", len(pending))
 
@@ -737,18 +1267,41 @@ def main() -> int:
             log.info("wrote %s (%d today, %d total)",
                      afile.name, len(ant_picks), len(aout))
 
+    # ---- BUG 53d: THE MESSAGE MUST NOT CLAIM EVERYTHING BROKE OUT TODAY ----
+    # The header used to say "broke out TODAY only" unconditionally. With aged
+    # tier B in the list that would be a lie, and a name 55 days past its
+    # cross presented as a fresh breakout is exactly the kind of thing that
+    # gets acted on wrongly. Each pick now states its own age.
+    n_fresh = sum(1 for r in picks if r.get("fresh"))
+    n_aged = len(picks) - n_fresh
     lines = [f"🌙 <b>BTST — {now:%d-%b-%Y} {now:%H:%M} IST</b>",
-             f"<i>{when}, exit tomorrow · {len(rows)} candle(s) checked "
-             f"· broke out TODAY only</i>", ""]
-    lines.insert(2, "🔥 <b>CONFIRMED — broke out TODAY</b>")
-    lines.insert(3, "")
+             f"<i>{when}, exit tomorrow · {len(rows)} candle(s) checked</i>", ""]
+    # BUG 55: a late run must say so at the TOP, before any price.
+    if too_late:
+        lines.insert(2, f"⛔ <b>TOO LATE — ran {now:%H:%M}, market closed "
+                        f"{entry_close:%H:%M}</b>")
+        lines.insert(3, "<i>These are NOT tradeable today. The buy-at-close "
+                        "entry is gone; they are logged for the record only. "
+                        "Do not chase them at tomorrow's open — that forfeits "
+                        "the overnight move this model exists to capture.</i>")
+        lines.insert(4, "")
+    elif too_early:
+        lines.insert(2, f"⏳ <b>PROVISIONAL — ran {now:%H:%M}, before "
+                        f"{entry_open:%H:%M}</b>")
+        lines.insert(3, "<i>The candle is still changing; only ~70% of names "
+                        "flagged this early still qualify at the close. Wait "
+                        "for the 15:20 list before acting.</i>")
+        lines.insert(4, "")
+    lines.insert(2 if not (too_late or too_early) else 5,
+                 "🔥 <b>CONFIRMED — today's setups</b>")
+    lines.insert(3 if not (too_late or too_early) else 6, "")
     if not picks:
         lines.append("<i>No setup qualified today. That is the normal case — "
-                     "the tiers fire ~2-4 times a week combined.</i>")
-    if stale:
-        lines.append(f"<i>{len(stale)} name(s) broke out earlier this week and "
-                     f"are not eligible today (Tier A measured +1.74% on the "
-                     f"breakout day, +0.16% after).</i>")
+                     "the tiers fire ~4 times a week combined.</i>")
+    elif n_aged:
+        lines.append(f"<i>{n_fresh} broke out today · {n_aged} already above "
+                     f"the level (Tier B holds with age; Tier A does not).</i>")
+        lines.append("")
     for r in picks:
         badge = ("🔥 <b>TIER A</b>" if r["tier"] == "A" else "⭐ <b>TIER B</b>")
         badge = f"<b>#{r['rank']}</b> {badge}"
@@ -756,16 +1309,31 @@ def main() -> int:
         prov = " <i>(candle still forming)</i>" if float(
             r.get("partial_frac", 1.0)) < 0.999 else ""
         pre_tag = f" <b>{r['pre']}/8</b>" if r.get("pre") is not None else ""
+        age = int(r.get("age", 0))
+        age_tag = "" if r.get("fresh") else f" <i>· {age}d old</i>"
+        where = ("above" if float(r.get("ext_pct") or 0) >= 0 else "below")
+        when_txt = ("broke out today" if r.get("fresh")
+                    else f"broke out {age} session(s) ago")
+        # BUG 54b: conviction is about the SIZE of the move, not the odds of
+        # a win. Labelled so it cannot be misread as "safest".
+        cv = int(r.get("conviction", 0))
+        cv_line = (f"    ⚡ <b>{cv}/{CONVICTION_MAX} explosive</b> "
+                   f"<i>· {', '.join(r.get('conv_why') or []) or 'none'}"
+                   f"{' · high tail, lower hit-rate' if cv >= 3 else ''}</i>")
         lines += [
             f"{badge}{pre_tag}  <b>{_esc(r['symbol'])}</b>  "
-            f"{_fmt(r['close'])}{cap}{prov}",
+            f"{_fmt(r['close'])}{cap}{prov}{age_tag}",
             f"    day <b>{r['day_ret']:+.1f}%</b> · closed at "
             f"<b>{r['close_pos']*100:.0f}%</b> of range · "
             f"rvol <b>{r['rvol']:.1f}x</b> · atr {r['atr_pct']:.1f}%",
-            f"    <i>{r['ext_pct']:+.1f}% above the 26W level "
+            f"    <i>{r['ext_pct']:+.1f}% {where} the 26W level "
             f"{_fmt(r['level'])}</i>",
-            f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
-            f"<i>· broke out today · exit tomorrow's close if &gt;+2%</i>", ""]
+            cv_line,
+            (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> "
+             f"<i>· {when_txt} · scan ran after the close, not tradeable</i>"
+             if too_late else
+             f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
+             f"<i>· {when_txt} · exit tomorrow's close if &gt;+2%</i>"), ""]
 
     if dropped:
         extra = ", ".join(_esc(r["symbol"]) for r in qualified[TOP_N:])
