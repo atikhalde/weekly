@@ -1,0 +1,117 @@
+name: Health Check
+
+# 03:00 UTC = 08:30 IST, fifteen minutes before the Shortlist and forty-five
+# before the open. A DEAD-MAN'S SWITCH.
+#
+# WHY THIS EXISTS (BUG 49, 03-Aug-2026)
+# The Sunday snapshot rebuild failed and the Monday retry hung. The committed
+# snapshot still carried week_start=2026-07-27 while the current week was
+# 2026-08-03, so load_snapshots() correctly dropped all 2,100 rows - that is
+# BUG 25's stale-level guard working as designed. Every downstream job then
+# logged an error and returned 0.
+#
+# The result: Intraday Scan, Daily Shortlist and BTST Scan all reported
+# SUCCESS, all day, having produced nothing. No failure notification fired
+# because nothing had failed. The outage was invisible for a full session.
+#
+# This job asserts the one invariant that matters before the market opens:
+# THE SNAPSHOT IS FOR THIS WEEK. It touches no APIs and needs no secrets
+# beyond Telegram, so it cannot itself be broken by a data problem.
+on:
+  schedule:
+    - cron: "0 3 * * 1-5"
+  workflow_dispatch:
+
+concurrency:
+  group: healthcheck
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install pandas pyyaml requests
+
+      - name: Verify the snapshot is current
+        id: verify
+        run: |
+          python - <<'PY' | tee result.txt
+          import sys
+          from datetime import date, timedelta
+
+          import pandas as pd
+
+          today = date.today()
+          week = today - timedelta(days=today.weekday())
+          try:
+              df = pd.read_csv("weekly_snapshot.csv", dtype=str)
+          except Exception as exc:
+              print(f"FAIL|snapshot unreadable: {exc}")
+              sys.exit(0)
+
+          weeks = sorted({str(w).strip() for w in df["week_start"].dropna()})
+          rows_now = int((df["week_start"].astype(str).str.strip()
+                          == str(week)).sum())
+          print(f"snapshot weeks present: {weeks}")
+          print(f"current week          : {week}")
+          print(f"rows for current week : {rows_now} of {len(df)}")
+
+          if rows_now == 0:
+              newest = max(weeks) if weeks else "none"
+              age = (week - pd.Timestamp(newest).date()).days if weeks else -1
+              print(f"FAIL|snapshot is for {newest}, {age} day(s) stale - "
+                    f"NO signals will be produced this week")
+          elif rows_now < 0.5 * len(df):
+              print(f"FAIL|only {rows_now} of {len(df)} rows are for the "
+                    f"current week - a partial rebuild")
+          else:
+              print(f"OK|{rows_now} symbols armed for week {week}")
+          PY
+
+      - name: Alert if unhealthy
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN_2: ${{ secrets.TELEGRAM_BOT_TOKEN_2 }}
+          TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
+            echo "Telegram secrets not set - skipping"; exit 0
+          fi
+          LINE=$(grep -m1 -E '^(OK|FAIL)\|' result.txt || echo "FAIL|health check did not produce a verdict")
+          STATUS="${LINE%%|*}"
+          DETAIL="${LINE#*|}"
+          if [[ "${STATUS}" == "OK" ]]; then
+            echo "healthy: ${DETAIL}"
+            exit 0
+          fi
+          MSG=$'🚨 <b>PRE-MARKET HEALTH CHECK FAILED</b>\n'
+          MSG+="${DETAIL}"$'\n\n'
+          MSG+=$'The scanner refuses to run on stale levels, so today there will be\n'
+          MSG+=$'<b>no alerts, no shortlist and no BTST scan</b> until this is fixed.\n\n'
+          MSG+=$'<b>Fix now:</b> Actions → Weekly Snapshot → Run workflow (tick <b>fresh</b>).\n'
+          MSG+="${RUN_URL}"
+          for TOKEN_CHAT in "${TELEGRAM_BOT_TOKEN}:::${TELEGRAM_CHAT_ID}" "${TELEGRAM_BOT_TOKEN_2}:::${TELEGRAM_CHAT_ID_2}"; do
+            TOK="${TOKEN_CHAT%%:::*}"; CHAT="${TOKEN_CHAT##*:::}"
+            [[ -z "${TOK}" || -z "${CHAT}" ]] && continue
+            curl -s -X POST "https://api.telegram.org/bot${TOK}/sendMessage" \
+              --data-urlencode "chat_id=${CHAT}" \
+              --data-urlencode "parse_mode=HTML" \
+              --data-urlencode "text=${MSG}" > /dev/null
+          done
+          # red tick as well, so the Actions tab shows it
+          exit 1

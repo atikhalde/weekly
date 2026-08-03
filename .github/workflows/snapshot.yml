@@ -20,7 +20,10 @@ on:
 
 concurrency:
   group: snapshot
-  cancel-in-progress: false
+  # BUG 49: was false. On 03-Aug a build hung for 4.5 hours; with the old
+  # setting the next scheduled attempt would have queued behind it instead of
+  # replacing it. A newer snapshot build always supersedes an older one.
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -28,7 +31,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90          # ~10 min of API time + headroom. The build
+    timeout-minutes: 45          # ~10 min of API time + headroom. The build
                                  # resumes from a committed partial snapshot,
                                  # so a timeout is recoverable, not fatal.
     steps:
@@ -105,7 +108,10 @@ jobs:
             ROWS=$(($(wc -l < weekly_snapshot.csv) - 1))
             MSG=$'✅ <b>Weekly snapshot rebuilt</b>\n'"${ROWS} symbols armed for the week."
           else
-            MSG=$'⚠️ <b>Weekly snapshot FAILED</b>\nThe scanner will keep using last week\'s levels.'
+            MSG=$'🚨 <b>Weekly snapshot FAILED</b>\n'
+            MSG+=$'The scanner does NOT fall back to old levels - it refuses to run.\n'
+            MSG+=$'Expect NO alerts, NO shortlist and NO BTST scan until this is rebuilt.\n\n'
+            MSG+=$'Re-run: Actions → Weekly Snapshot → Run workflow (tick <b>fresh</b>).'
           fi
           curl -s -X POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
