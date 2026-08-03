@@ -20,10 +20,12 @@ on:
 
 concurrency:
   group: snapshot
-  # BUG 49: was false. On 03-Aug a build hung for 4.5 hours; with the old
-  # setting the next scheduled attempt would have queued behind it instead of
-  # replacing it. A newer snapshot build always supersedes an older one.
-  cancel-in-progress: true
+  # BUG 50: I set this to true believing the 03-Aug build had HUNG. It had not
+  # - it was rate-limited and crawling (Dhan 429s pushed it from 1.8 s/symbol
+  # to 4.1 s/symbol, projecting ~2.6 hours for 2,372 names). Cancelling a slow
+  # but healthy build is strictly worse than letting it finish, especially now
+  # that it resumes from a partial snapshot. Back to false.
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -31,7 +33,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45          # ~10 min of API time + headroom. The build
+    timeout-minutes: 330         # 5.5h. NOT arbitrary - see BUG 50. The build
                                  # resumes from a committed partial snapshot,
                                  # so a timeout is recoverable, not fatal.
     steps:
@@ -91,6 +93,51 @@ jobs:
             git pull --rebase --autostash origin ${{ github.ref_name }} || true
             git push
           fi
+
+      # BUG 50. A rate-limited build can exceed even a generous timeout. The
+      # commit step above runs on always(), so whatever was finished IS saved -
+      # and build_snapshot.py resumes from a partial file for the same week and
+      # logic_version. Re-dispatching therefore continues rather than restarts.
+      #
+      # This checks whether the week is actually armed and, if not, kicks off
+      # one continuation run. It never loops forever: the guard is that a
+      # continuation only fires when progress was made.
+      # BUG 50. A rate-limited build can exceed even a generous timeout. The
+      # commit step above runs on always(), so whatever finished IS saved - and
+      # build_snapshot.py resumes from a partial file for the same week and
+      # logic_version. Re-dispatching therefore CONTINUES rather than restarts.
+      - name: Continue if the snapshot is incomplete
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - > rows.txt <<'PYEOF'
+          from datetime import date, timedelta
+          import pandas as pd
+          t = date.today()
+          w = t - timedelta(days=t.weekday())
+          try:
+              d = pd.read_csv("weekly_snapshot.csv", dtype=str)
+              n = int((d["week_start"].astype(str).str.strip() == str(w)).sum())
+          except Exception:
+              n = 0
+          print(n)
+          PYEOF
+          ROWS=$(cat rows.txt)
+          echo "rows armed for the current week: ${ROWS}"
+          # 1,400 is the practical floor - below that the scan universe is
+          # materially incomplete.
+          if [[ "${ROWS}" -ge 1400 ]]; then
+            echo "snapshot is usable - no continuation needed"
+            exit 0
+          fi
+          if [[ "${{ github.run_attempt }}" -ge 3 ]]; then
+            echo "already attempted 3 times - stopping to avoid a loop"
+            exit 0
+          fi
+          echo "incomplete (${ROWS} rows) - dispatching a continuation run"
+          gh workflow run snapshot.yml --ref "${{ github.ref_name }}" \
+            || echo "could not dispatch - re-run manually"
 
       - name: Report to Telegram
         if: always()
