@@ -20,8 +20,23 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 #  BUG 1 - scan.py exited 1 when the snapshot file was missing.
 #  scan.py runs every 5 minutes, so that turned one missing file into a failed
 #  workflow (and a failure alert) every single run, all day.
+#
+#  *** REVERSED BY BUG 49 (03-Aug-2026). ***
+#
+#  The BUG 1 fix - exit 0 and skip quietly - was the direct cause of a whole
+#  trading day with no alerts and no warning. The snapshot went stale, every
+#  job returned 0, and three workflows reported SUCCESS while producing
+#  nothing. Quiet skipping hid a real outage.
+#
+#  BUG 1's concern was alert fatigue: ~75 failure notices a day. That is
+#  solved properly now by de-duplicating the alarm to ONE per calendar day
+#  (AlertState.stale_alerted), not by silencing it. The workflow does go red -
+#  which is the point, because a red tick is how you find out.
+#
+#  This test now asserts the CURRENT contract: non-zero exit, and the alarm
+#  text must be produced.
 # --------------------------------------------------------------------------- #
-def test_scan_exits_zero_when_snapshot_missing(tmp_path):
+def test_scan_fails_loudly_when_snapshot_missing(tmp_path):
     cfg = tmp_path / "config.yaml"
     cfg.write_text("strategy: {}\nuniverse: {}\nruntime: {}\n")
 
@@ -32,10 +47,14 @@ def test_scan_exits_zero_when_snapshot_missing(tmp_path):
              "DHAN_ACCESS_TOKEN": "x", "HOME": str(tmp_path)},
         cwd=tmp_path,
     )
-    assert proc.returncode == 0, (
-        "a missing snapshot must be a quiet skip, not a hard failure "
+    assert proc.returncode != 0, (
+        "a missing snapshot is an OUTAGE and must fail the workflow - exiting "
+        "0 is what hid the 03-Aug incident "
         f"(stdout={proc.stdout[-400:]} stderr={proc.stderr[-400:]})"
     )
+    blob = (proc.stdout + proc.stderr).lower()
+    assert "stale" in blob or "snapshot" in blob, (
+        "the operator must be told WHY nothing ran")
 
 
 def test_load_snapshots_returns_empty_not_raises(tmp_path):
@@ -5807,3 +5826,142 @@ def test_bug48_message_prints_the_actual_count():
     listed = [ln for ln in msg.splitlines() if ln.startswith("• ")]
     assert len(listed) == 8, f"expected 8 rows, got {len(listed)}"
     assert "12 more in the CSV" in msg
+
+
+# --------------------------------------------------------------------------- #
+#  BUG 49 - a data outage was indistinguishable from a quiet day.
+#
+#  Mon 03-Aug-2026: the user received NOTHING. No alerts, no shortlist, no
+#  BTST scan. Every workflow reported SUCCESS.
+#
+#  CHAIN OF EVENTS
+#    1. Sun 02-Aug the Weekly Snapshot rebuild FAILED after 2 minutes.
+#    2. Mon 03-Aug the retry HUNG - still in_progress after 4.5 hours against
+#       a 90-minute timeout.
+#    3. The committed snapshot therefore still carried week_start=2026-07-27
+#       while the current week was 2026-08-03.
+#    4. load_snapshots() dropped all 2,100 rows. That is CORRECT - it is BUG
+#       25's stale-level guard, and alerting on week-old levels would be far
+#       worse.
+#    5. Every downstream job hit `if not snaps: return 0`.
+#
+#  So three workflows ran green all day producing nothing, and no failure
+#  notice fired because nothing had technically failed. The guard worked; the
+#  REPORTING of the guard did not.
+#
+#  FIXES
+#    a) scan.py / watchlist.py / btst.py exit 2 and send a Telegram alarm
+#       naming the job and the staleness. The 5-minute scanner de-duplicates
+#       to one alert per day via AlertState so it does not send ~75 of them.
+#    b) snapshot.yml: timeout 90 -> 45 min, cancel-in-progress true so a hung
+#       build cannot block the next attempt, and the failure message no longer
+#       claims the scanner "will keep using last week's levels" - it will not,
+#       it refuses to run at all.
+#    c) NEW healthcheck.yml at 08:30 IST - a dead-man's switch that asserts the
+#       snapshot is for the CURRENT week before the market opens, independent
+#       of every other job.
+# --------------------------------------------------------------------------- #
+def test_bug49_jobs_exit_nonzero_on_a_stale_snapshot():
+    """Silent success is the bug. Every scheduled job must go red."""
+    import inspect
+
+    import btst
+    import scan
+    import watchlist
+
+    for mod, name in ((scan, "scan"), (watchlist, "watchlist"), (btst, "btst")):
+        src = inspect.getsource(mod.main)
+        assert "report_stale_snapshot" in src, (
+            f"{name}.main must alarm when the snapshot is unusable")
+        assert "return 2" in src, (
+            f"{name}.main must exit non-zero so the workflow fails visibly")
+
+
+def test_bug49_stale_alert_is_deduplicated_per_day(tmp_path):
+    """The 5-minute scan would otherwise send ~75 identical alerts a day."""
+    from state import AlertState
+
+    p = tmp_path / "state.json"
+    st = AlertState(p)
+    assert st.stale_alerted("2026-08-03") is False
+    st.mark_stale("2026-08-03")
+    st.save()
+
+    st2 = AlertState(p)
+    assert st2.stale_alerted("2026-08-03") is True
+    assert st2.stale_alerted("2026-08-04") is False, "a new day must re-alert"
+
+
+def test_bug49_snapshot_age_is_computed(tmp_path):
+    import pandas as pd
+
+    import scan
+    from config import load_config
+
+    (tmp_path / "config.yaml").write_text("strategy:\n  use_mcap: false\n")
+    cfg = load_config(tmp_path / "config.yaml")
+
+    assert scan.snapshot_age_days(cfg) is None, "missing file -> None"
+
+    old = pd.Timestamp.now().normalize() - pd.Timedelta(days=7)
+    pd.DataFrame({"week_start": [str(old.date())] * 3}).to_csv(
+        tmp_path / "weekly_snapshot.csv", index=False)
+    age = scan.snapshot_age_days(cfg)
+    assert age is not None and age >= 6, age
+
+
+def test_bug49_alarm_never_crashes_the_job(tmp_path, monkeypatch):
+    """
+    The alarm runs on the failure path. If Telegram is down it must not raise
+    and mask the original problem.
+    """
+    import scan
+    from config import load_config
+
+    (tmp_path / "config.yaml").write_text("strategy:\n  use_mcap: false\n")
+    cfg = load_config(tmp_path / "config.yaml")
+
+    def boom(*a, **k):
+        raise RuntimeError("telegram unreachable")
+
+    monkeypatch.setattr(scan, "build_telegram", boom)
+    scan.report_stale_snapshot(cfg, "2026-08-03", "Test Job")   # must not raise
+
+
+def test_bug49_healthcheck_workflow_exists_and_runs_premarket():
+    import re
+
+    p = ROOT / ".github/workflows/healthcheck.yml"
+    assert p.exists(), "the dead-man's switch must exist"
+    wf = p.read_text()
+
+    crons = re.findall(r'cron:\s*"([^"]+)"', wf)
+    assert crons, "it must be scheduled"
+    mi, hr = crons[0].split()[0], crons[0].split()[1]
+    ist = int(hr) * 60 + int(mi) + 330
+    assert ist < 9 * 60 + 15, (
+        f"health check runs {ist//60:02d}:{ist%60:02d} IST - must be before "
+        "the 09:15 open")
+    assert "week_start" in wf and "stale" in wf.lower()
+    assert "exit 1" in wf, "an unhealthy check must fail the workflow"
+
+
+def test_bug49_snapshot_workflow_cannot_hang_indefinitely():
+    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
+    import re
+    m = re.search(r"timeout-minutes:\s*(\d+)", wf)
+    assert m and int(m.group(1)) <= 60, (
+        "a hung build occupied the runner for 4.5h on 03-Aug - cap it")
+    assert "cancel-in-progress: true" in wf, (
+        "a newer snapshot build must supersede a hung one")
+
+
+def test_bug49_failure_message_does_not_promise_a_fallback():
+    """
+    The old message said the scanner "will keep using last week's levels".
+    It does not - it refuses to run, which is a much bigger deal and the user
+    needs to know that immediately.
+    """
+    wf = (ROOT / ".github/workflows/snapshot.yml").read_text()
+    assert "keep using last week" not in wf
+    assert "does NOT fall back" in wf

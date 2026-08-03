@@ -411,8 +411,11 @@ def main() -> int:
 
     snaps = load_snapshots(cfg, week_s)
     if not snaps:
-        log.error("no usable snapshot for %s", week_s)
-        return 0
+        # BUG 49: fail loudly. A BTST scan that finds nothing because the
+        # snapshot is stale looks identical to a genuinely quiet day.
+        from scan import report_stale_snapshot
+        report_stale_snapshot(cfg, week_s, "BTST Scan")
+        return 2
     if not cfg.secrets.dhan_access_token:
         log.error("DHAN_ACCESS_TOKEN not set")
         return 0

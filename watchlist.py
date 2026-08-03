@@ -704,10 +704,12 @@ def main() -> int:
 
     snaps = load_snapshots(cfg, week_s)
     if not snaps:
-        # load_snapshots already logged why. Exit 0: this runs on a schedule and
-        # a missing snapshot is an operational problem, not a crash.
-        log.error("no usable snapshot for %s - nothing to report", week_s)
-        return 0
+        # BUG 49: an operational problem IS a failure. Silent success here is
+        # what turned the 03-Aug snapshot outage into a day with no alerts and
+        # no warning.
+        from scan import report_stale_snapshot
+        report_stale_snapshot(cfg, week_s, "Daily Shortlist")
+        return 2
     if not cfg.secrets.dhan_access_token:
         log.error("DHAN_ACCESS_TOKEN not set")
         return 0

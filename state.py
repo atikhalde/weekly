@@ -75,6 +75,18 @@ class AlertState:
         wk[symbol] = {"bar_time": bar_time.isoformat(timespec="minutes"), "price": price}
         self._dirty = True
 
+    # ---- stale-snapshot alarm de-duplication (BUG 49) --------------------
+    # The 5-minute scanner would otherwise send the same outage alert ~75
+    # times a day. One per calendar day is enough to be impossible to miss
+    # without being impossible to read.
+    def stale_alerted(self, day: str) -> bool:
+        return self._data.get("stale_alert") == day
+
+    def mark_stale(self, day: str) -> None:
+        if self._data.get("stale_alert") != day:
+            self._data["stale_alert"] = day
+            self._dirty = True
+
     def prune(self, keep_weeks: int = 6) -> None:
         weeks = self._data.get("weeks", {})
         if len(weeks) <= keep_weeks:

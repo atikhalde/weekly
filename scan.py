@@ -30,7 +30,7 @@ from dhan import IST, DhanClient, DhanError
 from mcap import load_table as load_mcap_table
 from state import AlertState
 from strategy import LOGIC_VERSION, WeeklySnapshot, replay_week, week_start_of
-from telegram import build_telegram, format_heartbeat
+from telegram import build_telegram, format_heartbeat, _esc
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
 log = logging.getLogger("scan")
@@ -155,6 +155,62 @@ def load_snapshots(cfg, week: str) -> list[WeeklySnapshot]:
     return snaps
 
 
+def snapshot_age_days(cfg) -> int | None:
+    """
+    How many days old the committed snapshot's week_start is, or None if the
+    file is missing/unreadable. Used to turn a silent no-op into a loud alarm.
+    """
+    path = cfg.paths["snapshot"]
+    if not path.exists():
+        return None
+    try:
+        df = pd.read_csv(path, dtype=str, usecols=["week_start"])
+    except Exception:
+        return None
+    weeks = [w for w in df["week_start"].dropna().unique() if str(w).strip()]
+    if not weeks:
+        return None
+    try:
+        newest = max(pd.Timestamp(str(w)) for w in weeks)
+    except Exception:
+        return None
+    return int((pd.Timestamp(datetime.now(IST).date()) - newest).days)
+
+
+def report_stale_snapshot(cfg, week: str, job: str) -> None:
+    """
+    BUG 49 - a missing/stale snapshot used to be a SILENT no-op.
+
+    On Mon 03-Aug-2026 the Sunday rebuild failed and the Monday retry hung.
+    The committed snapshot still said week_start=2026-07-27, so every job
+    dropped all 2,100 rows (correctly - that is BUG 25's stale-level guard),
+    logged an error, and returned 0. Three workflows reported SUCCESS while
+    doing nothing for a whole trading day, and no failure notice fired because
+    nothing had actually failed.
+
+    A data outage must be as loud as a crash. This sends one Telegram message
+    naming the job and the staleness, and callers exit non-zero so the
+    workflow goes red.
+    """
+    age = snapshot_age_days(cfg)
+    age_txt = f"{age} day(s) old" if age is not None else "missing"
+    log.error("STALE SNAPSHOT (%s): no usable rows for week %s at "
+              "logic_version %d - %s is doing nothing. Run the Weekly "
+              "Snapshot workflow.", age_txt, week, LOGIC_VERSION, job)
+    try:
+        tg = build_telegram(cfg)
+        tg.send(
+            f"\u26a0\ufe0f <b>{_esc(job)} produced NOTHING</b>\n"
+            f"<i>The weekly snapshot is {_esc(age_txt)} - it has no rows for "
+            f"the current week ({_esc(week)}).</i>\n\n"
+            f"No signals can be generated until it is rebuilt. This is a data "
+            f"outage, not a quiet day.\n\n"
+            f"<b>Fix:</b> Actions \u2192 <b>Weekly Snapshot</b> \u2192 Run "
+            f"workflow (tick <b>fresh</b>).")
+    except Exception as exc:      # never let the alarm itself crash the job
+        log.error("could not send the stale-snapshot alert: %s", str(exc)[:200])
+
+
 def prefilter(client: DhanClient, snaps: list[WeeklySnapshot], cfg) -> list[WeeklySnapshot]:
     """Keep only names trading above their frozen 26W level (and 52W if required)."""
     by_seg: dict[str, list[int]] = {}
@@ -252,10 +308,19 @@ def main() -> int:
         want = {s.strip().upper() for s in args.symbols.split(",")}
         snaps = [s for s in snaps if s.symbol.upper() in want]
     if not snaps:
-        # Exit 0 on purpose: this runs every 5 minutes, and a hard failure here
-        # would raise a workflow alert on every scheduled run until fixed.
-        log.warning("no snapshots to scan - nothing to do")
-        return 0
+        # BUG 49: this used to log a warning and exit 0. The scan then reported
+        # SUCCESS on every 5-minute run for a whole day while producing
+        # nothing. It now alarms ONCE per day (state-tracked, so the remaining
+        # ~75 runs stay quiet) and exits non-zero so the workflow goes red.
+        st = AlertState(cfg.paths["state"])
+        today = f"{datetime.now(IST):%Y-%m-%d}"
+        if not st.stale_alerted(today):
+            report_stale_snapshot(cfg, week, "Intraday Scan")
+            st.mark_stale(today)
+            st.save()
+        else:
+            log.error("stale snapshot for week %s - already alerted today", week)
+        return 2
 
     tg = build_telegram(cfg, dry_run=cfg.runtime.dry_run)
     state = AlertState(cfg.paths["state"])
