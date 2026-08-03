@@ -10,10 +10,27 @@ name: BTST Scan (15:20 IST)
 # Measured at this cutoff, 82% of flagged names still qualify at the close, and
 # the entry is 0.14% CHEAPER than the close (these names ramp into the bell).
 #
-# GitHub cron is only best-effort and often runs 3-4 minutes late, which at
-# this hour matters. If a pick is consistently arriving after 15:25, drive this
-# workflow from cron-job.org the same way scan.yml is - the schedule below is
-# the fallback, not a guarantee.
+# BUG 55 - GITHUB CRON IS NOT RELIABLE ENOUGH FOR THIS JOB.
+# On 03-Aug the message arrived at 15:48 IST - 28 minutes late, after the
+# 15:30 close - and still said "BUY NOW". GitHub's scheduler is explicitly
+# best-effort and deprioritises under load; a ten-minute entry window cannot
+# be built on it.
+#
+# Two changes:
+#   1. repository_dispatch, so cron-job.org can FIRE this job at exactly
+#      15:18 IST the same way it already drives scan.yml. That is the real
+#      fix - see CRON_JOBS.md for the curl payload.
+#   2. btst.py now refuses to say "BUY NOW" after 15:30 (it marks the picks
+#      MISSED and tradeable=0 instead), so if the schedule slips again the
+#      alert is honest rather than unfillable.
+#
+# The cron below is now the FALLBACK, not the primary trigger.
+#
+# To wire cron-job.org (15:18 IST, Mon-Fri):
+#   POST https://api.github.com/repos/atikhalde/weekly/dispatches
+#   Header: Authorization: Bearer <PAT with repo scope>
+#   Header: Accept: application/vnd.github+json
+#   Body:   {"event_type":"btst"}
 #
 # It runs TWO scans and commits TWO lists:
 #   btst_picks.csv        confirmed - broke out TODAY (Models E / E-wide)
@@ -28,7 +45,11 @@ name: BTST Scan (15:20 IST)
 # It never places orders and never touches state.json.
 on:
   schedule:
+    # 09:50 UTC = 15:20 IST. FALLBACK ONLY - see the note above.
     - cron: "50 9 * * 1-5"
+  # Primary trigger: cron-job.org POSTs {"event_type":"btst"} at 15:18 IST.
+  repository_dispatch:
+    types: [btst]
   workflow_dispatch:
     inputs:
       all:

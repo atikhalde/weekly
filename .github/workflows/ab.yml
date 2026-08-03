@@ -8,7 +8,12 @@ name: A/B Paper Trading
 # (model, symbol, signal date, signal time), so re-running is always safe.
 on:
   schedule:
+    # 10:45 UTC = 16:15 IST. FALLBACK ONLY.
+    # BUG 55: zero scheduled runs on 03-Aug, same as report.yml. Primary
+    # trigger should be cron-job.org POSTing {"event_type":"ab"} at 16:15 IST.
     - cron: "45 10 * * 1-5"
+  repository_dispatch:
+    types: [ab]
   workflow_dispatch:
     inputs:
       days:

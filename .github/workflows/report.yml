@@ -4,7 +4,14 @@ name: Paper Trading Report
 # (16:00 IST) leaves time for the last candles to settle.
 on:
   schedule:
+    # 10:30 UTC = 16:00 IST. FALLBACK ONLY.
+    # BUG 55: on 03-Aug this had ZERO scheduled runs - the user got no paper
+    # report after the market. GitHub cron is best-effort and silently skips
+    # under load. cron-job.org should POST {"event_type":"report"} at 16:00
+    # IST as the primary trigger; see CRON_JOBS.md.
     - cron: "30 10 * * 1-5"
+  repository_dispatch:
+    types: [report]
   workflow_dispatch:
     inputs:
       weeks:
