@@ -293,9 +293,41 @@ ANTICIPATE_FILE = "anticipate_picks.csv"
 #  score alone, and the out-of-sample column barely moves - the strongest sign
 #  in the whole study that this is not curve fitting.
 #
-#  MIN_PRE_CONFIRM is therefore applied to BOTH lists here. It is a floor, not
-#  a ranking: 6 keeps ~5.8 setups a week, 7 would keep 2.9. Six is chosen so
-#  the list does not go empty for a week at a time.
+#  ---- CORRECTION (BUG 56, 04-Aug-2026): IT IS APPLIED TO ONE LIST, NOT TWO
+#  This block used to claim "MIN_PRE_CONFIRM is therefore applied to BOTH
+#  lists here". It never was. classify_approach() enforces it; the confirmed
+#  tier path in classify() does not, and never did.
+#
+#  Caught from the live btst_picks.csv, which recorded DALMIASUG at PRE 4/8 -
+#  impossible if the floor applied. Every table in this file that quotes a
+#  "PRE>=6" figure for the CONFIRMED list therefore describes a rule the
+#  scanner was not running.
+#
+#  MEASURED BEFORE CHANGING ANYTHING. The confirmed-tier list, 5 years, with
+#  the BUG 54 floors in place:
+#
+#      variant                       n     /wk    mean     win%   PF    OOS
+#      as it actually runs (no PRE) 786    3.0   +2.092%   62.7  2.36  +2.715
+#      as it was documented (>=6)   745    2.9   +2.085%   62.4  2.32  +2.744
+#      the slice that leaks in       41          +2.229%   68.3  3.66  +2.334
+#
+#  The leaking slice is BETTER than the list it leaks into: t=3.47, positive
+#  in all six years, and it survives removing its top 3 trades (+1.642%).
+#  Top-5/day portfolio: no floor 62.7% win / maxDD -28.6%, with floor 62.4% /
+#  -34.5%. The accident is mildly HELPING.
+#
+#  So the CODE IS LEFT ALONE and the comment is corrected instead. Adding the
+#  floor now would remove ~41 good trades to satisfy a sentence.
+#
+#  Why the PRE score adds nothing here any more: it was measured as a proxy
+#  for trend quality against close_pos>=0.90. BUG 51 added an explicit trend
+#  floor (ret_12m>=50, dist200>=25) and BUG 54 raised close_pos to 0.98 -
+#  both of which test the same thing more directly. By PRE bucket on today's
+#  rule the ordering is flat-to-inverted (5/8 +2.838%, 7/8 +1.897%,
+#  8/8 +2.116%), so there is nothing left for it to add.
+#
+#  It STILL GATES THE ANTICIPATION LIST, where it was measured and where
+#  close_pos is only required to be 0.90. Do not "tidy" it away from there.
 # --------------------------------------------------------------------------- #
 MIN_PRE_CONFIRM = 6
 
