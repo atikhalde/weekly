@@ -5565,6 +5565,126 @@ def test_bug59_scan_has_a_deadline_and_sends_what_it_has():
         "names that fired TODAY must be submitted before the aged pool")
 
 
+def test_bug65_prior_exhaustion_is_rejected():
+    """
+    A breakout whose BASE was already pinned at 52-week highs, or whose stock
+    had already doubled in the prior quarter, is spent:
+
+        base within 2% of the 252d high   n=325  +1.333%  P(+5%) 12.6%
+        prior 3-month > +100%             n=106  +1.592%  P(+5%)  7.5%
+        everything else                 n=1,366  +2.624%  P(+5%) 25.9%
+
+    Welch t 4.09; kept set clustered t 13.90; every year positive.
+    """
+    import btst
+
+    assert btst.MAX_BASE_FROM_HIGH == -2.0
+    assert btst.MAX_RET_3M_PRIOR == 100.0
+
+    # pinned at highs -> rejected
+    assert btst.exhausted({"base_from_high": -0.5, "ret_3m_prior": 20.0})
+    # already doubled -> rejected
+    assert btst.exhausted({"base_from_high": -30.0, "ret_3m_prior": 150.0})
+    # emerging from a base -> kept
+    assert btst.exhausted({"base_from_high": -12.0, "ret_3m_prior": 30.0}) is None
+    # NaN must PASS - a young listing has no 252d high to be pinned against,
+    # and rejecting it would repeat the BUG 51 over-reach.
+    assert btst.exhausted({"base_from_high": float("nan"),
+                           "ret_3m_prior": float("nan")}) is None
+
+    # wired into BOTH paths
+    body = (ROOT / "btst.py").read_text()
+    assert body.count("spent = exhausted(m)") == 2, (
+        "both classify() and classify_approach() must apply it")
+
+    # the two names the user queried must SURVIVE - they were not extended
+    assert btst.exhausted({"base_from_high": -10.7,
+                           "ret_3m_prior": 37.3}) is None   # MOREPENLAB
+    assert btst.exhausted({"base_from_high": -19.3,
+                           "ret_3m_prior": 8.3}) is None    # RBA
+    # but the two extended anticipation picks must be dropped
+    assert btst.exhausted({"base_from_high": -1.6, "ret_3m_prior": 79.9})  # RAIN
+    assert btst.exhausted({"base_from_high": -1.5, "ret_3m_prior": 46.5})  # TFCILTD
+
+
+def test_bug65_refuted_claims_stay_refuted():
+    """
+    Two intuitive ideas were tested on 858,401 stock-days and measured
+    BACKWARDS. Recorded so they are not "fixed" into the scanner later.
+
+      1. "a big up-day today means no big move tomorrow" - the opposite:
+         P(+5%) rises monotonically 3.6% -> 21.3% as today's move goes
+         -5% -> +20%, and reaches 33.4% for a +15-20% day that closed at its
+         high. TIER_A_DAY must stay at 15.
+      2. "require a tight/VCP base" - tight bases measured WORSE:
+         coiled (contraction<0.70) P(+5%) 9.2% vs expanding (>1.20) 31.2%.
+    """
+    import btst
+
+    assert btst.TIER_A_DAY == 15.0, (
+        "a large up-day is the STRONGEST predictor of a big next day, not a "
+        "sign of exhaustion - lift 5.15x at +15-20%")
+
+    body = (ROOT / "btst.py").read_text()
+    for token in ("REFUTED", "15..20%", "TIGHT  n=123", "LOOSE  n=714"):
+        assert token in body, f"the measurement must stay documented: {token!r}"
+
+    # no tightness/squeeze gate may exist IN CODE (comments discuss it freely)
+    code = "\n".join(ln for ln in body.splitlines()
+                     if not ln.lstrip().startswith("#"))
+    for bad in ("bbw_pct <", "contraction <", "MIN_TIGHT", "squeeze <"):
+        assert bad not in code, (
+            f"tightness measured negative - {bad!r} must not gate")
+
+
+def test_bug64_degenerate_today_bar_is_repaired_from_the_quote():
+    """
+    E2E on 04-Aug came back with open == high == low == close == 570.15, so
+    the scan reported day_ret 0.00% when the real bar was 552.00 -> 570.15
+    (+3.29%). RAIN and TFCILTD matched Yahoo within feed noise on the same
+    run, so this is a per-symbol data defect.
+
+    It matters because day_ret is a GATE: TIER_A_DAY needs >= +15% and
+    conviction awards a point at >= +6%. A zeroed open silently demotes a
+    tier A setup to nothing - the best trade of the day would never be shown.
+    """
+    from datetime import date
+
+    import pandas as pd
+
+    import btst
+
+    today = date(2026, 8, 4)
+    df = pd.DataFrame([
+        {"datetime": pd.Timestamp("2026-08-03"), "open": 536.35, "high": 543.0,
+         "low": 526.9, "close": 543.0, "volume": 1e6},
+        {"datetime": pd.Timestamp("2026-08-04"), "open": 570.15, "high": 570.15,
+         "low": 570.15, "close": 570.15, "volume": 1e6},
+    ])
+    assert (df.iloc[-1].close / df.iloc[-1].open - 1) * 100 == 0.0
+
+    q = {"open": 552.00, "high": 570.15, "low": 551.60, "last_price": 570.15}
+    out = btst.repair_today_bar(df, q, today)
+    t = out.iloc[-1]
+    assert abs((t.close / t.open - 1) * 100 - 3.29) < 0.05, "must repair day_ret"
+    assert t.high >= t.close and t.low <= t.open, "bar must stay consistent"
+    # close_pos must still read "at the high"
+    assert abs((t.close - t.low) / (t.high - t.low) - 1.0) < 1e-6
+
+    # guards: no quote, or a bar that is not today's, must change nothing
+    d2 = pd.DataFrame([{"datetime": pd.Timestamp("2026-08-04"), "open": 100,
+                        "high": 110, "low": 99, "close": 108, "volume": 1}])
+    assert btst.repair_today_bar(d2, None, today).iloc[-1].open == 100
+    d3 = pd.DataFrame([{"datetime": pd.Timestamp("2026-07-30"), "open": 100,
+                        "high": 110, "low": 99, "close": 108, "volume": 1}])
+    assert btst.repair_today_bar(d3, q, today).iloc[-1].open == 100
+
+    # and it must be wired into BOTH data paths
+    body = (ROOT / "btst.py").read_text()
+    assert body.count("repair_today_bar(df, ohlc_all.get(s.symbol)") == 2, (
+        "both the confirmed and anticipation paths must repair today's bar")
+
+
 def test_bug63_anticipate_list_also_honours_the_entry_window():
     """
     THE 20:43 RUN. The confirmed list correctly read "⛔ MISSED" while the
@@ -6348,6 +6468,11 @@ def test_bug47_close_pos_still_gates_both_sides(monkeypatch):
 
     monkeypatch.setattr(btst, "_pre_score_from_daily", lambda *a, **k: (8, []))
     _stub_trend(monkeypatch)
+    # BUG 65 added a prior-exhaustion gate. This fixture is 259 identical bars
+    # at 1000, so the prior close sits ~1.96% under the 252-day high and trips
+    # it by construction - an artifact of the synthetic frame, not the logic
+    # under test here. Neutralise it so the test keeps measuring close_pos.
+    monkeypatch.setattr(btst, "exhausted", lambda m: None)
 
     def frame(close_pos, mult, n=260, price=1000.0, base=5e5):
         """Build the last candle directly so close_pos is exactly as asked -

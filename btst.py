@@ -371,6 +371,91 @@ ANTICIPATE_FILE = "anticipate_picks.csv"
 # --------------------------------------------------------------------------- #
 MIN_PRE_CONFIRM = 6
 
+# --------------------------------------------------------------------------- #
+#  BUG 65 - PRIOR EXHAUSTION  (user observation, 05-Aug-2026)
+#
+#  The user objected that the picks "look like extended rallies" and that a
+#  stock which already ran should not be expected to run again. Two separate
+#  claims were tested on 858,401 tradeable stock-days, losers kept as control.
+#
+#  CLAIM A - "it moved +20% TODAY so it won't move big tomorrow" - REFUTED,
+#  and refuted hard. P(next day >= +5%) by today's move:
+#
+#      today's move    n        P(+5%)   lift
+#      -5..0%       464,722      3.6%    0.86
+#       0..3%       278,241      3.8%    0.92
+#       3..6%        64,664      5.3%    1.28
+#       6..10%       17,781      8.2%    1.99
+#      10..15%        4,527     11.7%    2.83
+#      15..20%        1,520     21.3%    5.15
+#
+#  Monotonic the OPPOSITE way to the claim. Restricted to names that also
+#  closed at their high, a +15-20% day reaches 33.4% - an 8x lift. TIER_A_DAY
+#  stays at 15. Momentum does not exhaust overnight.
+#
+#  CLAIM B - "there is no tight-structure / VCP logic" - TRUE, and it stays
+#  that way, because tightness measured NEGATIVE at every horizon:
+#
+#      prior-base Bollinger width  0-15th pct (tightest)  +2.478%  lift 0.93
+#                                  85-100th   (widest)    +2.504%  lift 1.07
+#      base contraction  <0.70 (coiled)   n= 76  P(+5%)  9.2%  lift 0.40
+#                        >1.20 (expanding) n=474 P(+5%) 31.2%  lift 1.35
+#      tight base vs loose base, same breakout shape:
+#          TIGHT  n=123  +1.868%  P(+5%) 20.3%  OOS +1.696%
+#          LOOSE  n=714  +2.673%  P(+5%) 29.6%  OOS +2.658%
+#
+#  This restates the STRUCTURE FINDING already in the repo (391,207 sampled
+#  stock-days): coiled bases break out less reliably, expanding ones run.
+#  A squeeze is a good ENTRY pattern for a swing trade; it is not a predictor
+#  of a large OVERNIGHT gap, which is what this model sells.
+#
+#  BUT THE UNDERLYING INSTINCT WAS RIGHT, AT A DIFFERENT TIME SCALE. What is
+#  exhausted is not today's candle, it is the QUARTER behind it:
+#
+#      slice                                  n     mean    P(+5%)  lift
+#      base sat within 2% of its 252d high   325   +1.333%   12.6%  0.54
+#      prior 3-month return > +100%          106   +1.592%    7.5%  0.32
+#      both true                              71   +1.827%    4.2%  0.18
+#      everything else                     1,366   +2.624%   25.9%  1.12
+#
+#  So: a breakout is worth taking when the stock is emerging from somewhere,
+#  and worth skipping when it is already pinned at 52-week highs after
+#  doubling. Welch t on the difference 4.09; date-clustered t on the kept set
+#  13.90; every year positive; the kept set survives de-duplication (n=1,227,
+#  +2.629%) and removal of its 10 most frequent names (+2.619%).
+#
+#  Threshold grid -1..-8% x 60..150% all land +2.55..+2.74% - not a
+#  cherry-pick. -2% / +100% is the loosest pair that captures the effect.
+#
+#  HONEST LIMITS. Paired daily t on the top-5 portfolio is +1.79, so this is
+#  suggestive rather than decisive at the portfolio level; it earns its place
+#  because the DROPPED slice is independently and consistently poor, not
+#  because the headline moved. It also costs ~1.4 setups a week, and drawdown
+#  is slightly worse (-19.8% -> -21.1%) because fewer names share the risk.
+#
+#  Applied to the live 04-Aug list: MOREPENLAB (base -10.7%, 3m +37%) and RBA
+#  (base -19.3%, 3m +8%) both SURVIVE - they were not the extended ones. Two
+#  of the three ANTICIPATE picks, RAIN (base -1.6%) and TFCILTD (base -1.5%),
+#  are dropped. The user's eye was right about the anticipation list.
+MAX_BASE_FROM_HIGH = -2.0    # yesterday's close must be >2% below the 252d high
+MAX_RET_3M_PRIOR = 100.0     # and the prior quarter must not have doubled
+
+
+def exhausted(m: dict) -> str | None:
+    """Reason this setup is already spent, or None if it is still fresh.
+
+    NaN PASSES here, unlike the trend floor. A young listing has no 252-day
+    high to be pinned against, and refusing it would re-introduce the BUG 51
+    over-reach on a population where it was never measured.
+    """
+    bfh = m.get("base_from_high", float("nan"))
+    r3 = m.get("ret_3m_prior", float("nan"))
+    if bfh == bfh and bfh >= MAX_BASE_FROM_HIGH:
+        return f"base was {bfh:+.1f}% off its 252d high (already at highs)"
+    if r3 == r3 and r3 > MAX_RET_3M_PRIOR:
+        return f"prior 3m {r3:+.0f}% (already doubled)"
+    return None
+
 
 # Thresholds live here and are imported by ab_paper.py's Model E, so the paper
 # model and the nightly scanner can never drift apart.
@@ -570,6 +655,52 @@ def conviction(m: dict) -> tuple[int, list[str]]:
     return len(hits), hits
 
 
+def repair_today_bar(df: pd.DataFrame, quote: dict | None,
+                     today) -> pd.DataFrame:
+    """
+    Trust the bulk OHLC quote for TODAY's open/high/low.
+
+    BUG 64. On 04-Aug the scan reported E2E at day_ret 0.00% when the real bar
+    was 552.00 -> 570.15 (+3.29%). The daily candle came back with
+    open == close == high, a degenerate bar: day_ret collapses to zero and
+    close_pos to 1.000. RAIN and TFCILTD matched Yahoo within feed noise on
+    the same run, so this is a per-symbol data defect, not a formula error.
+
+    It matters because day_ret is a GATE, not decoration: TIER_A_DAY needs
+    >= +15% and conviction awards a point at >= +6%. A zeroed open silently
+    demotes a tier A setup to nothing - the scanner would simply never
+    mention the best trade of the day.
+
+    The bulk /marketfeed/ohlc response already carries today's true open,
+    high and low for every symbol, at no extra request, so it is used to
+    repair the last bar whenever it is today's. The CLOSE is left alone: the
+    daily bar (or the 5-minute reconstruction) is the better source for it,
+    and only the open was observed to be wrong.
+    """
+    if df is None or df.empty or not quote:
+        return df
+    try:
+        if pd.Timestamp(df.iloc[-1]["datetime"]).date() != today:
+            return df
+        q_o = float(quote.get("open") or 0.0)
+        q_h = float(quote.get("high") or 0.0)
+        q_l = float(quote.get("low") or 0.0)
+    except (TypeError, ValueError, KeyError):
+        return df
+    if q_o <= 0:
+        return df
+    i = df.index[-1]
+    c = float(df.at[i, "close"])
+    df.at[i, "open"] = q_o
+    # keep the bar self-consistent: the range must span open and close
+    hi = max(float(df.at[i, "high"]), q_h, q_o, c)
+    lo = min(float(df.at[i, "low"]) or q_l, q_l or float(df.at[i, "low"]), q_o, c)
+    df.at[i, "high"] = hi
+    if lo > 0:
+        df.at[i, "low"] = lo
+    return df
+
+
 def _num(v, nd: int = 2):
     """Round for the picks file, but keep NaN/None BLANK rather than 0.
 
@@ -766,6 +897,19 @@ def classify(daily: pd.DataFrame, level: float,
     dist_200dma = (float((c / np.mean(cl[-200:]) - 1) * 100.0)
                    if len(cl) >= 200 else float("nan"))
 
+    # ---- BUG 65: PRIOR EXHAUSTION (user observation, 05-Aug-2026) ---------
+    # Measured on the PRIOR bars only - today is excluded, because today's
+    # breakout is the trigger, not the exhaustion.
+    #   base_from_high : where yesterday's close sat vs the 252-day high
+    #   ret_3m_prior   : the move already made in the previous quarter
+    hi252_prior = float(np.max(hi[-253:-1])) if len(hi) >= 253 else float("nan")
+    prior_close = float(cl[-2]) if len(cl) >= 2 else float("nan")
+    base_from_high = (float((prior_close / hi252_prior - 1) * 100.0)
+                      if hi252_prior == hi252_prior and hi252_prior > 0
+                      else float("nan"))
+    ret_3m_prior = (float((prior_close / cl[-64] - 1) * 100.0)
+                    if len(cl) >= 64 and cl[-64] > 0 else float("nan"))
+
     pre, _ = _pre_score_from_daily(d, level, c)
     m = dict(
         pre=pre,
@@ -778,6 +922,7 @@ def classify(daily: pd.DataFrame, level: float,
         if float(prev.iloc[-1]["close"]) > 0 else float("nan"),
         atr_pct=atr_pct, turnover_cr=turnover, ret_12m=ret_12m,
         dist_200dma=dist_200dma,
+        base_from_high=base_from_high, ret_3m_prior=ret_3m_prior,
         ext_pct=((c / level - 1) * 100.0) if level > 0 else float("nan"),
     )
 
@@ -793,6 +938,13 @@ def classify(daily: pd.DataFrame, level: float,
         age = breakout_age(d, level)
     m["age"] = int(age)
     m["fresh"] = bool(age == 0)
+
+    # BUG 65: reject a breakout that is already spent, BEFORE tiering it.
+    spent = exhausted(m)
+    if spent:
+        m["tier"] = None
+        m["reject"] = spent
+        return m
 
     rv = m["rvol"] if not np.isnan(m["rvol"]) else 0.0
     # --- TIER A: the YASHO shape. Rare, and the strongest measured.
@@ -955,7 +1107,16 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
              day_ret=(c / o - 1) * 100.0,
              close_pos=((c - lo) / rng) if rng > 0 else 0.5,
              rvol=(v / vma_cmp) if vma_cmp > 0 else float("nan"),
-             atr_pct=atr_pct, turnover_cr=turnover, partial_frac=frac)
+             atr_pct=atr_pct, turnover_cr=turnover, partial_frac=frac,
+             # BUG 65: prior-exhaustion inputs, computed from bars BEFORE
+             # today so the breakout itself is not counted as exhaustion.
+             base_from_high=(
+                 float((cl[-2] / np.max(hi[-253:-1]) - 1) * 100.0)
+                 if len(cl) >= 253 and np.max(hi[-253:-1]) > 0
+                 else float("nan")),
+             ret_3m_prior=(
+                 float((cl[-2] / cl[-64] - 1) * 100.0)
+                 if len(cl) >= 64 and cl[-64] > 0 else float("nan")))
 
     if not (m["turnover_cr"] >= MIN_TURNOVER_CR and c >= MIN_PRICE
             and m["atr_pct"] >= MIN_ATR_PCT):
@@ -989,6 +1150,14 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
         m["ok"] = False
         shown = f"{d200:.0f}%" if d200 == d200 else "unknown"
         m["reject"] = f"dist200 {shown} < {MIN_DIST_200DMA:.0f}%"
+        return m
+    # BUG 65: the anticipation list is where the user's "extended rally"
+    # objection actually landed - on 04-Aug two of its three picks (RAIN,
+    # TFCILTD) had bases sitting within 2% of their 52-week high.
+    spent = exhausted(m)
+    if spent:
+        m["ok"] = False
+        m["reject"] = spent
         return m
     m["ok"] = True
     return m
@@ -1263,6 +1432,8 @@ def main() -> int:
             }
             df = pd.concat([df, pd.DataFrame([today_bar])], ignore_index=True)
             frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
+        # BUG 64: trust the bulk quote for today's open/high/low
+        df = repair_today_bar(df, ohlc_all.get(s.symbol), now.date())
         # A name whose alert fired today is age 0 by definition - trust the
         # alert rather than re-deriving it, so classify() and the alert can
         # never disagree about what "today" means. For the aged pool the age
@@ -1302,6 +1473,8 @@ def main() -> int:
                 "volume": float(m5["volume"].sum()),
             }])], ignore_index=True)
             frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
+        # BUG 64: same repair for the anticipation pass
+        df = repair_today_bar(df, ohlc_all.get(s.symbol), now.date())
         return df, frac
 
     # BUG 61: completion-order iteration with a hard wall clock. ex.map()
