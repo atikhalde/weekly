@@ -115,8 +115,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from datetime import datetime, time as dtime, timedelta
 
 import numpy as np
@@ -557,6 +558,53 @@ def conviction(m: dict) -> tuple[int, list[str]]:
     if r12 == r12 and r12 <= 200.0:
         hits.append("trend not exhausted")
     return len(hits), hits
+
+
+def run_until(fn, items, workers: int, deadline, log_label: str):
+    """
+    Map `fn` over `items` and STOP AT `deadline`, whatever is still in flight.
+
+    BUG 61. The previous version used ex.map(), which yields IN SUBMISSION
+    ORDER. A single slow symbol therefore blocked every deadline check behind
+    it: the loop could not break because nothing was being yielded. One
+    unlucky request can take 210 seconds (5 attempts x 30s HTTP timeout plus
+    exponential backoff) and a symbol needs TWO calls, so ONE name can hold
+    the scan for seven minutes - which is the whole entry window.
+
+    This iterates in COMPLETION order and re-checks the wall clock on every
+    tick, so a stall costs only the results still outstanding. Pending work is
+    cancelled; in-flight requests are abandoned (their threads are daemonic
+    from the pool's point of view and the process exits after sending).
+
+    `deadline` may be None to disable the cap (post-close review).
+    Returns (results, n_unfinished).
+    """
+    out, pending = [], []
+    ex = ThreadPoolExecutor(max_workers=max(1, workers))
+    try:
+        futs = {ex.submit(fn, it): it for it in items}
+        pending = set(futs)
+        while pending:
+            if deadline is not None:
+                left = (deadline - datetime.now(IST)).total_seconds()
+                if left <= 0:
+                    break
+            else:
+                left = None
+            done, pending = wait(pending, timeout=left, return_when=FIRST_COMPLETED)
+            if not done:
+                break                      # timed out with nothing new
+            for f in done:
+                try:
+                    out.append(f.result())
+                except Exception as exc:   # one bad symbol must not kill the run
+                    log.debug("%s: %s", log_label, str(exc)[:120])
+        for f in pending:
+            f.cancel()
+        return out, len(pending)
+    finally:
+        # do NOT block on in-flight requests - that is the hang we are fixing
+        ex.shutdown(wait=False, cancel_futures=True)
 
 
 def fetch_ohlc(client, snaps: list) -> dict:
@@ -1020,9 +1068,18 @@ def main() -> int:
                  "tier B candidates only (BUG 53): %s", len(stale),
                  ", ".join(f"{sym}({bar})" for sym, bar in stale[:12]))
 
+    # BUG 61: the defaults (timeout 30s, 5 retries with backoff to 30s) let a
+    # SINGLE call burn 210 seconds and a single symbol - two calls - burn
+    # seven minutes, which is the whole entry window. Inside a ten-minute
+    # window a slow symbol is worth abandoning, not retrying: there are
+    # hundreds of others and the tier gate needs a fast, complete candle.
+    # The post-close review keeps the patient defaults.
+    urgent = not (args.after_close or too_late)
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
-                        quote_rate=cfg.runtime.quote_rate_per_sec)
+                        quote_rate=cfg.runtime.quote_rate_per_sec,
+                        timeout=8 if urgent else 30,
+                        max_retries=2 if urgent else 5)
     caps = load_mcap_table(cfg.paths["mcap"])
     start = now.date() - timedelta(days=HISTORY_DAYS)
 
@@ -1215,26 +1272,24 @@ def main() -> int:
             frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
         return df, frac
 
+    # BUG 61: completion-order iteration with a hard wall clock. ex.map()
+    # yielded in submission order, so one slow symbol blocked every deadline
+    # check behind it and the loop could never break.
     rows = []
-    stopped_early = 0
-    with ThreadPoolExecutor(max_workers=max(1, cfg.runtime.max_workers)) as ex:
-        todo = fired + aged_pool
-        for i, (s, m) in enumerate(ex.map(one, todo)):
-            # BUG 59b: stop at the deadline and SEND WHAT WE HAVE. The
-            # estimate above can be wrong (rate limiting, a slow segment);
-            # this is the guarantee that the alert still lands before 15:30.
-            if enforce_deadline and datetime.now(IST) >= deadline:
-                stopped_early = len(todo) - i
-                log.warning("deadline %s reached - stopping with %d name(s) "
-                            "unchecked and sending what is ready",
-                            f"{deadline:%H:%M}", stopped_early)
-                break
-            if not m:
-                continue
-            m["symbol"] = s.symbol
-            m["level"] = s.entry_level
-            m["mcap_cr"] = caps.get(s.symbol.upper())
-            rows.append(m)
+    todo = fired + aged_pool
+    res, stopped_early = run_until(
+        one, todo, cfg.runtime.max_workers,
+        deadline if enforce_deadline else None, "btst")
+    if stopped_early:
+        log.warning("deadline %s reached - %d name(s) unchecked, sending what "
+                    "is ready", f"{deadline:%H:%M}", stopped_early)
+    for s, m in res:
+        if not m:
+            continue
+        m["symbol"] = s.symbol
+        m["level"] = s.entry_level
+        m["mcap_cr"] = caps.get(s.symbol.upper())
+        rows.append(m)
 
     # ---- BUG 53c: THE TREND FLOOR NOW APPLIES TO THE CONFIRMED LIST TOO ----
     # BUG 51 added MIN_RET_12M / MIN_DIST_200DMA but wired them only into
@@ -1471,19 +1526,19 @@ def main() -> int:
             return s, classify_approach(df, s.entry_level, s.hi_short2,
                                         partial_frac=frac)
 
-        ant_stopped = 0
-        with ThreadPoolExecutor(max_workers=max(1, cfg.runtime.max_workers)) as ex:
-            for i, (s, m) in enumerate(ex.map(one_ant, pending)):
-                if enforce_deadline and datetime.now(IST) >= deadline:
-                    ant_stopped = len(pending) - i
-                    log.warning("anticipation: deadline %s reached, %d "
-                                "unchecked", f"{deadline:%H:%M}", ant_stopped)
-                    break
-                if not m:
-                    continue
-                m["symbol"] = s.symbol
-                m["mcap_cr"] = caps.get(s.symbol.upper())
-                ant_rows.append(m)
+        # BUG 61: same completion-order guard as the confirmed pass.
+        ant_res, ant_stopped = run_until(
+            one_ant, pending, cfg.runtime.max_workers,
+            deadline if enforce_deadline else None, "anticipate")
+        if ant_stopped:
+            log.warning("anticipation: deadline %s reached, %d unchecked",
+                        f"{deadline:%H:%M}", ant_stopped)
+        for s, m in ant_res:
+            if not m:
+                continue
+            m["symbol"] = s.symbol
+            m["mcap_cr"] = caps.get(s.symbol.upper())
+            ant_rows.append(m)
 
         aq = [r for r in ant_rows if r.get("ok")]
         # ABOVE-level names first - measured +0.819% vs +0.580% for below -
@@ -1698,4 +1753,21 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    code = main()
+    # BUG 61: HARD EXIT.
+    # Abandoning a slow HTTP request is not enough. ThreadPoolExecutor
+    # registers an atexit hook that JOINS its worker threads, and those
+    # threads are non-daemon, so the interpreter blocks on the way out even
+    # after shutdown(wait=False, cancel_futures=True) has returned. Measured:
+    # a worker sleeping 60s holds the process for the full 60s at exit.
+    #
+    # That is precisely the observed hang - the scan finishes, the alert is
+    # sent, and the job still sits there until the workflow timeout kills it,
+    # which then reports FAILURE for a run that actually succeeded.
+    #
+    # Everything that matters (Telegram, picks CSV) is already flushed to the
+    # network/disk by this point, so there is nothing to lose by not waiting
+    # for a stuck socket read.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code if isinstance(code, int) else 0)

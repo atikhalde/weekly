@@ -5547,15 +5547,81 @@ def test_bug59_scan_has_a_deadline_and_sends_what_it_has():
     body = (ROOT / "btst.py").read_text()
     assert "deadline = now.replace(hour=15, minute=26" in body
     assert "stopped_early" in body
-    # it must break out of the loop, not just log
-    loop = body.split("for i, (s, m) in enumerate(ex.map(one, todo))", 1)[1][:900]
-    assert "break" in loop, "the scan must actually stop at the deadline"
-    # and the message must disclose it
+    # BUG 61: ex.map() yields in SUBMISSION order, so one slow symbol blocked
+    # every deadline check behind it. Completion-order iteration is required.
+    import ast
+    tree = ast.parse(body)
+    calls = [n for n in ast.walk(tree)
+             if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Attribute) and n.func.attr == "map"]
+    assert not calls, (
+        "ex.map yields in submission order - a single slow symbol prevents "
+        "the deadline from ever being evaluated; use run_until()")
+    assert "run_until(" in body
+    # and the message must disclose truncation
     assert "name(s) unchecked" in body, (
         "a truncated scan must say so in the alert")
+    assert "todo = fired + aged_pool" in body, (
+        "names that fired TODAY must be submitted before the aged pool")
 
-    # names that fired TODAY must be processed before the aged pool
-    assert "ex.map(one, todo)" in body and "todo = fired + aged_pool" in body
+
+def test_bug61_run_until_honours_the_deadline_despite_a_stall():
+    """
+    THE ACTUAL HANG. ex.map() yields in SUBMISSION order, so if symbol #1 is
+    slow nothing is yielded and the deadline is never evaluated. With the old
+    client settings one call could burn 210s (5 x 30s timeout + backoff) and a
+    symbol needs two, so ONE name could hold the scan for seven minutes - the
+    entire entry window - and the workflow timeout then killed it with no
+    output at all.
+    """
+    import time
+    from datetime import datetime, timedelta
+
+    import btst
+    from dhan import IST
+
+    def work(i):
+        time.sleep(30 if i == 0 else 0.05)
+        return (i, {"ok": True})
+
+    dl = datetime.now(IST) + timedelta(seconds=3)
+    t0 = time.time()
+    res, unfinished = btst.run_until(work, list(range(25)), 3, dl, "t")
+    el = time.time() - t0
+    assert el < 8, f"blocked on the stalled item ({el:.1f}s)"
+    assert len(res) >= 10, "fast items must still be collected"
+    assert unfinished >= 1
+
+    # deadline=None must disable the cap (post-close review)
+    res2, un2 = btst.run_until(lambda i: (i, {}), list(range(5)), 2, None, "t")
+    assert len(res2) == 5 and un2 == 0
+
+
+def test_bug61_urgent_mode_caps_retry_time():
+    """Inside a ten-minute window a slow symbol is worth abandoning, not
+    retrying. Patient defaults are kept for the post-close review."""
+    body = (ROOT / "btst.py").read_text()
+    assert "urgent = not (args.after_close or too_late)" in body
+    assert "timeout=8 if urgent else 30" in body
+    assert "max_retries=2 if urgent else 5" in body
+
+
+def test_bug61_process_exits_hard_after_sending():
+    """
+    ThreadPoolExecutor registers an atexit hook that JOINS its non-daemon
+    workers, so the interpreter blocks on exit even after
+    shutdown(wait=False, cancel_futures=True). Measured: a worker sleeping
+    60s holds the process 60s at exit. That is the observed 'stuck' run - the
+    alert was already sent.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "os._exit(" in body, (
+        "btst.py must hard-exit; a stuck socket read otherwise holds the "
+        "process until the workflow timeout kills a successful run")
+    tail = body.split('if __name__ == "__main__":', 1)[1]
+    assert "sys.stdout.flush()" in tail and "sys.stderr.flush()" in tail, (
+        "output must be flushed before os._exit bypasses normal teardown")
+    assert "shutdown(wait=False, cancel_futures=True)" in body
 
 
 def test_bug60_a_late_run_still_screens_and_records_missed():
@@ -5570,8 +5636,10 @@ def test_bug60_a_late_run_still_screens_and_records_missed():
     body = (ROOT / "btst.py").read_text()
     assert "enforce_deadline = (not args.after_close) and not too_late" in body, (
         "the deadline must not apply once the entry window has already closed")
-    # every deadline check must be gated on it
-    assert "if enforce_deadline and datetime.now(IST) >= deadline:" in body
+    # every deadline use must be gated on it - BUG 61 moved the clock check
+    # inside run_until(), which takes None to mean "no cap".
+    assert body.count("deadline if enforce_deadline else None") == 2, (
+        "both passes must disable the cap once the entry window has closed")
     assert "if enforce_deadline and len(aged_pool) > room:" in body
     # and the log must say which mode it is in
     assert "post-close review - no deadline, recording as MISSED" in body
