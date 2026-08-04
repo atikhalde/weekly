@@ -5504,6 +5504,71 @@ def test_bug57_trend_floor_is_NOT_applied_to_confirmed_tiers():
         "the trend floor must remain in classify_approach()")
 
 
+def test_bug59_aged_pool_is_prescreened_on_close_pos():
+    """
+    THE 04-AUG HANG. BUG 53 widened the pool to every name within -10..+20% of
+    its level. On 04-Aug that was 628 aged + 19 fired = 647 names, each needing
+    ~2 history calls at the measured ~4 names/minute (BUG 52) = 2.6 HOURS. The
+    job was killed by the workflow timeout at 15:48, after the close, having
+    produced nothing.
+
+    close_pos >= TIER_B_CLOSE_POS is mandatory for BOTH tiers and needs only
+    today's high/low/LTP, which the bulk OHLC call already returns. Screening
+    on it before any history request is FREE and, verified on 157,995
+    stock-days, retains 100.00% of names that ultimately qualify while keeping
+    ~5.5% of the universe.
+    """
+    import btst
+
+    assert hasattr(btst, "fetch_ohlc") and hasattr(btst, "cheap_close_pos")
+    body = (ROOT / "btst.py").read_text()
+    assert "close_pos>=%.2f pre-screen" in body, (
+        "the aged pool must be pre-screened on close_pos")
+    seg = body.split("in_band = len(aged_pool)", 1)[1][:1800]
+    assert "TIER_B_CLOSE_POS" in seg, "the screen must use the shipped floor"
+    assert "kept.append(s)" in seg, "an unknown quote must NOT be dropped"
+
+    # the cheap calculation must match what classify() would compute
+    cp, dr = btst.cheap_close_pos(
+        {"last_price": 100.0, "open": 90.0, "high": 101.0, "low": 89.0})
+    assert abs(cp - (100.0 - 89.0) / (101.0 - 89.0)) < 1e-9
+    assert abs(dr - (100.0 / 90.0 - 1) * 100) < 1e-9
+    # junk must not raise, and must not pass as 0
+    bad, _ = btst.cheap_close_pos({"last_price": 0, "high": 0, "low": 0})
+    assert bad != bad, "unusable quote must return NaN, not a passing value"
+
+
+def test_bug59_scan_has_a_deadline_and_sends_what_it_has():
+    """
+    A timeout that kills the job produces NOTHING - no alert, no picks, no
+    explanation. The scan must stop itself before the close and send whatever
+    is ready, with the truncation stated in the message.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "deadline = now.replace(hour=15, minute=26" in body
+    assert "stopped_early" in body
+    # it must break out of the loop, not just log
+    loop = body.split("for i, (s, m) in enumerate(ex.map(one, todo))", 1)[1][:900]
+    assert "break" in loop, "the scan must actually stop at the deadline"
+    # and the message must disclose it
+    assert "name(s) unchecked" in body, (
+        "a truncated scan must say so in the alert")
+
+    # names that fired TODAY must be processed before the aged pool
+    assert "ex.map(one, todo)" in body and "todo = fired + aged_pool" in body
+
+
+def test_bug59_workflow_timeout_is_inside_the_entry_window():
+    """A 30-minute timeout on a job that must finish in 12 is meaningless."""
+    wf = (ROOT / ".github" / "workflows" / "btst.yml").read_text()
+    import re
+    m = re.search(r"timeout-minutes:\s*(\d+)", wf)
+    assert m, "btst.yml must set a timeout"
+    assert int(m.group(1)) <= 15, (
+        "the timeout must be shorter than the 15:20->15:30 entry window, "
+        "otherwise the job can be killed AFTER the close (04-Aug: 15:48)")
+
+
 def test_bug58_message_stats_match_the_shipped_rule():
     """
     THE STATS IN THE ALERT MUST DESCRIBE THE RULE THAT IS ACTUALLY RUNNING.
@@ -5574,7 +5639,7 @@ def test_bug53_message_does_not_claim_everything_broke_out_today():
     body = (ROOT / "btst.py").read_text()
     # look at the message construction only, not the comments explaining the
     # change (which necessarily quote the old wording).
-    msg = body.split("lines = [f\"🌙 <b>BTST", 1)[1][:2500]
+    msg = body.split("lines = [f\"🌙 <b>BTST", 1)[1].split("if dropped:", 1)[0]
     assert "broke out TODAY only" not in msg, (
         "the header can no longer claim every pick is same-day")
     assert "broke out {age} session(s) ago" in msg, (

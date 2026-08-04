@@ -559,6 +559,62 @@ def conviction(m: dict) -> tuple[int, list[str]]:
     return len(hits), hits
 
 
+def fetch_ohlc(client, snaps: list) -> dict:
+    """
+    symbol -> {last_price, open, high, low, prev_close} via bulk quotes.
+
+    BUG 59. This is the cheap half of the tier test. /marketfeed/ohlc returns
+    today's open/high/low plus the LTP for up to 1000 instruments in ONE
+    request, which is everything needed to compute close_pos and day_ret -
+    the two mandatory gates - with no per-symbol history call at all.
+    """
+    from watchlist import QUOTE_BATCH
+
+    by_seg: dict[str, list[int]] = {}
+    ident: dict[tuple[str, str], str] = {}
+    for s in snaps:
+        by_seg.setdefault(s.exchange_segment, []).append(int(s.security_id))
+        ident[(s.exchange_segment, str(s.security_id))] = s.symbol
+
+    out: dict[str, dict] = {}
+    for seg, ids in by_seg.items():
+        for i in range(0, len(ids), QUOTE_BATCH):
+            try:
+                part = client.ohlc({seg: ids[i:i + QUOTE_BATCH]})
+            except DhanError as exc:
+                log.warning("ohlc batch failed: %s", str(exc)[:140])
+                continue
+            for sg, m in part.items():
+                for sid, payload in m.items():
+                    sym = ident.get((sg, str(sid)))
+                    if sym:
+                        out[sym] = payload
+    return out
+
+
+def cheap_close_pos(q: dict) -> tuple[float, float]:
+    """
+    (close_pos, day_ret) from a bulk OHLC payload alone. NaN when unusable.
+
+    Uses the LTP as the running close, exactly as the partial-candle path
+    does. High/low are today's so far, so this is the same quantity
+    classify() computes - just without paying for history.
+    """
+    try:
+        px = float(q.get("last_price") or 0.0)
+        hi = float(q.get("high") or 0.0)
+        lo = float(q.get("low") or 0.0)
+        op = float(q.get("open") or 0.0)
+    except (TypeError, ValueError):
+        return float("nan"), float("nan")
+    if px <= 0 or hi <= 0 or lo <= 0 or hi < lo:
+        return float("nan"), float("nan")
+    rng = hi - lo
+    cp = ((px - lo) / rng) if rng > 0 else 0.5
+    dr = ((px / op - 1) * 100.0) if op > 0 else float("nan")
+    return cp, dr
+
+
 def breakout_age(daily: pd.DataFrame, level: float,
                  lookback: int = AGED_MAX_AGE_DAYS) -> int:
     """
@@ -971,9 +1027,20 @@ def main() -> int:
     start = now.date() - timedelta(days=HISTORY_DAYS)
 
     # ---- one bulk quote, reused by the aged pass and the anticipation pass -
+    # BUG 59: this is now an OHLC call, not just LTP. Same cost (1 request per
+    # 1000 names) but it also returns today's open/high/low, which is what
+    # makes the close_pos pre-screen below possible.
     fired_syms = {s.symbol for s in fired}
+    ohlc_all = {}
     try:
-        ltp_all = fetch_ltp(client, snaps)
+        ohlc_all = fetch_ohlc(client, snaps)
+    except DhanError as exc:
+        log.warning("bulk ohlc failed (%s) - falling back to LTP only",
+                    str(exc)[:120])
+    try:
+        ltp_all = ({k: v["last_price"] for k, v in ohlc_all.items()
+                    if v.get("last_price")} if ohlc_all
+                   else fetch_ltp(client, snaps))
     except DhanError as exc:
         log.warning("bulk quote failed (%s) - aged tier B pass is SKIPPED "
                     "and only today's breakouts are scanned", str(exc)[:120])
@@ -991,17 +1058,73 @@ def main() -> int:
             ex = (px / lvl - 1) * 100.0
             if AGED_EXT_MIN <= ex <= AGED_EXT_MAX:
                 aged_pool.append(s)
-        log.info("aged tier B pool: %d name(s) within %+.0f..%+.0f%% of their "
-                 "26W level (of %d not fired today)",
-                 len(aged_pool), AGED_EXT_MIN, AGED_EXT_MAX,
-                 len(snaps) - len(fired))
+        in_band = len(aged_pool)
+
+        # ---- BUG 59: SECOND, FREE SCREEN ON close_pos ----------------------
+        # The band alone left 628 names on 04-Aug. At 2 history calls each and
+        # the measured ~4 names/minute (BUG 52), 647 candidates is 2.6 HOURS -
+        # the job was killed by the 30-minute timeout at 15:48, long after the
+        # close. Widening the pool in BUG 53 without re-checking the time
+        # budget is my error; the band was sized against the OLD pool.
+        #
+        # close_pos >= TIER_B_CLOSE_POS is MANDATORY for tier B and, since
+        # BUG 54, for tier A too. It needs only today's high/low/LTP, which
+        # the bulk OHLC call already returned. So it can be applied before any
+        # history request, for free.
+        #
+        # LOSSLESS, verified on 157,995 stock-days: screening at 0.98 retains
+        # 100.00% of names that ultimately qualify, while keeping only 5.5% of
+        # the universe. A small margin is allowed because the quote and the
+        # 5-minute reconstruction can disagree by a tick.
+        if ohlc_all:
+            margin = 0.02
+            kept = []
+            for s in aged_pool:
+                q = ohlc_all.get(s.symbol)
+                if not q:
+                    kept.append(s)          # unknown -> do not silently drop
+                    continue
+                cp, _ = cheap_close_pos(q)
+                if cp != cp or cp >= TIER_B_CLOSE_POS - margin:
+                    kept.append(s)
+            aged_pool = kept
+        log.info("aged tier B pool: %d in the %+.0f..%+.0f%% band -> %d after "
+                 "the close_pos>=%.2f pre-screen (of %d not fired today)",
+                 in_band, AGED_EXT_MIN, AGED_EXT_MAX, len(aged_pool),
+                 TIER_B_CLOSE_POS - 0.02, len(snaps) - len(fired))
+
+    # ---- BUG 59b: A HARD DEADLINE, NOT A TIMEOUT -------------------------
+    # The workflow's timeout-minutes kills the job and produces NOTHING. That
+    # is the worst outcome: no alert, no picks file, and no explanation. A
+    # scan that has processed 400 of 600 names by 15:26 should SEND WHAT IT
+    # HAS, not die at 15:48 with empty hands.
+    #
+    # Names are ordered so the ones that fired TODAY are always processed
+    # first - they are the tier A candidates and the highest-value half of
+    # the list - and the aged pool is truncated to whatever the remaining
+    # budget allows.
+    SEC_PER_NAME = 15.0 / 4.0      # BUG 52 measured ~4 names/minute
+    deadline = now.replace(hour=15, minute=26, second=0, microsecond=0)
+    budget_s = max(0.0, (deadline - now).total_seconds())
+    affordable = int(budget_s / SEC_PER_NAME) if budget_s > 0 else 0
+    room = max(0, affordable - len(fired))
+    if len(aged_pool) > room and not args.after_close:
+        # keep the aged names CLOSEST to their level - highest prior odds
+        aged_pool.sort(key=lambda s: abs(
+            (ltp_all.get(s.symbol, 0.0) / s.entry_level - 1) * 100.0
+            if s.entry_level else 999))
+        log.warning("time budget: %.0f min to %s leaves room for ~%d names; "
+                    "trimming the aged pool %d -> %d (closest to level kept)",
+                    budget_s / 60, f"{deadline:%H:%M}", affordable,
+                    len(aged_pool), room)
+        aged_pool = aged_pool[:room]
 
     if not fired and not aged_pool:
         log.info("no BTST candidates today - nothing broke out and nothing "
                  "is inside the aged band")
         return 0
-    log.info("%d fired today + %d aged; checking the candles ...",
-             len(fired), len(aged_pool))
+    log.info("%d fired today + %d aged; checking the candles ... "
+             "(deadline %s)", len(fired), len(aged_pool), f"{deadline:%H:%M}")
 
     def one(s):
         try:
@@ -1083,8 +1206,19 @@ def main() -> int:
         return df, frac
 
     rows = []
+    stopped_early = 0
     with ThreadPoolExecutor(max_workers=max(1, cfg.runtime.max_workers)) as ex:
-        for s, m in ex.map(one, fired + aged_pool):
+        todo = fired + aged_pool
+        for i, (s, m) in enumerate(ex.map(one, todo)):
+            # BUG 59b: stop at the deadline and SEND WHAT WE HAVE. The
+            # estimate above can be wrong (rate limiting, a slow segment);
+            # this is the guarantee that the alert still lands before 15:30.
+            if (not args.after_close) and datetime.now(IST) >= deadline:
+                stopped_early = len(todo) - i
+                log.warning("deadline %s reached - stopping with %d name(s) "
+                            "unchecked and sending what is ready",
+                            f"{deadline:%H:%M}", stopped_early)
+                break
             if not m:
                 continue
             m["symbol"] = s.symbol
@@ -1375,6 +1509,11 @@ def main() -> int:
     lines.insert(2 if not (too_late or too_early) else 5,
                  "🔥 <b>CONFIRMED — today's setups</b>")
     lines.insert(3 if not (too_late or too_early) else 6, "")
+    if stopped_early:
+        lines.append(f"<i>⏱ Scan stopped at the {deadline:%H:%M} deadline with "
+                     f"{stopped_early} name(s) unchecked, so the list may be "
+                     f"incomplete. Everything shown was fully screened.</i>")
+        lines.append("")
     if not picks:
         lines.append("<i>No setup qualified today. That is the normal case — "
                      "the tiers fire ~4 times a week combined.</i>")
