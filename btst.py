@@ -1463,15 +1463,41 @@ def main() -> int:
         if ant_dropped:
             lines.append(f"<i>{ant_dropped} more qualified, cap is top "
                          f"{ANTICIPATE_TOP_N}</i>")
+        # BUG 58: re-measured. The old line claimed above-level BEAT below
+        # (+0.82% vs +0.58%) - that was BUG 47's number, taken on a different
+        # population (no PRE floor, no trend floor, any distance). Inside the
+        # window this list actually screens, the ordering is REVERSED:
+        #     BELOW the level  n=810   +1.325%  t  9.4  OOS +1.418%
+        #     ABOVE the level  n=2,795 +0.886%  t 10.6  OOS +0.918%
+        # The sort still puts above-level first and that is left alone: at
+        # top-5 the cap almost never binds, so both orderings measure the
+        # SAME (+0.964%/trade, 55.9% win). Only the false claim is removed.
         lines.append("<i>close_pos≥0.90 + 12m≥50% + 200DMA≥25% measured "
-                     "+1.61%/trade (t 7.8, n=1,822), +1.65% out of sample. "
-                     "🚀 above-level beat 🔭 below (+0.82% vs +0.58%). "
+                     "+0.99%/trade (t 13.7, n=3,605), +1.03% out of sample. "
+                     "🔭 below-level beat 🚀 above (+1.33% vs +0.89%). "
                      "Most still do not run — it pays through the tail.</i>")
 
+    # BUG 58: these footers quoted the ORIGINAL tier study (+1.75%/+0.83%,
+    # "win rate ~50%"). Those numbers described the pre-BUG-53/54/57 rule and
+    # were left untouched through three threshold changes, so the message was
+    # under-reporting the shipped rule by more than half and claiming a win
+    # rate 13 points below the real one. Re-measured on the CURRENT rule
+    # (close_pos>=0.98 both tiers, aged tier B, no trend floor on the tier
+    # path), 892,121 tradeable stock-days, entry at the 15:20 price, exit at
+    # tomorrow's close, net 0.22%:
+    #     TIER A (fresh)  n=302   1.2/wk  57.0% win  +3.044%  t  6.4  OOS +3.809%
+    #     TIER B          n=852   3.3/wk  65.0% win  +2.148%  t 11.5  OOS +2.450%
+    #     the list        n=1154  4.5/wk  62.9% win  +2.382%  t 12.8  OOS +2.760%
+    # Any future threshold change MUST update these three lines - a regression
+    # test now pins them to the live constants.
     lines += ["", "━━━━━━━━━━━━━━━━━━━━",
-        "<i>Tier A measured +1.75%/trade (t 5.2, n=417) over 5 years; "
-        "Tier B +0.83% (t 5.0, n=1086). Win rate ~50% — it pays through the "
-        "tail, not the hit rate. Exit at tomorrow's close.</i>"]
+        "<i>Tier A measured +3.04%/trade (t 6.4, n=302, 57% win) over 5 years; "
+        "Tier B +2.15% (t 11.5, n=852, 65% win). Out of sample +3.81% / "
+        "+2.45%. Roughly 3 of every 5 win, and the average is carried by the "
+        "tail — one in five gains 5%+ overnight. Exit at tomorrow's close.</i>",
+        "<i>Reality check: ~31 stocks a week jump 5%+ across the market and "
+        "this list flags ~4.5, catching about 3% of them. Missing most big "
+        "movers is the price of the hit rate, not a fault.</i>"]
     if partial:
         lines.append(
             "<i>⚠ Judged on a partial candle. Measured at this cutoff, 82% of "

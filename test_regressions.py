@@ -5504,6 +5504,37 @@ def test_bug57_trend_floor_is_NOT_applied_to_confirmed_tiers():
         "the trend floor must remain in classify_approach()")
 
 
+def test_bug58_message_stats_match_the_shipped_rule():
+    """
+    THE STATS IN THE ALERT MUST DESCRIBE THE RULE THAT IS ACTUALLY RUNNING.
+
+    Caught from a live 04-Aug message: the footer still read "Tier A measured
+    +1.75%/trade (t 5.2, n=417) ... Tier B +0.83% ... Win rate ~50%". Those
+    are the ORIGINAL tier numbers, left untouched through BUG 53 (aged tier
+    B), BUG 54 (close_pos 0.98) and BUG 57 (trend floor off). The shipped rule
+    measures +3.04% / +2.15% at a 63% win rate, so the message was
+    understating it by more than half and quoting a win rate 13 points low.
+
+    A stale stat is not cosmetic - it is the number the user sizes on.
+    """
+    body = (ROOT / "btst.py").read_text()
+    foot = body.split("Tier A measured", 1)[1][:900]
+    # the retired numbers must be gone from the FOOTER
+    for stale in ("+1.75%/trade", "n=417", "+0.83% (t 5.0", "n=1086",
+                  "Win rate ~50%"):
+        assert stale not in foot, (
+            f"footer still quotes the pre-BUG-53/54/57 stat {stale!r}")
+    for live in ("+3.04%", "n=302", "+2.15%", "n=852"):
+        assert live in foot, f"footer must quote the shipped stat {live!r}"
+
+    # the anticipation footer claimed above-level beat below; measured on the
+    # window this list screens, it is the other way round.
+    assert "above-level beat" not in body, (
+        "BUG 58: below-level measured better (+1.33% vs +0.89%) inside the "
+        "anticipation window")
+    assert "below-level beat" in body
+
+
 def test_bug57_recall_is_documented_as_the_known_tradeoff():
     """
     The scanner catches ~3% of all big movers. That is inherent, not a bug:
