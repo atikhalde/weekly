@@ -1103,12 +1103,20 @@ def main() -> int:
     # first - they are the tier A candidates and the highest-value half of
     # the list - and the aged pool is truncated to whatever the remaining
     # budget allows.
+    # BUG 60: THE DEADLINE ONLY APPLIES WHILE THE ENTRY IS STILL LIVE.
+    # On a 16:15 run the 15:26 deadline is already in the past, so budget=0,
+    # room=0, and the loop broke instantly - "checked 0 candles". That threw
+    # away the whole point of BUG 55, which is that a late run must STILL
+    # screen and STILL record its picks as MISSED so the day is auditable and
+    # Model E can see what would have been taken. Racing a deadline that has
+    # already passed is pointless; there is nothing left to protect.
     SEC_PER_NAME = 15.0 / 4.0      # BUG 52 measured ~4 names/minute
     deadline = now.replace(hour=15, minute=26, second=0, microsecond=0)
+    enforce_deadline = (not args.after_close) and not too_late
     budget_s = max(0.0, (deadline - now).total_seconds())
     affordable = int(budget_s / SEC_PER_NAME) if budget_s > 0 else 0
     room = max(0, affordable - len(fired))
-    if len(aged_pool) > room and not args.after_close:
+    if enforce_deadline and len(aged_pool) > room:
         # keep the aged names CLOSEST to their level - highest prior odds
         aged_pool.sort(key=lambda s: abs(
             (ltp_all.get(s.symbol, 0.0) / s.entry_level - 1) * 100.0
@@ -1123,8 +1131,10 @@ def main() -> int:
         log.info("no BTST candidates today - nothing broke out and nothing "
                  "is inside the aged band")
         return 0
-    log.info("%d fired today + %d aged; checking the candles ... "
-             "(deadline %s)", len(fired), len(aged_pool), f"{deadline:%H:%M}")
+    log.info("%d fired today + %d aged; checking the candles ... (%s)",
+             len(fired), len(aged_pool),
+             f"deadline {deadline:%H:%M}" if enforce_deadline
+             else "post-close review - no deadline, recording as MISSED")
 
     def one(s):
         try:
@@ -1213,7 +1223,7 @@ def main() -> int:
             # BUG 59b: stop at the deadline and SEND WHAT WE HAVE. The
             # estimate above can be wrong (rate limiting, a slow segment);
             # this is the guarantee that the alert still lands before 15:30.
-            if (not args.after_close) and datetime.now(IST) >= deadline:
+            if enforce_deadline and datetime.now(IST) >= deadline:
                 stopped_early = len(todo) - i
                 log.warning("deadline %s reached - stopping with %d name(s) "
                             "unchecked and sending what is ready",
@@ -1424,6 +1434,33 @@ def main() -> int:
             pending = [s for s in pending if in_range(s)]
             log.info("anticipation pre-filter: %d -> %d name(s) in range",
                      before, len(pending))
+        # ---- BUG 60b: THE SAME FREE SCREEN, AND THE SAME DEADLINE ----------
+        # BUG 59 protected the confirmed pass and left this one unbounded. On
+        # 04-Aug it still queued 296 names x ~3.75s = ~18 minutes with no
+        # stopping rule - the identical BUG 52/59 failure on the path I did
+        # not fix. Three strikes now: any pool built from the snapshot MUST be
+        # screened cheaply and MUST have a deadline.
+        #
+        # classify_approach() requires close_pos >= ANTICIPATE_CLOSE_POS, and
+        # that comes free from the bulk OHLC call. Verified on 157,995
+        # stock-days: screening at 0.90 retains 100.00% of names that finally
+        # qualify while keeping 19.4% of the universe.
+        if ohlc_all:
+            before = len(pending)
+            margin = 0.02
+            pending = [s for s in pending
+                       if (lambda cp: cp != cp or cp >= ANTICIPATE_CLOSE_POS - margin)(
+                           cheap_close_pos(ohlc_all.get(s.symbol) or {})[0])]
+            log.info("anticipation close_pos pre-screen: %d -> %d",
+                     before, len(pending))
+        if enforce_deadline:
+            ant_budget = max(0.0, (deadline - datetime.now(IST)).total_seconds())
+            ant_room = int(ant_budget / SEC_PER_NAME)
+            if len(pending) > ant_room:
+                log.warning("anticipation: %.1f min left allows ~%d names; "
+                            "trimming %d -> %d", ant_budget / 60, ant_room,
+                            len(pending), max(0, ant_room))
+                pending = pending[:max(0, ant_room)]
         log.info("anticipation: screening %d name(s) (both sides of the "
                  "level) ...", len(pending))
 
@@ -1434,8 +1471,14 @@ def main() -> int:
             return s, classify_approach(df, s.entry_level, s.hi_short2,
                                         partial_frac=frac)
 
+        ant_stopped = 0
         with ThreadPoolExecutor(max_workers=max(1, cfg.runtime.max_workers)) as ex:
-            for s, m in ex.map(one_ant, pending):
+            for i, (s, m) in enumerate(ex.map(one_ant, pending)):
+                if enforce_deadline and datetime.now(IST) >= deadline:
+                    ant_stopped = len(pending) - i
+                    log.warning("anticipation: deadline %s reached, %d "
+                                "unchecked", f"{deadline:%H:%M}", ant_stopped)
+                    break
                 if not m:
                     continue
                 m["symbol"] = s.symbol

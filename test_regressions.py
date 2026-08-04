@@ -5558,6 +5558,43 @@ def test_bug59_scan_has_a_deadline_and_sends_what_it_has():
     assert "ex.map(one, todo)" in body and "todo = fired + aged_pool" in body
 
 
+def test_bug60_a_late_run_still_screens_and_records_missed():
+    """
+    REGRESSION I INTRODUCED IN BUG 59b. On a 16:15 run the 15:26 deadline was
+    already in the past, so budget=0 -> room=0 -> the loop broke immediately
+    and the job logged "checked 0 candles". That destroyed BUG 55's guarantee
+    that a late run still screens and still records its picks as MISSED.
+
+    Racing a deadline that has already passed protects nothing.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "enforce_deadline = (not args.after_close) and not too_late" in body, (
+        "the deadline must not apply once the entry window has already closed")
+    # every deadline check must be gated on it
+    assert "if enforce_deadline and datetime.now(IST) >= deadline:" in body
+    assert "if enforce_deadline and len(aged_pool) > room:" in body
+    # and the log must say which mode it is in
+    assert "post-close review - no deadline, recording as MISSED" in body
+
+
+def test_bug60_anticipation_pass_is_also_bounded():
+    """
+    BUG 59 protected the confirmed pass and left this one unbounded - 296
+    names x ~3.75s with no stopping rule, the identical BUG 52/59 failure.
+    Any pool built from the snapshot must be cheaply screened AND deadlined.
+    """
+    body = (ROOT / "btst.py").read_text()
+    seg = body.split("SECOND PASS - ANTICIPATION", 1)[1]
+    assert "anticipation close_pos pre-screen" in seg, (
+        "the anticipation pool must be pre-screened on close_pos")
+    assert "ANTICIPATE_CLOSE_POS - margin" in seg, (
+        "the screen must use the shipped anticipation floor")
+    assert "ant_stopped" in seg and "break" in seg, (
+        "the anticipation loop must stop at the deadline")
+    # unknown quote must not be silently dropped here either
+    assert "cp != cp or cp >=" in seg
+
+
 def test_bug59_workflow_timeout_is_inside_the_entry_window():
     """A 30-minute timeout on a job that must finish in 12 is meaningless."""
     wf = (ROOT / ".github" / "workflows" / "btst.yml").read_text()
