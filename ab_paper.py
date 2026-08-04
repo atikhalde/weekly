@@ -1023,6 +1023,13 @@ def main() -> int:
                                         ap_ = ant_lookup.get((day_key, sig.symbol))
                                         if ap_ is None:
                                             continue
+                                        # BUG 63: an anticipation pick written
+                                        # after the close was never enterable.
+                                        # Same guard Model E already has.
+                                        # Older files have no column -> 1.
+                                        if not bool(int(float(
+                                                ap_.get("tradeable", 1) or 0))):
+                                            continue
                                         sig.price = float(ap_["entry"])
                                         sig.btst_tier = "F"
                                         sig.btst_day_ret = float(ap_.get("day_ret") or 0.0)

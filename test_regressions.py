@@ -5565,6 +5565,36 @@ def test_bug59_scan_has_a_deadline_and_sends_what_it_has():
         "names that fired TODAY must be submitted before the aged pool")
 
 
+def test_bug63_anticipate_list_also_honours_the_entry_window():
+    """
+    THE 20:43 RUN. The confirmed list correctly read "⛔ MISSED" while the
+    anticipation list on the SAME message still said "BUY NOW ~570.15" on an
+    entry that had been dead for five hours. BUG 55 was applied to one list
+    and not the other, and Model F had no tradeable guard at all - so it would
+    have booked three fills that were never available.
+    """
+    body = (ROOT / "btst.py").read_text()
+
+    # the anticipation BUY NOW line must be conditional on too_late
+    ant = body.split("SECOND PASS - ANTICIPATION", 1)[1]
+    seg = ant.split("BUY NOW ~", 1)[0][-600:]
+    assert "if too_late else" in seg, (
+        "the anticipation entry line must degrade to MISSED after 15:30")
+    assert body.count("⛔ <b>MISSED ~") == 2, (
+        "BOTH lists must show MISSED when the window has closed")
+
+    # the anticipation picks file must carry the flag
+    apick = ant.split("aout = pd.DataFrame", 1)[1][:900]
+    assert '"tradeable": 0 if too_late else 1' in apick, (
+        "anticipate_picks.csv must record whether the pick was enterable")
+
+    # and Model F must honour it
+    ab = (ROOT / "ab_paper.py").read_text()
+    fseg = ab.split("ant_lookup.get((day_key, sig.symbol))", 1)[1][:600]
+    assert 'ap_.get("tradeable", 1)' in fseg, (
+        "Model F must skip picks that were not tradeable")
+
+
 def test_bug62_history_window_is_long_enough_for_annual_stats():
     """
     HISTORY_DAYS is CALENDAR days. 260 of them is only ~179 TRADING bars, but

@@ -1590,6 +1590,10 @@ def main() -> int:
         if ant_picks:
             aout = pd.DataFrame([{
                 "date": f"{now:%Y-%m-%d}", "scan_time": f"{now:%H:%M}",
+                # BUG 63: Model F must not book a fill that was never
+                # available either. Same flag, same meaning as the confirmed
+                # picks file.
+                "tradeable": 0 if too_late else 1,
                 "rank": r["rank"], "symbol": r["symbol"],
                 "entry": round(float(r["close"]), 2),
                 "pre": int(r.get("pre", 0)),
@@ -1730,8 +1734,16 @@ def main() -> int:
                 f"day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x",
                 f"    <i>12m {r.get('ret_12m', 0):+.0f}% · "
                 f"{r.get('dist_200dma', 0):+.0f}% over the 200DMA</i>",
-                f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
-                f"<i>· exit tomorrow's close</i>", ""]
+                # BUG 63: this line ignored too_late. At 20:43 the confirmed
+                # list correctly read MISSED while the anticipation list still
+                # said BUY NOW on the same dead entry - the exact failure
+                # BUG 55 was written to stop, left in the one place it was not
+                # applied.
+                (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> "
+                 f"<i>· scan ran after the close, not tradeable</i>"
+                 if too_late else
+                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
+                 f"<i>· exit tomorrow's close</i>"), ""]
         if ant_dropped:
             lines.append(f"<i>{ant_dropped} more qualified, cap is top "
                          f"{ANTICIPATE_TOP_N}</i>")
