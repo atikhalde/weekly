@@ -5565,6 +5565,53 @@ def test_bug59_scan_has_a_deadline_and_sends_what_it_has():
         "names that fired TODAY must be submitted before the aged pool")
 
 
+def test_bug62_history_window_is_long_enough_for_annual_stats():
+    """
+    HISTORY_DAYS is CALENDAR days. 260 of them is only ~179 TRADING bars, but
+    ret_12m needs cl[-252] and the 200DMA needs 200 bars - so on the confirmed
+    path ret_12m was ALWAYS NaN and dist_200dma was never computed at all.
+    Visible in the live 04-Aug picks file: ret_12m blank, dist_200dma 0.0 for
+    both MOREPENLAB and RBA.
+    """
+    import numpy as np
+    import pandas as pd
+
+    import btst
+
+    assert btst.HISTORY_DAYS >= 400, (
+        "need ~420 calendar days to clear 252 trading bars after holidays")
+
+    n = 300
+    px = np.linspace(50, 100, n)
+    d = pd.DataFrame({"open": px * 0.99, "high": px * 1.02,
+                      "low": px * 0.98, "close": px, "volume": [1e6] * n})
+    m = btst.classify(d, level=95.0, age=0)
+    assert m["ret_12m"] == m["ret_12m"], "ret_12m must compute"
+    assert m["dist_200dma"] == m["dist_200dma"], "dist_200dma must compute"
+    assert m["dist_200dma"] > 0
+
+
+def test_bug62_unknown_is_blank_not_zero_in_the_picks_file():
+    """
+    `float(x or 0)` turned "no 12-month history" into "+0.0% return" - a
+    different and far more confident claim. Any later review reads it as a
+    flat stock rather than an unknown.
+    """
+    import btst
+
+    assert btst._num(float("nan")) == "", "NaN must render blank"
+    assert btst._num(None) == "", "None must render blank"
+    assert btst._num(0.0, 1) == 0.0, "a REAL zero must survive"
+    assert btst._num(12.345, 1) == 12.3
+
+    body = (ROOT / "btst.py").read_text()
+    assert 'float(r.get("ret_12m") or 0)' not in body, (
+        "unknown trend must not be written as 0")
+    assert 'float(r.get("dist_200dma") or 0)' not in body
+    assert body.count('_num(r.get("ret_12m"), 1)') == 2, (
+        "both the confirmed and anticipate picks files must use _num")
+
+
 def test_bug61_run_until_honours_the_deadline_despite_a_stall():
     """
     THE ACTUAL HANG. ex.map() yields in SUBMISSION order, so if symbol #1 is
@@ -6730,8 +6777,11 @@ def test_bug51_watchlist_moon_matches_the_1520_floor():
 
 def test_bug51_trend_reaches_the_picks_file_and_message():
     body = (ROOT / "btst.py").read_text()
-    assert '"ret_12m": round(' in body, "picks must record the trend"
-    assert '"dist_200dma": round(' in body
+    # BUG 62 replaced round(float(x or 0)) with _num(), which keeps an unknown
+    # BLANK instead of claiming 0.0. The requirement is unchanged: the trend
+    # must reach the picks file and the message.
+    assert '"ret_12m": _num(' in body, "picks must record the trend"
+    assert '"dist_200dma": _num(' in body
     assert "over the 200DMA" in body, "the message must show it"
 
 

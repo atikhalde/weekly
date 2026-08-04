@@ -141,7 +141,17 @@ MIN_TURNOVER_CR = 2.0
 MIN_PRICE = 30.0
 MIN_ATR_PCT = 3.0
 
-HISTORY_DAYS = 260
+# BUG 62: this is CALENDAR days, and it was too short to compute anything
+# annual. 260 calendar days is only ~179 trading bars after weekends and
+# holidays, but ret_12m needs cl[-252] and the 200DMA needs 200 bars - so
+# ret_12m was ALWAYS NaN on the confirmed path and dist_200dma was never
+# computed at all. The live 04-Aug picks file shows it: ret_12m blank,
+# dist_200dma 0.0 for both MOREPENLAB and RBA.
+#
+# 420 calendar days ~= 288 trading days, which clears 252 with margin for a
+# long holiday run. The cost is a slightly larger daily-history payload per
+# symbol, not an extra request.
+HISTORY_DAYS = 420
 BARS_PER_SESSION = 75      # NSE: 09:15-15:30 in 5-minute candles
 
 # How many picks are actually taken. This is THE top-5: btst.py caps the list
@@ -560,6 +570,20 @@ def conviction(m: dict) -> tuple[int, list[str]]:
     return len(hits), hits
 
 
+def _num(v, nd: int = 2):
+    """Round for the picks file, but keep NaN/None BLANK rather than 0.
+
+    BUG 62. `float(x or 0)` silently turns "no 12-month history" into "+0.0%
+    return", which is a different and much more confident claim. Any later
+    review of the ledger would read it as a flat stock rather than an unknown.
+    """
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return ""
+    return round(f, nd) if f == f else ""
+
+
 def run_until(fn, items, workers: int, deadline, log_label: str):
     """
     Map `fn` over `items` and STOP AT `deadline`, whatever is still in flight.
@@ -734,6 +758,13 @@ def classify(daily: pd.DataFrame, level: float,
     turnover = float((cl[-20:] * d["volume"].to_numpy(float)[-20:]).mean() / 1e7) \
         if "volume" in d else 0.0
     ret_12m = float((c / cl[-252] - 1) * 100.0) if len(cl) >= 252 else float("nan")
+    # BUG 62: dist_200dma was never computed here, so the picks file recorded
+    # 0.0 for every confirmed pick and the trend context was unauditable.
+    # These are REPORTING fields on this path - BUG 57 removed the trend floor
+    # from the tier gate - but they are what makes a pick reviewable later,
+    # and Model E carries them into the ledger.
+    dist_200dma = (float((c / np.mean(cl[-200:]) - 1) * 100.0)
+                   if len(cl) >= 200 else float("nan"))
 
     pre, _ = _pre_score_from_daily(d, level, c)
     m = dict(
@@ -746,6 +777,7 @@ def classify(daily: pd.DataFrame, level: float,
         gap_pct=((o / float(prev.iloc[-1]["close"]) - 1) * 100.0)
         if float(prev.iloc[-1]["close"]) > 0 else float("nan"),
         atr_pct=atr_pct, turnover_cr=turnover, ret_12m=ret_12m,
+        dist_200dma=dist_200dma,
         ext_pct=((c / level - 1) * 100.0) if level > 0 else float("nan"),
     )
 
@@ -1388,8 +1420,11 @@ def main() -> int:
                     else "fresh_B" if r.get("fresh") else "aged_B"),
             "conviction": int(r.get("conviction", 0)),
             "ext_pct": round(float(r.get("ext_pct") or 0), 2),
-            "ret_12m": round(float(r.get("ret_12m") or 0), 1),
-            "dist_200dma": round(float(r.get("dist_200dma") or 0), 1),
+            # BUG 62: "or 0" turned an unknown into a confident 0.0. A young
+            # listing with no 12-month history is NOT a stock that returned
+            # 0% - blank says "unknown", which is the truth.
+            "ret_12m": _num(r.get("ret_12m"), 1),
+            "dist_200dma": _num(r.get("dist_200dma"), 1),
             "entry": round(float(r["close"]), 2), "pre": int(r.get("pre", 0)),
             "level": round(float(r["level"]), 2),
             "day_ret": round(float(r["day_ret"]), 2),
@@ -1561,8 +1596,8 @@ def main() -> int:
                 "level": round(float(r["level"]), 2), "which": r["which"],
                 "gap_pct": round(float(r["gap_pct"]), 2),
                 "side": r.get("side", "below"),
-                "ret_12m": round(float(r.get("ret_12m") or 0), 1),
-                "dist_200dma": round(float(r.get("dist_200dma") or 0), 1),
+                "ret_12m": _num(r.get("ret_12m"), 1),
+                "dist_200dma": _num(r.get("dist_200dma"), 1),
                 "close_pos": round(float(r["close_pos"]), 3),
                 "day_ret": round(float(r["day_ret"]), 2),
                 "rvol": round(float(r.get("rvol") or 0), 2),
