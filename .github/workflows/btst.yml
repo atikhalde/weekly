@@ -71,7 +71,12 @@ permissions:
 jobs:
   btst:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # BUG 59: 30 minutes was longer than the entry window itself. On 04-Aug
+    # the job started 15:18 and was still running at 15:48 - killed AFTER the
+    # close, producing nothing at all. btst.py now enforces its own 15:26
+    # deadline and sends whatever is ready, so this only needs to cover
+    # checkout + pip + a scan that has already stopped itself.
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
         with:
