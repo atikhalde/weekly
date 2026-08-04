@@ -5468,26 +5468,52 @@ def test_bug54_conviction_scores_the_fat_tail_and_never_gates():
     # IT MUST NEVER REMOVE A TRADE. The scan may sort on conviction but must
     # not filter on it.
     body = (ROOT / "btst.py").read_text()
-    scan = body.split("qualified = [r for r in tiered", 1)[1][:2000]
+    scan = body.split("tiered = [r for r in rows", 1)[1][:2500]
     assert "conviction" in scan, "conviction must be computed for picks"
     for bad in ("if r[\"conviction\"] >", "conviction\") >=", "conviction >= "):
         assert bad not in scan, (
             f"conviction must be a RANK, not a gate - found {bad!r}")
 
 
-def test_bug53_trend_floor_applies_to_confirmed_tiers_too():
+def test_bug57_trend_floor_is_NOT_applied_to_confirmed_tiers():
     """
-    BUG 51 added the trend floor but wired it only into classify_approach(),
-    so the 03-Aug losers it was written to stop could still reach the BTST
-    list through the tier route. Every tier number in btst.py was measured
-    WITH the floor applied.
+    SUPERSEDES test_bug53_trend_floor_applies_to_confirmed_tiers_too.
+
+    BUG 53c applied BUG 51's trend floor to the tier list by symmetry, without
+    measuring it there. Measured, it deletes the best slice in the study:
+
+        removed by the floor  n=324  +3.173%  64.5% win  PF 3.56
+                              P(+5%) 30.2%   IS +3.405 -> OOS +2.985
+        the list it protected        +2.074%  62.3% win
+
+    Date-clustered t=7.74, every year positive, survives de-duplication, and
+    the top-5/day drawdown IMPROVES -28.0% -> -22.7%.
+
+    BUG 51 was not wrong, it was misapplied: its losers were SCAN alerts. A
+    tier pick already closes in the top 2% of range on 3x+ volume, so what the
+    floor removes there is EARLY TREND (median ret_12m 24.5% vs 117.5%), not
+    junk - consistent with BUG 54b measuring ret_12m>=400% at lift 0.35.
     """
     body = (ROOT / "btst.py").read_text()
-    assert "def trend_ok" in body, "confirmed picks must check the trend floor"
-    head, tail = body.split("def trend_ok", 1)
-    assert "MIN_RET_12M" in tail[:900] and "MIN_DIST_200DMA" in tail[:900]
-    # and it must actually be applied to the tiered list, not just defined
-    assert "trend_ok(r)" in body
+    assert "def trend_ok" not in body, (
+        "BUG 57: the trend floor must NOT gate the confirmed tier list")
+    assert "qualified = list(tiered)" in body
+    # it MUST still gate the anticipation path, where it was measured
+    src = body.split("def classify_approach", 1)[1].split("\ndef ", 1)[0]
+    assert "MIN_RET_12M" in src and "MIN_DIST_200DMA" in src, (
+        "the trend floor must remain in classify_approach()")
+
+
+def test_bug57_recall_is_documented_as_the_known_tradeoff():
+    """
+    The scanner catches ~3% of all big movers. That is inherent, not a bug:
+    31 stocks/week jump >=+5% and the top-5 cap allows 25 trades/week, so
+    every second tier tested measured NEGATIVE on its own (best was
+    cp>=0.95 & rvol>=5 at +0.551%, OOS t=1.26). Recorded so it is not
+    "fixed" by loosening later.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "RECALL" in body, "the precision/recall tradeoff must be documented"
 
 
 def test_bug53_no_double_count_between_confirmed_and_anticipate():

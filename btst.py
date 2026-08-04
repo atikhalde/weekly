@@ -75,6 +75,35 @@ Win rate is barely above 50% even for Tier A. This is a fat-tail setup:
 P(next day >= +3%) = 36.5% and P(>= +5%) = 28.1% for Tier A, against a base
 rate of 15.3% / 6.3%. It wins by size, not by frequency.
 
+-----------------------------------------------------------------------------
+RECALL - WHY MOST BIG MOVERS ARE NOT ON THIS LIST
+-----------------------------------------------------------------------------
+This scanner is a PRECISION instrument, and the cost is stated here so it is
+not mistaken for a defect. Measured over 892,121 tradeable stock-days:
+
+    stocks that jump >= +5% tomorrow      31 PER WEEK, market-wide
+    this scanner flags                   4.5 per week
+    of those flagged, actually jump      23.4%   (precision)
+    of all jumpers, we catch              3.4%   (RECALL)
+
+So roughly 30 of every 31 big movers happen without us. Opening a mover list
+the next morning and finding almost none of them on the previous evening's
+BTST message is the EXPECTED outcome, not evidence of a broken scan.
+
+That trade-off is forced, not chosen. The top-5/day cap allows 25 trades a
+week; at a realistic ~23% precision, catching even 5 movers a week means
+taking ~22 - the cap binds and quality collapses. Every second tier tested
+measured NEGATIVE standing alone:
+
+    cp>=0.90 & rvol>=5 & day>=8   n=688  -0.132%  OOS -0.346
+    cp>=0.90 & rvol>=8            n=543  -0.065%  OOS -0.053
+    day>=15 & cp>=0.90            n=285  -0.250%  OOS -0.450
+    rvol>=10 & cp>=0.85           n=901  -0.259%  OOS -0.190
+    cp>=0.95 & rvol>=5            n=174  +0.551%  OOS t 1.26  (best, still thin)
+
+Adding any of them lowers the mean, the win rate and usually the drawdown.
+The 97% we miss buys the 63% win rate. Do not "fix" recall by loosening.
+
     python btst.py               # send tonight's list
     python btst.py --dry-run     # print, do not send
     python btst.py --all         # show every breakout, with its tier
@@ -1071,25 +1100,44 @@ def main() -> int:
     # reach the BTST list through the tier route. That was an oversight, not a
     # decision. Every number quoted in this file's tier tables was measured
     # WITH the trend floor applied, so this makes the code match the study.
-    def trend_ok(r: dict) -> bool:
-        r12 = r.get("ret_12m", float("nan"))
-        d200 = r.get("dist_200dma", float("nan"))
-        if not (r12 == r12) or r12 < MIN_RET_12M:
-            r["reject"] = (f"ret_12m {r12:.0f}% < {MIN_RET_12M:.0f}%"
-                           if r12 == r12 else "no 12m history")
-            return False
-        if not (d200 == d200) or d200 < MIN_DIST_200DMA:
-            r["reject"] = (f"dist200 {d200:.0f}% < {MIN_DIST_200DMA:.0f}%"
-                           if d200 == d200 else "no 200DMA")
-            return False
-        return True
-
+    # ---- BUG 57: THE TREND FLOOR IS REMOVED FROM THE CONFIRMED LIST -------
+    # RETRACTION of BUG 53c, which added it here 3 days ago.
+    #
+    # WHY IT WAS ADDED. BUG 51 built the floor (ret_12m>=50, dist200>=25) from
+    # the 03-Aug alerts, where the four clean losers had no established
+    # uptrend. BUG 53c then noticed the floor was only wired into
+    # classify_approach() and "fixed" the inconsistency by applying it to the
+    # tier list too. That was reasoning by symmetry, not measurement.
+    #
+    # WHAT IT ACTUALLY DOES. On the TIER list (close_pos>=0.98 + rvol>=3), the
+    # floor deletes the single best slice in the whole study:
+    #
+    #     removed by the floor   n=324   +3.173%   64.5% win   PF 3.56
+    #                            P(next day >= +5%) = 30.2%
+    #                            IS +3.405 -> OOS +2.985
+    #
+    # versus +2.074% for the list it was protecting. Every year positive
+    # (2021 +4.93 ... 2026 +4.03), date-clustered t = 7.74, survives
+    # de-duplication (n=301, +3.260%) and removing its top 10% (+1.638%).
+    #
+    # Confirmed list, with and without:
+    #     with floor (BUG 53c)   830 rows  3.2/wk  +2.074%  P(+5%) 20.7%
+    #     without    (now)     1,154 rows  4.5/wk  +2.382%  P(+5%) 23.4%
+    # and the top-5/day portfolio DRAWDOWN IMPROVES, -28.0% -> -22.7%.
+    #
+    # WHY BUG 51 WAS NOT WRONG, ONLY MISAPPLIED. Its losers were SCAN alerts -
+    # any 26W breakout. There the floor screens genuine junk. A BTST TIER pick
+    # must already close in the top 2% of its range on 3x+ volume; those names
+    # median rvol 12.97 and day_ret +14.7%. What the floor removes from THAT
+    # pool is not junk, it is EARLY TREND: median ret_12m 24.5% instead of
+    # 117.5%. A stock that has not yet run 50% has the most room left, which
+    # is the same inversion BUG 54b found (ret_12m >= 400% has lift 0.35).
+    #
+    # THE FLOOR REMAINS IN classify_approach() (anticipation), where it was
+    # measured and where the candle test is far weaker. Do not "unify" these
+    # two again - that symmetry argument is what caused this bug.
     tiered = [r for r in rows if r.get("tier")]
-    qualified = [r for r in tiered if trend_ok(r)]
-    if len(tiered) != len(qualified):
-        log.info("%d tiered name(s) failed the trend floor (ret12m>=%.0f%%, "
-                 "dist200>=%.0f%%)", len(tiered) - len(qualified),
-                 MIN_RET_12M, MIN_DIST_200DMA)
+    qualified = list(tiered)
 
     # ---- ranking: fresh tier A first, then aged tier B, then fresh tier B --
     # Measured on the top-5/day portfolio (per-trade net, 5 years):
