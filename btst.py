@@ -152,6 +152,12 @@ MIN_ATR_PCT = 3.0
 # long holiday run. The cost is a slightly larger daily-history payload per
 # symbol, not an extra request.
 HISTORY_DAYS = 420
+
+# BUG 66: wall-clock budget for a POST-CLOSE / --after-close review run, which
+# has no 15:26 deadline to race. It must still stop, because the workflow
+# timeout (14 min) kills the job outright and produces nothing at all. 9
+# minutes leaves ~5 for checkout, pip, the Telegram send and the git commit.
+REVIEW_BUDGET_MIN = 9
 BARS_PER_SESSION = 75      # NSE: 09:15-15:30 in 5-minute candles
 
 # How many picks are actually taken. This is THE top-5: btst.py caps the list
@@ -1371,6 +1377,27 @@ def main() -> int:
     SEC_PER_NAME = 15.0 / 4.0      # BUG 52 measured ~4 names/minute
     deadline = now.replace(hour=15, minute=26, second=0, microsecond=0)
     enforce_deadline = (not args.after_close) and not too_late
+
+    # ---- BUG 66: A POST-CLOSE RUN STILL NEEDS A BUDGET -------------------
+    # BUG 60 disabled the 15:26 deadline once the entry window had closed -
+    # correct, because racing a deadline that has already passed protects
+    # nothing. But it left NO stopping rule at all in that mode, while the
+    # workflow keeps a hard 14-minute timeout. On 05-Aug the 22:23 IST review
+    # run took >18s per name (heavy rate limiting at that hour, vs the 3.19s
+    # measured intraday), hit the timeout at 46 names, and was CANCELED:
+    #
+    #     16:53:28  23 fired + 23 aged; checking the candles ...
+    #     17:07:22  ##[error]The operation was canceled.
+    #
+    # Canceled means no alert, no picks file, no explanation - exactly the
+    # failure mode BUG 59b was written to eliminate, reintroduced by my own
+    # BUG 60 fix in the one branch it did not cover.
+    #
+    # So the deadline is never "off"; it just moves. Off-hours it becomes a
+    # wall-clock budget sized to finish inside the workflow timeout with room
+    # to send the message and commit the CSV.
+    if not enforce_deadline:
+        deadline = now + timedelta(minutes=REVIEW_BUDGET_MIN)
     budget_s = max(0.0, (deadline - now).total_seconds())
     affordable = int(budget_s / SEC_PER_NAME) if budget_s > 0 else 0
     room = max(0, affordable - len(fired))
@@ -1483,8 +1510,7 @@ def main() -> int:
     rows = []
     todo = fired + aged_pool
     res, stopped_early = run_until(
-        one, todo, cfg.runtime.max_workers,
-        deadline if enforce_deadline else None, "btst")
+        one, todo, cfg.runtime.max_workers, deadline, "btst")
     if stopped_early:
         log.warning("deadline %s reached - %d name(s) unchecked, sending what "
                     "is ready", f"{deadline:%H:%M}", stopped_early)
@@ -1716,14 +1742,17 @@ def main() -> int:
                            cheap_close_pos(ohlc_all.get(s.symbol) or {})[0])]
             log.info("anticipation close_pos pre-screen: %d -> %d",
                      before, len(pending))
-        if enforce_deadline:
-            ant_budget = max(0.0, (deadline - datetime.now(IST)).total_seconds())
-            ant_room = int(ant_budget / SEC_PER_NAME)
-            if len(pending) > ant_room:
-                log.warning("anticipation: %.1f min left allows ~%d names; "
-                            "trimming %d -> %d", ant_budget / 60, ant_room,
-                            len(pending), max(0, ant_room))
-                pending = pending[:max(0, ant_room)]
+        # BUG 66: trim against whatever budget is left, in BOTH modes. The
+        # deadline is now always set - 15:26 while the entry is live, or a
+        # wall-clock review budget off-hours - so this must not be gated on
+        # enforce_deadline any more.
+        ant_budget = max(0.0, (deadline - datetime.now(IST)).total_seconds())
+        ant_room = int(ant_budget / SEC_PER_NAME)
+        if len(pending) > ant_room:
+            log.warning("anticipation: %.1f min left allows ~%d names; "
+                        "trimming %d -> %d", ant_budget / 60, ant_room,
+                        len(pending), max(0, ant_room))
+            pending = pending[:max(0, ant_room)]
         log.info("anticipation: screening %d name(s) (both sides of the "
                  "level) ...", len(pending))
 
@@ -1737,7 +1766,7 @@ def main() -> int:
         # BUG 61: same completion-order guard as the confirmed pass.
         ant_res, ant_stopped = run_until(
             one_ant, pending, cfg.runtime.max_workers,
-            deadline if enforce_deadline else None, "anticipate")
+            deadline, "anticipate")
         if ant_stopped:
             log.warning("anticipation: deadline %s reached, %d unchecked",
                         f"{deadline:%H:%M}", ant_stopped)

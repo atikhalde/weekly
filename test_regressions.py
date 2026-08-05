@@ -5832,14 +5832,55 @@ def test_bug60_a_late_run_still_screens_and_records_missed():
     """
     body = (ROOT / "btst.py").read_text()
     assert "enforce_deadline = (not args.after_close) and not too_late" in body, (
-        "the deadline must not apply once the entry window has already closed")
-    # every deadline use must be gated on it - BUG 61 moved the clock check
-    # inside run_until(), which takes None to mean "no cap".
-    assert body.count("deadline if enforce_deadline else None") == 2, (
-        "both passes must disable the cap once the entry window has closed")
+        "the 15:26 entry deadline must not apply once the window has closed")
+    # BUG 66: the deadline is no longer switched OFF off-hours - it MOVES to a
+    # wall-clock review budget, because "no cap" let the workflow timeout kill
+    # the job outright (05-Aug: canceled at 14 min, zero output).
+    assert "deadline = now + timedelta(minutes=REVIEW_BUDGET_MIN)" in body, (
+        "a post-close run still needs a budget, not an unbounded scan")
+    assert "deadline if enforce_deadline else None" not in body, (
+        "passing None re-introduces the unbounded post-close scan")
     assert "if enforce_deadline and len(aged_pool) > room:" in body
     # and the log must say which mode it is in
     assert "post-close review - no deadline, recording as MISSED" in body
+
+
+def test_bug66_post_close_run_cannot_hit_the_workflow_timeout():
+    """
+    THE 05-Aug CANCELLATION. A post-close review run had no stopping rule at
+    all (BUG 60 switched the deadline off rather than moving it), while the
+    workflow kept a hard 14-minute timeout:
+
+        16:53:28  23 fired + 23 aged; checking the candles ...
+        17:07:22  ##[error]The operation was canceled.
+
+    46 names at >18s each (heavy rate limiting at 22:23 IST vs 3.19s measured
+    intraday). Canceled = no alert, no picks file, no explanation - the exact
+    failure BUG 59b existed to prevent, reintroduced in the branch it missed.
+    """
+    import re
+
+    import btst
+
+    # the review budget must leave room for send + commit inside the timeout
+    wf = (ROOT / ".github" / "workflows" / "btst.yml").read_text()
+    m = re.search(r"timeout-minutes:\s*(\d+)", wf)
+    assert m, "btst.yml must set a timeout"
+    timeout = int(m.group(1))
+    assert btst.REVIEW_BUDGET_MIN + 4 <= timeout, (
+        f"review budget {btst.REVIEW_BUDGET_MIN}min + overhead must finish "
+        f"inside the {timeout}min workflow timeout")
+
+    # run_until must always receive a real deadline, never None
+    body = (ROOT / "btst.py").read_text()
+    for call in ("deadline, \"btst\")", "deadline, \"anticipate\")"):
+        assert call in body, f"run_until must be bounded: {call}"
+
+    # the anticipation trim must apply in BOTH modes now
+    seg = body.split("SECOND PASS - ANTICIPATION", 1)[1]
+    assert "if enforce_deadline:\n            ant_budget" not in seg, (
+        "the anticipation trim must not be gated on enforce_deadline")
+    assert "ant_budget = max(0.0," in seg
 
 
 def test_bug60_anticipation_pass_is_also_bounded():
