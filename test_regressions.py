@@ -7147,3 +7147,90 @@ def test_bug68_pool_composition_is_stated_and_quote_failure_is_loud():
     assert "NO BULK QUOTE" in body, "a skipped aged pass must be an ERROR"
     assert "aged setups were NOT scanned" in body, (
         "the user must be told the aged pass was skipped")
+
+
+def test_bug69_bulk_quote_does_not_inherit_the_urgent_timeout():
+    """
+    BUG 61 set timeout=8s / retries=2 while the entry window is live. That is
+    right for a PER-SYMBOL history call - hundreds of them, a slow one is
+    worth abandoning - and WRONG for the bulk quote.
+
+    fetch_ohlc sends ~2,100 ids as 3 requests of up to 1000 instruments. Those
+    payloads are large, and unlike a per-symbol call this one is not
+    redundant: if it fails, ltp_all is empty, the aged tier B pool is never
+    built, and the scan silently degenerates to "names that crossed today".
+
+    07-Aug signature:
+        15:18 (urgent, 8s)  ->  7 candidates, SBCL absent
+        16:08 (not urgent)  -> 17 candidates, SBCL present as TIER B
+    SBCL was +13.1% above its level at close_pos 1.000 by 15:18 and passed
+    both aged screens, so only an empty quote explains its absence.
+    """
+    body = (ROOT / "btst.py").read_text()
+
+    assert "quote_client = client if not urgent else DhanClient(" in body, (
+        "the bulk quote needs its own patient client")
+    seg = body.split("quote_client = client if not urgent", 1)[1][:400]
+    assert "timeout=30" in seg and "max_retries=4" in seg, (
+        "one request that gates an entire pass must be retried patiently")
+
+    # every bulk-quote call site must use it; per-symbol calls must NOT
+    assert "fetch_ohlc(quote_client, snaps)" in body
+    assert body.count("fetch_ltp(quote_client") == 2, (
+        "both the aged fallback and the anticipation pre-filter are bulk "
+        "quotes and must use the patient client")
+    # (the def line is `def fetch_ohlc(client, snaps)` - check CALL sites)
+    assert "= fetch_ohlc(client," not in body
+    # the per-symbol path keeps the urgent settings
+    assert "timeout=8 if urgent else 30" in body
+    assert "max_retries=2 if urgent else 5" in body
+
+
+def test_bug70_session_fraction_comes_from_the_clock_not_the_bar_count():
+    """
+    THE 17:34 FALSE TIER B. `frac` used to be len(m5)/75 - bars returned over
+    a full session. That conflates "session still running" with "the API sent
+    a partial page", and frac DIVIDES the volume benchmark, so a wrongly-low
+    frac inflates rvol.
+
+    On the 07-Aug 17:34 review run - two hours after the close - SONACOMS came
+    back with ~36 of 75 bars and its rvol doubled 1.5x -> 3.1x, stepping over
+    TIER_B_RVOL >= 3.0. A post-close rerun was MANUFACTURING a Tier B setup
+    that did not exist at the bell. Compare the same names at 16:30:
+        SBCL 13.7 -> 14.1, COMSYN 1.6 -> 1.5, DIVGIITTS 0.8 -> 0.7 (stable)
+        SONACOMS 1.5 -> 3.1 (doubled)
+    """
+    from datetime import datetime
+
+    import pytz
+
+    import btst
+
+    IST = pytz.timezone("Asia/Kolkata")
+
+    def at(h, m):
+        return btst.session_fraction(IST.localize(datetime(2026, 8, 7, h, m)))
+
+    # after the close the session is over BY DEFINITION, whatever came back
+    assert at(15, 30) == 1.0
+    assert at(17, 34) == 1.0
+    assert at(22, 0) == 1.0
+    # during the session it tracks the clock
+    assert 0.95 < at(15, 18) < 0.98, "15:18 is ~97% of the session"
+    assert 0.4 < at(12, 0) < 0.5
+    assert at(9, 20) <= 0.06
+    # never zero - that would make rvol infinite
+    assert at(9, 0) > 0
+
+    # the bar count must NOT be able to shorten it
+    n = IST.localize(datetime(2026, 8, 7, 17, 34))
+    assert btst.session_fraction(n, 36) == 1.0, (
+        "a partial intraday page after the close must not inflate rvol")
+
+    body = (ROOT / "btst.py").read_text()
+    assert "frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)" not in body, (
+        "frac must never be derived from how many bars the API returned")
+    assert body.count("frac = session_fraction(now") == 2, (
+        "both the confirmed and anticipation paths must use the clock")
+    assert 'drops["partial intraday after close"]' in body, (
+        "a short intraday page after the close is a data gap worth reporting")

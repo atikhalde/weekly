@@ -707,6 +707,41 @@ def repair_today_bar(df: pd.DataFrame, quote: dict | None,
     return df
 
 
+def session_fraction(now_ist, n_bars: int | None = None) -> float:
+    """
+    Fraction of the NSE session elapsed, from the CLOCK.
+
+    BUG 70. This used to be `len(m5) / 75` - how many 5-minute bars the API
+    returned, divided by a full session. That silently conflates two very
+    different things:
+
+        session still running   ->  fewer bars, frac < 1   CORRECT
+        API returned a partial  ->  fewer bars, frac < 1   WRONG
+
+    `frac` divides the volume benchmark, so a wrongly-low frac INFLATES rvol.
+    On the 07-Aug 17:34 review run - two hours after the close - SONACOMS came
+    back with roughly half the day's bars and its rvol doubled from 1.5x to
+    3.1x, stepping over the TIER_B_RVOL >= 3.0 gate. A post-close rerun was
+    manufacturing a Tier B setup that did not exist at the bell.
+
+    The clock cannot be fooled that way: after 15:30 the elapsed fraction is
+    1.0 by definition, and missing bars are a data gap to be reported, not
+    evidence of an unfinished session.
+
+    `n_bars` is accepted only so the caller can flag a suspicious gap; it
+    never shortens the fraction.
+    """
+    t = now_ist.time()
+    if t >= dtime(15, 30):
+        return 1.0
+    if t <= dtime(9, 15):
+        return 0.05
+    elapsed = ((now_ist.hour * 60 + now_ist.minute)
+               - (9 * 60 + 15))
+    total = (15 * 60 + 30) - (9 * 60 + 15)      # 375 minutes
+    return min(max(elapsed / total, 0.05), 1.0)
+
+
 def _num(v, nd: int = 2):
     """Round for the picks file, but keep NaN/None BLANK rather than 0.
 
@@ -1287,6 +1322,33 @@ def main() -> int:
                         quote_rate=cfg.runtime.quote_rate_per_sec,
                         timeout=8 if urgent else 30,
                         max_retries=2 if urgent else 5)
+    # ---- BUG 69: THE BULK QUOTE MUST NOT INHERIT THE URGENT TIMEOUT -------
+    # BUG 61 set timeout=8s / retries=2 while the entry window is live, which
+    # is right for a PER-SYMBOL history call: there are hundreds of them and
+    # a slow one is worth abandoning.
+    #
+    # It is wrong for the bulk quote. fetch_ohlc sends ~2,100 security ids as
+    # 3 requests of up to 1000 instruments each; those payloads are large and
+    # 8 seconds is aggressive. And unlike a per-symbol call this one is NOT
+    # redundant - if it fails, `ltp_all` is empty, the aged tier B pool is
+    # never built at all, and the scan silently degenerates to "names that
+    # crossed today".
+    #
+    # That is the 07-Aug signature exactly:
+    #     15:18 (urgent, 8s)  -> 7 candidates,  SBCL absent
+    #     16:08 (not urgent)  -> 17 candidates, SBCL present as TIER B
+    # SBCL crossed 814 on 07-Aug (06-Aug close 767.45 -> 920.90) and was
+    # +13.1% above its level with close_pos 1.000 by 15:18, so it passed both
+    # aged screens. Only an empty quote explains its absence.
+    #
+    # One request that gates an entire pass deserves patience; three of them
+    # cost at most ~30s of a 480s budget. A separate client keeps the urgent
+    # per-symbol behaviour untouched.
+    quote_client = client if not urgent else DhanClient(
+        cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
+        data_rate=cfg.runtime.data_rate_per_sec,
+        quote_rate=cfg.runtime.quote_rate_per_sec,
+        timeout=30, max_retries=4)
     caps = load_mcap_table(cfg.paths["mcap"])
     start = now.date() - timedelta(days=HISTORY_DAYS)
 
@@ -1305,14 +1367,14 @@ def main() -> int:
     fired_syms = {s.symbol for s in fired}
     ohlc_all = {}
     try:
-        ohlc_all = fetch_ohlc(client, snaps)
+        ohlc_all = fetch_ohlc(quote_client, snaps)
     except DhanError as exc:
         log.warning("bulk ohlc failed (%s) - falling back to LTP only",
                     str(exc)[:120])
     try:
         ltp_all = ({k: v["last_price"] for k, v in ohlc_all.items()
                     if v.get("last_price")} if ohlc_all
-                   else fetch_ltp(client, snaps))
+                   else fetch_ltp(quote_client, snaps))
     except DhanError as exc:
         log.warning("bulk quote failed (%s) - aged tier B pass is SKIPPED "
                     "and only today's breakouts are scanned", str(exc)[:120])
@@ -1479,7 +1541,10 @@ def main() -> int:
                     "close": float(m5.iloc[-1]["close"]),
                     "volume": float(m5["volume"].sum()),
                 }
-                frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
+                # BUG 70: from the CLOCK, never from the bar count.
+                frac = session_fraction(now, len(m5))
+                if frac >= 0.999 and len(m5) < BARS_PER_SESSION * 0.9:
+                    drops["partial intraday after close"] += 1
             else:
                 # ---- BUG 67: FALL BACK TO THE BULK QUOTE -------------------
                 # Losing the intraday call used to DELETE the symbol. On
@@ -1555,7 +1620,8 @@ def main() -> int:
                 "close": float(m5.iloc[-1]["close"]),
                 "volume": float(m5["volume"].sum()),
             }])], ignore_index=True)
-            frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
+            # BUG 70: clock-based, same reason as the confirmed pass.
+            frac = session_fraction(now, len(m5))
         # BUG 64: same repair for the anticipation pass
         df = repair_today_bar(df, ohlc_all.get(s.symbol), now.date())
         return df, frac
@@ -1765,7 +1831,7 @@ def main() -> int:
         ltp = ltp_all
         if not ltp:
             try:
-                ltp = fetch_ltp(client, pending)
+                ltp = fetch_ltp(quote_client, pending)
             except DhanError as exc:
                 log.warning("bulk quote failed (%s) - screening without a "
                             "pre-filter", str(exc)[:120])
