@@ -7234,3 +7234,51 @@ def test_bug70_session_fraction_comes_from_the_clock_not_the_bar_count():
         "both the confirmed and anticipation paths must use the clock")
     assert 'drops["partial intraday after close"]' in body, (
         "a short intraday page after the close is a data gap worth reporting")
+
+
+def test_bug71_vma_ignores_non_trading_days():
+    """
+    THE SONACOMS 3.0x. classify() and classify_approach() both dropna on
+    open/high/low/close but NOT on volume, so a row with a valid close and
+    volume 0/NaN - holiday, suspension, feed padding - stayed in the 50-bar
+    window and dragged the average down.
+
+    vma is the DENOMINATOR of rvol, so a halved average doubles rvol. On the
+    07-Aug list SONACOMS displayed 3.0x against a true 1.56x: implied vma
+    1,249,780 vs actual 2,402,774, ratio 1.92 - about half the window was
+    non-trading rows.
+
+    Display-only on the ANTICIPATE list, but TIER_B_RVOL >= 3.0 is a HARD
+    GATE on the confirmed list, so this could promote a quiet stock into
+    tier B on nothing but holidays in its history.
+    """
+    import pandas as pd
+
+    import btst
+
+    real = pd.DataFrame({"volume": [2_400_000.0] * 50})
+    zeros = pd.DataFrame({"volume": [2_400_000.0] * 25 + [0.0] * 25})
+    nans = pd.DataFrame({"volume": [2_400_000.0] * 25 + [float("nan")] * 25})
+
+    assert btst._vma50(real) == 2_400_000.0
+    assert btst._vma50(zeros) == 2_400_000.0, "zero-volume days must not count"
+    assert btst._vma50(nans) == 2_400_000.0, "NaN volume must not count"
+
+    # the SONACOMS numbers specifically
+    today = 3_749_341
+    assert abs(today / btst._vma50(real) - 1.56) < 0.02
+    assert today / 1_200_000 > btst.TIER_B_RVOL, (
+        "the old behaviour crossed the tier B gate - that is why this matters")
+
+    # degenerate input must not raise or divide by zero
+    assert btst._vma50(pd.DataFrame({"volume": []})) == 0.0
+    assert btst._vma50(pd.DataFrame({"volume": [0.0, 0.0]})) == 0.0
+    assert btst._vma50(pd.DataFrame({"close": [1.0]})) == 0.0
+
+    # both call sites must use it
+    body = (ROOT / "btst.py").read_text()
+    assert body.count("vma = _vma50(prev)") == 2, (
+        "classify() and classify_approach() must share one definition")
+    code = "\n".join(ln for ln in body.splitlines()
+                     if not ln.lstrip().startswith("#"))
+    assert 'vma = float(prev["volume"].tail(50).mean())' not in code

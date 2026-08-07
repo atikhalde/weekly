@@ -707,6 +707,34 @@ def repair_today_bar(df: pd.DataFrame, quote: dict | None,
     return df
 
 
+def _vma50(prev: pd.DataFrame, n: int = 50) -> float:
+    """
+    Average daily volume over the last `n` bars that ACTUALLY TRADED.
+
+    BUG 71. This was `prev["volume"].tail(50).mean()`. Both classify() and
+    classify_approach() dropna on open/high/low/close but NOT on volume, so a
+    row with a valid close and volume 0 or NaN - an exchange holiday, a
+    suspension, or feed padding - stays in the window and drags the mean down.
+
+    vma is the DENOMINATOR of rvol, so a halved average doubles rvol.
+    Measured on the 07-Aug list: SONACOMS displayed 3.0x against a true 50-day
+    figure of 1.56x - the implied vma was 1,249,780 vs an actual 2,402,774,
+    a ratio of 1.92, i.e. roughly half the window was non-trading rows.
+
+    On the ANTICIPATE list rvol is display-only, so that was cosmetic. On the
+    CONFIRMED list TIER_B_RVOL >= 3.0 is a hard gate, and this could promote a
+    quiet stock into tier B on nothing but holidays in its history.
+
+    Zero-volume days are excluded rather than zero-filled: "did not trade" is
+    not "traded nothing", and averaging them in understates normal turnover.
+    """
+    if "volume" not in prev or prev.empty:
+        return 0.0
+    v = pd.to_numeric(prev["volume"], errors="coerce")
+    v = v[v > 0].tail(n)
+    return float(v.mean()) if len(v) else 0.0
+
+
 def session_fraction(now_ist, n_bars: int | None = None) -> float:
     """
     Fraction of the NSE session elapsed, from the CLOCK.
@@ -916,7 +944,7 @@ def classify(daily: pd.DataFrame, level: float,
         return None
 
     prev = d.iloc[:-1]
-    vma = float(prev["volume"].tail(50).mean()) if "volume" in d else 0.0
+    vma = _vma50(prev)
     # Pro-rate the benchmark when today's candle is still forming.
     frac = min(max(float(partial_frac), 0.05), 1.0)
     vma_cmp = vma * frac
@@ -1119,7 +1147,7 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
         "D" if level == level_d else "C")
 
     prev = d.iloc[:-1]
-    vma = float(prev["volume"].tail(50).mean()) if "volume" in d else 0.0
+    vma = _vma50(prev)
     frac = min(max(float(partial_frac), 0.05), 1.0)
     vma_cmp = vma * frac
     rng = h - lo
