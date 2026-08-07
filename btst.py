@@ -1290,6 +1290,14 @@ def main() -> int:
     caps = load_mcap_table(cfg.paths["mcap"])
     start = now.date() - timedelta(days=HISTORY_DAYS)
 
+    # BUG 67: count every reason a symbol is dropped. Six code paths used to
+    # `return s, None` with at most a DEBUG line, so a name could disappear
+    # from the scan with nothing in the log and nothing in the message. That
+    # is how SBCL - already +8.19% at close_pos 1.000 by 15:15 - was missing
+    # from the 15:18 list on 07-Aug.
+    from collections import Counter
+    drops = Counter()
+
     # ---- one bulk quote, reused by the aged pass and the anticipation pass -
     # BUG 59: this is now an OHLC call, not just LTP. Same cost (1 request per
     # 1000 names) but it also returns today's open/high/low, which is what
@@ -1426,9 +1434,11 @@ def main() -> int:
             df = client.daily_candles(str(s.security_id), s.exchange_segment,
                                       start, now.date())
         except DhanError as exc:
+            drops["daily error"] += 1
             log.debug("%s: %s", s.symbol, str(exc)[:100])
             return s, None
         if df.empty:
+            drops["daily empty"] += 1
             return s, None
 
         frac = 1.0
@@ -1437,7 +1447,9 @@ def main() -> int:
             # Running BEFORE the close, so today's daily bar does not exist
             # yet. Build it from today's 5-minute candles and mark it partial.
             if args.after_close:
+                drops["no bar (after-close)"] += 1
                 return s, None
+            m5 = None
             try:
                 m5 = client.intraday_candles(
                     str(s.security_id), s.exchange_segment,
@@ -1445,20 +1457,52 @@ def main() -> int:
                     now.replace(tzinfo=None), interval=5)
             except DhanError as exc:
                 log.debug("%s intraday: %s", s.symbol, str(exc)[:100])
-                return s, None
-            if m5 is None or m5.empty:
-                return s, None
-            m5 = m5.sort_values("datetime")
-            today_bar = {
-                "datetime": pd.Timestamp(now.date()),
-                "open": float(m5.iloc[0]["open"]),
-                "high": float(m5["high"].max()),
-                "low": float(m5["low"].min()),
-                "close": float(m5.iloc[-1]["close"]),
-                "volume": float(m5["volume"].sum()),
-            }
+            if m5 is not None and not m5.empty:
+                m5 = m5.sort_values("datetime")
+                today_bar = {
+                    "datetime": pd.Timestamp(now.date()),
+                    "open": float(m5.iloc[0]["open"]),
+                    "high": float(m5["high"].max()),
+                    "low": float(m5["low"].min()),
+                    "close": float(m5.iloc[-1]["close"]),
+                    "volume": float(m5["volume"].sum()),
+                }
+                frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
+            else:
+                # ---- BUG 67: FALL BACK TO THE BULK QUOTE -------------------
+                # Losing the intraday call used to DELETE the symbol. On
+                # 07-Aug the 15:18 scan checked 7 candles while the 16:08
+                # rerun checked 17 - SBCL was already +8.19% at close_pos
+                # 1.000 by 15:15 and simply vanished, because intraday is
+                # needed for EVERY name while the market is open and is the
+                # first thing to rate-limit at 15:18.
+                #
+                # The bulk /marketfeed/ohlc response already holds today's
+                # true open/high/low/LTP for all ~2,100 names, fetched in one
+                # request. It is a complete substitute for the tier test -
+                # only `volume` is missing, so rvol is unavailable and the
+                # name can still make TIER A (day + close_pos) but not the
+                # rvol-dependent TIER B. Losing the symbol entirely is
+                # strictly worse than losing one gate.
+                q = ohlc_all.get(s.symbol) or {}
+                px = float(q.get("last_price") or 0.0)
+                q_o = float(q.get("open") or 0.0)
+                q_h = float(q.get("high") or 0.0)
+                q_l = float(q.get("low") or 0.0)
+                if px <= 0 or q_o <= 0:
+                    drops["no intraday, no quote"] += 1
+                    return s, None
+                drops["quote fallback"] += 1
+                q_v = float(q.get("volume") or 0.0)
+                today_bar = {
+                    "datetime": pd.Timestamp(now.date()),
+                    "open": q_o, "high": max(q_h, px), "low": min(q_l or px, px),
+                    "close": px, "volume": q_v,
+                }
+                # frac stays 1.0: the quote's volume is the full day so far,
+                # exactly like the 5-minute sum it replaces.
+                frac = 1.0
             df = pd.concat([df, pd.DataFrame([today_bar])], ignore_index=True)
-            frac = min(len(m5) / float(BARS_PER_SESSION), 1.0)
         # BUG 64: trust the bulk quote for today's open/high/low
         df = repair_today_bar(df, ohlc_all.get(s.symbol), now.date())
         # A name whose alert fired today is age 0 by definition - trust the
@@ -1521,6 +1565,15 @@ def main() -> int:
         m["level"] = s.entry_level
         m["mcap_cr"] = caps.get(s.symbol.upper())
         rows.append(m)
+
+    # BUG 67: a symbol that never reached classify() is a BLIND SPOT, not a
+    # rejection. Say so loudly - and put it in the message, because "7 candles
+    # checked" out of 46 read like a quiet day rather than a data outage.
+    missing = len(todo) - stopped_early - len(rows)
+    if drops or missing:
+        log.warning("coverage: %d/%d candidates produced a candle; drops: %s",
+                    len(rows), len(todo) - stopped_early,
+                    dict(drops) or "none")
 
     # ---- BUG 53c: THE TREND FLOOR NOW APPLIES TO THE CONFIRMED LIST TOO ----
     # BUG 51 added MIN_RET_12M / MIN_DIST_200DMA but wired them only into
@@ -1853,6 +1906,22 @@ def main() -> int:
                      f"{stopped_early} name(s) unchecked, so the list may be "
                      f"incomplete. Everything shown was fully screened.</i>")
         lines.append("")
+    # BUG 67: never let a data outage read as a quiet market.
+    if drops:
+        lost = sum(v for k, v in drops.items() if k != "quote fallback")
+        if lost:
+            lines.append(
+                f"⚠️ <b>{lost} of {len(todo)} candidate(s) returned no candle</b> "
+                f"<i>— {', '.join(f'{k}: {v}' for k, v in drops.items() if k != 'quote fallback')}. "
+                f"This list is INCOMPLETE; a setup may exist that was never "
+                f"screened.</i>")
+            lines.append("")
+        if drops.get("quote fallback"):
+            lines.append(
+                f"<i>ℹ️ {drops['quote fallback']} name(s) judged from the bulk "
+                f"quote (intraday feed unavailable) — no volume, so TIER B "
+                f"could not be tested on them.</i>")
+            lines.append("")
     if not picks:
         lines.append("<i>No setup qualified today. That is the normal case — "
                      "the tiers fire ~4 times a week combined.</i>")

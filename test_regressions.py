@@ -5845,6 +5845,77 @@ def test_bug60_a_late_run_still_screens_and_records_missed():
     assert "post-close review - no deadline, recording as MISSED" in body
 
 
+def test_bug67_missing_intraday_falls_back_to_the_quote():
+    """
+    THE 07-Aug BLIND SPOT. The 15:18 scan checked 7 candles; the 16:08 rerun
+    checked 17 and found SBCL (Tier B, rvol 13.7x). SBCL was already +8.19% at
+    close_pos 1.000 by 15:15 - three minutes BEFORE the 15:18 run - so it was
+    not a timing miss. It was DELETED: while the market is open every symbol
+    needs an intraday call to build today's bar, that call is the first thing
+    to rate-limit, and failure did `return s, None` with only a DEBUG line.
+
+    The bulk OHLC response already holds today's open/high/low/LTP/volume for
+    all ~2,100 names in ONE request, so it is a complete substitute.
+    """
+    import numpy as np
+    import pandas as pd
+
+    import btst
+
+    n = 300
+    px = np.linspace(700, 850, n)
+    hist = pd.DataFrame({
+        "datetime": pd.date_range("2025-06-01", periods=n, freq="B"),
+        "open": px * 0.99, "high": px * 1.01, "low": px * 0.98,
+        "close": px, "volume": [5e5] * n})
+    # SBCL as the bulk quote saw it, with no intraday feed available
+    q = {"last_price": 920.90, "open": 850.80, "high": 920.90,
+         "low": 848.00, "volume": 6.85e6}
+    bar = {"datetime": pd.Timestamp("2026-08-07"), "open": q["open"],
+           "high": max(q["high"], q["last_price"]),
+           "low": min(q["low"], q["last_price"]),
+           "close": q["last_price"], "volume": q["volume"]}
+    df = pd.concat([hist, pd.DataFrame([bar])], ignore_index=True)
+    m = btst.classify(df, 814.00, partial_frac=1.0, age=0)
+    assert abs(m["day_ret"] - 8.24) < 0.1, "quote must reproduce day_ret"
+    assert m["close_pos"] > 0.99, "quote must reproduce close_pos"
+    # the whole point: volume survives, so rvol works and TIER B is testable
+    assert m["rvol"] > 3.0, (
+        "the quote must carry volume - otherwise rvol is 0 and TIER B can "
+        "never fire on a fallback name")
+
+    # dhan.ohlc must actually return volume
+    src = (ROOT / "dhan.py").read_text()
+    seg = src.split("def ohlc", 1)[1].split("\n    def ", 1)[0]
+    assert '"volume"' in seg, "ohlc() must not discard today's volume"
+
+    # and one() must fall back rather than dropping the symbol
+    body = (ROOT / "btst.py").read_text()
+    o = body.split("def one(s):", 1)[1].split("def candle(s):", 1)[0]
+    assert "quote fallback" in o
+    assert o.count("return s, None") <= 4, (
+        "a failed intraday call must fall back to the quote, not delete "
+        "the candidate")
+
+
+def test_bug67_silent_drops_are_counted_and_reported():
+    """
+    "7 candle(s) checked" out of 46 candidates read exactly like a quiet
+    market. A symbol that never reached classify() is a BLIND SPOT, not a
+    rejection, and must be visible in the log AND in the message.
+    """
+    body = (ROOT / "btst.py").read_text()
+    assert "drops = Counter()" in body, "every drop reason must be counted"
+    for reason in ("daily error", "daily empty", "no intraday, no quote",
+                   "quote fallback"):
+        assert f'drops["{reason}"]' in body, f"unlabelled drop path: {reason}"
+    assert "coverage: %d/%d candidates produced a candle" in body
+    # it must reach the user, not just the log
+    assert "candidate(s) returned no candle" in body, (
+        "a data outage must not be presentable as a quiet day")
+    assert "This list is INCOMPLETE" in body
+
+
 def test_bug66_post_close_run_cannot_hit_the_workflow_timeout():
     """
     THE 05-Aug CANCELLATION. A post-close review run had no stopping rule at

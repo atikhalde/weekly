@@ -360,6 +360,12 @@ class DhanClient:
                     "high": float(o.get("high") or 0.0),
                     "low": float(o.get("low") or 0.0),
                     "prev_close": float(o.get("close") or 0.0),
+                    # BUG 67: today's traded quantity. Dhan returns it and it
+                    # was being discarded, which meant the quote could not
+                    # substitute for the intraday feed - rvol came out 0 and
+                    # TIER B could never fire on a fallback name.
+                    "volume": float(payload.get("volume")
+                                    or payload.get("last_quantity") or 0.0),
                 }
         return out
 
