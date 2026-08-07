@@ -398,6 +398,40 @@ def btst_tier_for(day_bar, prev_bars, atr_pct: float) -> str | None:
     return None
 
 
+def _is_tradeable(row) -> bool:
+    """
+    Was this pick actually enterable? Missing/blank -> YES.
+
+    BUG 76. The original guard was `int(float(row.get("tradeable", 1) or 0))`.
+    It was written for picks files predating BUG 55, whose rows have no
+    `tradeable` column at all - and for a MISSING key the default 1 works.
+
+    But rows written before the column existed and re-read from CSV come back
+    with a BLANK cell, which pandas parses as NaN - and **NaN is truthy**, so
+    `or 0` never fires, and `int(float(nan))` raises. That crashed the whole
+    A/B paper run on 07-Aug:
+
+        ValueError: cannot convert float NaN to integer
+        ab_paper.py line 1067, in main
+
+    Both scheduled runs that day died, so the paper ledger - the only forward
+    evidence this project has - silently stopped recording.
+
+    Unknown means "written before the flag existed", which means it was a
+    normal live pick. Treat it as tradeable.
+    """
+    v = row.get("tradeable", 1)
+    if v is None:
+        return True
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return True                      # unparseable -> do not silently drop
+    if f != f:                           # NaN
+        return True
+    return bool(int(f))
+
+
 def load_btst_picks(path: Path | str | None = None) -> tuple[dict, dict]:
     """
     The top-5 list btst.py wrote at 15:20.
@@ -1027,8 +1061,7 @@ def main() -> int:
                                         # after the close was never enterable.
                                         # Same guard Model E already has.
                                         # Older files have no column -> 1.
-                                        if not bool(int(float(
-                                                ap_.get("tradeable", 1) or 0))):
+                                        if not _is_tradeable(ap_):
                                             continue
                                         sig.price = float(ap_["entry"])
                                         sig.btst_tier = "F"
@@ -1063,8 +1096,7 @@ def main() -> int:
                                     # file exists to prevent. Older files have
                                     # no such column; those all predate the
                                     # guard and are treated as tradeable.
-                                    if pick is not None and not bool(
-                                            int(float(pick.get("tradeable", 1) or 0))):
+                                    if pick is not None and not _is_tradeable(pick):
                                         continue
                                     if pick is not None:
                                         sig.price = float(pick["entry"])
