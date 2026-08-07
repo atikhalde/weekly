@@ -398,31 +398,6 @@ def btst_tier_for(day_bar, prev_bars, atr_pct: float) -> str | None:
     return None
 
 
-def _f(row, key, default=0.0):
-    """
-    Read a numeric CSV field safely. Missing / blank / NaN -> `default`.
-
-    BUG 77. Three sites read picks-file columns as `float(row.get(k) or 0)`.
-    That works for a MISSING key and for an empty string, but a blank cell
-    read back by pandas is **NaN, which is truthy**, so `or 0` never fires.
-    `float(nan)` is harmless; `int(float(nan))` RAISES.
-
-    BUG 76 fixed the `tradeable` instance. This one - `age` - has the identical
-    shape and crashed the A/B run again on the very next execution, this time
-    at the END of the replay instead of 25 symbols in. Fixing one instance of a
-    pattern and not grepping for its siblings is what made that a second
-    outage rather than one.
-    """
-    v = row.get(key, default)
-    if v is None:
-        return default
-    try:
-        f = float(v)
-    except (TypeError, ValueError):
-        return default
-    return default if f != f else f
-
-
 def _is_tradeable(row) -> bool:
     """
     Was this pick actually enterable? Missing/blank -> YES.
@@ -1090,8 +1065,8 @@ def main() -> int:
                                             continue
                                         sig.price = float(ap_["entry"])
                                         sig.btst_tier = "F"
-                                        sig.btst_day_ret = _f(ap_, "day_ret", 0.0)
-                                        sig.btst_rank = int(_f(ap_, "rank", 0.0))
+                                        sig.btst_day_ret = float(ap_.get("day_ret") or 0.0)
+                                        sig.btst_rank = int(ap_.get("rank") or 0)
                                         sig.btst_source = "anticipate"
                                         tr = simulate_btst(sig, dafter, capital,
                                                            m.exit, m.hold_days, cost)
@@ -1126,15 +1101,15 @@ def main() -> int:
                                     if pick is not None:
                                         sig.price = float(pick["entry"])
                                         sig.btst_tier = str(pick.get("tier") or "")
-                                        sig.btst_day_ret = _f(pick, "day_ret", 0.0)
-                                        sig.btst_rank = int(_f(pick, "rank", 0.0))
+                                        sig.btst_day_ret = float(pick.get("day_ret") or 0.0)
+                                        sig.btst_rank = int(pick.get("rank") or 0)
                                         sig.btst_source = "picks"
                                         # BUG 53: carry the arm through from
                                         # the 15:20 file. Older picks files
                                         # have no such column - default to
                                         # fresh, which is what they all were.
                                         sig.btst_arm = str(pick.get("arm") or "")
-                                        sig.btst_age = int(_f(pick, "age", 0.0))
+                                        sig.btst_age = int(float(pick.get("age") or 0))
                                     elif picks_have_day.get(day_key):
                                         # The picks file covers this day and
                                         # this name is not in it -> it was not
@@ -1229,7 +1204,7 @@ def main() -> int:
                 rk = 0
             if rk > 0:
                 return (0, rk, 0.0)
-            return (1, 0, -_f(r, "btst_day_ret", 0.0)
+            return (1, 0, -float(r.get("btst_day_ret") or 0.0)
                     + (0.0 if r.get("btst_tier") == "A" else 1e6))
         group.sort(key=_rank)
         kept = group[:top_n]
