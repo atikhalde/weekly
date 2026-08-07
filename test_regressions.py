@@ -7306,3 +7306,39 @@ def test_bug72_debug_vma_is_reachable_from_the_workflow():
         assert field in seg, f"vma_debug must report {field!r}"
     # and be off by default - zero cost when unused
     assert "_DBG_VMA: set[str] = set()" in body
+
+
+def test_bug73_rvol_shows_its_inputs_in_the_message():
+    """
+    THE SONACOMS HUNT. rvol displayed 3.0x against an independently computed
+    1.54x. Three hypotheses were tested and ALL THREE were wrong (partial
+    candle fraction, zero-volume rows, corporate action) because the ratio
+    alone hides its inputs - nobody could see today's volume or the 50-day
+    average without a workflow log and a debug flag the UI did not expose.
+
+    rvol is a HARD GATE on the confirmed list (TIER_B_RVOL), so an
+    undiagnosable rvol is a correctness risk, not a cosmetic one. Print the
+    numerator, the denominator and the bar count next to it.
+    """
+    import btst
+
+    r = dict(rvol=13.7, vol_today=6_014_307, vma50=416_590, vma_bars=50)
+    out = btst._rvol_detail(r)
+    assert "60.1L" in out and "4.2L" in out and "over 50d" in out
+
+    # a short window is the thing most worth seeing
+    assert "over 12d" in btst._rvol_detail(
+        dict(vol_today=3_749_341, vma50=1_249_780, vma_bars=12))
+
+    # must degrade quietly rather than crash or print junk
+    assert btst._rvol_detail({}) == ""
+    assert btst._rvol_detail(dict(vol_today=1, vma50=0, vma_bars=0)) == ""
+    assert btst._rvol_detail(
+        dict(vol_today=float("nan"), vma50=100, vma_bars=5)) == " <i>(?/100 over 5d)</i>"
+
+    # the inputs must actually be carried out of BOTH classify paths
+    body = (ROOT / "btst.py").read_text()
+    assert body.count("vol_today=v, vma50=vma, vma_bars=int(_vma_n(prev))") == 2, (
+        "classify() and classify_approach() must both expose the inputs")
+    # and reach the message on both lists
+    assert body.count("_rvol_detail(r)") == 2

@@ -764,6 +764,51 @@ def _vma50(prev: pd.DataFrame, n: int = 50) -> float:
     return float(v.mean()) if len(v) else 0.0
 
 
+def _rvol_detail(r: dict) -> str:
+    """
+    "13.7x (6.0M / 0.4M over 50d)" - the ratio AND its inputs.
+
+    BUG 73. rvol is a hard gate on the confirmed list (TIER_B_RVOL) and the
+    most-questioned number in the message. When SONACOMS displayed 3.0x
+    against an independently computed 1.54x, the ratio alone made the cause
+    unknowable: three hypotheses were tested and all three were wrong, purely
+    because today's volume and the 50-day average were never shown.
+
+    Printing the inputs turns "that number looks wrong" into "that number is
+    wrong BECAUSE the average used 12 bars, not 50" - visible in the alert,
+    with no workflow log and no debug flag needed.
+    """
+    def m(x):
+        try:
+            x = float(x)
+        except (TypeError, ValueError):
+            return "?"
+        if x != x:
+            return "?"
+        if x >= 1e7:
+            return f"{x/1e7:.1f}Cr"
+        if x >= 1e5:
+            return f"{x/1e5:.1f}L"
+        if x >= 1e3:
+            return f"{x/1e3:.0f}K"
+        return f"{x:.0f}"
+
+    v = r.get("vol_today")
+    a = r.get("vma50")
+    n = r.get("vma_bars")
+    if v is None or a is None or not a:
+        return ""
+    return f" <i>({m(v)}/{m(a)} over {n}d)</i>"
+
+
+def _vma_n(prev: pd.DataFrame, n: int = 50) -> int:
+    """How many bars actually fed _vma50 - 0 means the average is meaningless."""
+    if "volume" not in prev or prev.empty:
+        return 0
+    v = pd.to_numeric(prev["volume"], errors="coerce")
+    return int(len(v[v > 0].tail(n)))
+
+
 _DBG_VMA: set[str] = set()
 
 
@@ -1021,6 +1066,11 @@ def classify(daily: pd.DataFrame, level: float,
         close_pos=((c - lo) / rng) if rng > 0 else 0.5,
         rvol=(v / vma_cmp) if vma_cmp > 0 else float("nan"),
         partial_frac=frac,
+        # BUG 73: carry the rvol INPUTS, not just the ratio. A wrong rvol is
+        # undiagnosable from the ratio alone - see the SONACOMS 3.0x-vs-1.54x
+        # hunt, where three separate hypotheses were tested and all wrong
+        # because nobody could see today's volume or the 50-day average.
+        vol_today=v, vma50=vma, vma_bars=int(_vma_n(prev)),
         range_pct=(rng / c * 100.0),
         gap_pct=((o / float(prev.iloc[-1]["close"]) - 1) * 100.0)
         if float(prev.iloc[-1]["close"]) > 0 else float("nan"),
@@ -1214,6 +1264,7 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
              day_ret=(c / o - 1) * 100.0,
              close_pos=((c - lo) / rng) if rng > 0 else 0.5,
              rvol=(v / vma_cmp) if vma_cmp > 0 else float("nan"),
+             vol_today=v, vma50=vma, vma_bars=int(_vma_n(prev)),
              atr_pct=atr_pct, turnover_cr=turnover, partial_frac=frac,
              # BUG 65: prior-exhaustion inputs, computed from bars BEFORE
              # today so the breakout itself is not counted as exhaustion.
@@ -2120,7 +2171,7 @@ def main() -> int:
             f"{_fmt(r['close'])}{cap}{prov}{age_tag}",
             f"    day <b>{r['day_ret']:+.1f}%</b> · closed at "
             f"<b>{r['close_pos']*100:.0f}%</b> of range · "
-            f"rvol <b>{r['rvol']:.1f}x</b> · atr {r['atr_pct']:.1f}%",
+            f"rvol <b>{r['rvol']:.1f}x</b>{_rvol_detail(r)} · atr {r['atr_pct']:.1f}%",
             f"    <i>{r['ext_pct']:+.1f}% {where} the 26W level "
             f"{_fmt(r['level'])}</i>",
             cv_line,
@@ -2170,7 +2221,8 @@ def main() -> int:
                  f"    <b>{r['gap_pct']:.2f}% below</b> the {r['which']} level "
                  f"<code>{_fmt(r['level'])}</code>") +
                 f" · closed at <b>{r['close_pos']*100:.0f}%</b> of range · "
-                f"day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x",
+                f"day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x"
+                f"{_rvol_detail(r)}",
                 f"    <i>12m {r.get('ret_12m', 0):+.0f}% · "
                 f"{r.get('dist_200dma', 0):+.0f}% over the 200DMA</i>",
                 # BUG 63: this line ignored too_late. At 20:43 the confirmed
