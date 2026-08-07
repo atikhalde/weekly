@@ -5393,11 +5393,13 @@ def test_bug55_late_picks_are_marked_untradeable_and_model_e_skips_them():
         "the picks file must record whether the pick was enterable")
 
     ab = (ROOT / "ab_paper.py").read_text()
-    assert 'pick.get("tradeable", 1)' in ab, (
+    # BUG 76 moved this into _is_tradeable(); assert the BEHAVIOUR, not the
+    # literal expression, so a safe refactor does not fail the test.
+    assert "_is_tradeable(pick)" in ab, (
         "Model E must honour the tradeable flag")
-    # default 1 so pre-BUG-55 picks files keep working
-    seg = ab.split('pick.get("tradeable"', 1)[1][:80]
-    assert "1" in seg, "older picks files must default to tradeable"
+    from ab_paper import _is_tradeable
+    assert _is_tradeable({}) is True, "pre-BUG-55 files default to tradeable"
+    assert _is_tradeable({"tradeable": 0}) is False
 
 
 def test_bug55_the_schedule_is_no_longer_cron_only():
@@ -5711,7 +5713,7 @@ def test_bug63_anticipate_list_also_honours_the_entry_window():
     # and Model F must honour it
     ab = (ROOT / "ab_paper.py").read_text()
     fseg = ab.split("ant_lookup.get((day_key, sig.symbol))", 1)[1][:600]
-    assert 'ap_.get("tradeable", 1)' in fseg, (
+    assert "_is_tradeable(ap_)" in fseg, (
         "Model F must skip picks that were not tradeable")
 
 
@@ -7202,14 +7204,15 @@ def test_bug70_session_fraction_comes_from_the_clock_not_the_bar_count():
     """
     from datetime import datetime
 
-    import pytz
-
     import btst
-
-    IST = pytz.timezone("Asia/Kolkata")
+    # BUG 75: use the SAME tz object production uses. Importing pytz here made
+    # the suite pass locally and fail in CI (ModuleNotFoundError) because pytz
+    # is not in requirements.txt - it is not a dependency of this project at
+    # all. A test must not introduce one.
+    from dhan import IST
 
     def at(h, m):
-        return btst.session_fraction(IST.localize(datetime(2026, 8, 7, h, m)))
+        return btst.session_fraction(datetime(2026, 8, 7, h, m, tzinfo=IST))
 
     # after the close the session is over BY DEFINITION, whatever came back
     assert at(15, 30) == 1.0
@@ -7223,7 +7226,7 @@ def test_bug70_session_fraction_comes_from_the_clock_not_the_bar_count():
     assert at(9, 0) > 0
 
     # the bar count must NOT be able to shorten it
-    n = IST.localize(datetime(2026, 8, 7, 17, 34))
+    n = datetime(2026, 8, 7, 17, 34, tzinfo=IST)
     assert btst.session_fraction(n, 36) == 1.0, (
         "a partial intraday page after the close must not inflate rvol")
 
@@ -7342,3 +7345,75 @@ def test_bug73_rvol_shows_its_inputs_in_the_message():
         "classify() and classify_approach() must both expose the inputs")
     # and reach the message on both lists
     assert body.count("_rvol_detail(r)") == 2
+
+
+def test_bug76_tradeable_flag_survives_a_blank_csv_cell():
+    """
+    THE CRASH THAT KILLED THE PAPER LEDGER. From the 07-Aug A/B run log:
+
+        ValueError: cannot convert float NaN to integer
+        ab_paper.py line 1067, in main
+            int(float(pick.get("tradeable", 1) or 0))
+
+    Both scheduled A/B runs that day died. The paper ledger - the ONLY forward
+    evidence this project has - silently stopped recording.
+
+    My BUG 55 guard defaulted a MISSING key to 1, which is right. But a row
+    written before the column existed comes back from pandas as a BLANK cell =
+    NaN, and **NaN is truthy**, so `or 0` never fires and int(float(nan))
+    raises. Unknown means "pre-flag pick", i.e. a normal live one.
+    """
+    from ab_paper import _is_tradeable
+
+    nan = float("nan")
+    # unknown in every form it can arrive -> tradeable
+    assert _is_tradeable({}) is True, "missing key = pre-BUG-55 file"
+    assert _is_tradeable({"tradeable": nan}) is True, "blank CSV cell = NaN"
+    assert _is_tradeable({"tradeable": ""}) is True
+    assert _is_tradeable({"tradeable": None}) is True
+    assert _is_tradeable({"tradeable": "junk"}) is True
+    # explicit values are honoured
+    assert _is_tradeable({"tradeable": 1}) is True
+    assert _is_tradeable({"tradeable": "1"}) is True
+    assert _is_tradeable({"tradeable": 0}) is False
+    assert _is_tradeable({"tradeable": 0.0}) is False
+
+    # the raising form must be gone from BOTH call sites
+    src = (ROOT / "ab_paper.py").read_text()
+    assert 'int(float(pick.get("tradeable", 1) or 0))' not in src
+    assert 'ap_.get("tradeable", 1) or 0' not in src
+    assert src.count("_is_tradeable(") >= 3
+
+
+def test_bug75_tests_do_not_import_undeclared_packages():
+    """
+    The suite passed locally and FAILED in CI for 10 of 12 runs on 07-Aug:
+
+        ModuleNotFoundError: No module named 'pytz'
+
+    A test had imported pytz, which is not in requirements.txt and not used
+    anywhere in production - the code uses dhan.IST (zoneinfo). A green local
+    run meant nothing; CI was red all day and I never looked.
+    """
+    import re
+
+    req = (ROOT / "requirements.txt").read_text().lower()
+    declared = set(re.findall(r"^([a-z0-9_.-]+)", req, re.M))
+    declared |= {"pandas", "numpy", "requests", "yaml", "openpyxl"}
+
+    body = (ROOT / "test_regressions.py").read_text()
+    imported = set(re.findall(r"^\s*import ([a-z0-9_]+)", body, re.M))
+    imported |= set(re.findall(r"^\s*from ([a-z0-9_]+) import", body, re.M))
+
+    stdlib = {"os", "sys", "re", "json", "math", "time", "csv", "io", "ast",
+              "glob", "shutil", "types", "typing", "pathlib", "datetime",
+              "itertools", "collections", "subprocess", "tempfile", "random",
+              "importlib", "textwrap", "hashlib", "zoneinfo", "statistics",
+              "inspect", "warnings", "contextlib", "functools", "copy",
+              "dataclasses", "logging", "threading", "unittest", "decimal",
+              "string", "uuid", "base64", "zipfile", "traceback"}
+    local = {m.stem for m in ROOT.glob("*.py")}
+    unknown = imported - declared - stdlib - local - {"pytest", "yaml"}
+    assert not unknown, (
+        f"tests import packages that are not declared dependencies: "
+        f"{sorted(unknown)} - CI will fail even though local passes")
