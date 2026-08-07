@@ -7282,3 +7282,27 @@ def test_bug71_vma_ignores_non_trading_days():
     code = "\n".join(ln for ln in body.splitlines()
                      if not ln.lstrip().startswith("#"))
     assert 'vma = float(prev["volume"].tail(50).mean())' not in code
+
+
+def test_bug72_debug_vma_is_reachable_from_the_workflow():
+    """
+    I shipped --debug-vma in btst.py and then asked the user to run it - but
+    the workflow only exposed `all` and `after_close`, so the flag was
+    unreachable from the Actions UI. Instrumentation that cannot be triggered
+    is not instrumentation.
+    """
+    import re
+
+    wf = (ROOT / ".github" / "workflows" / "btst.yml").read_text()
+    assert "debug_vma:" in wf, "the flag must be a workflow_dispatch input"
+    assert "--debug-vma" in wf, "and must be passed through to btst.py"
+
+    body = (ROOT / "btst.py").read_text()
+    assert '"--debug-vma"' in body
+    assert "def vma_debug" in body
+    # it must log the things needed to diagnose a wrong average
+    seg = body.split("def vma_debug", 1)[1][:1400]
+    for field in ("nonzero", "nan=", "zero=", "mean=", "median=", "min=", "max="):
+        assert field in seg, f"vma_debug must report {field!r}"
+    # and be off by default - zero cost when unused
+    assert "_DBG_VMA: set[str] = set()" in body
