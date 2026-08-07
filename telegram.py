@@ -53,6 +53,16 @@ class Telegram:
                         time.sleep(float(retry) + 1)
                         continue
                     log.error("telegram %s: %s", r.status_code, r.text[:300])
+                    # BUG 74: a 400/401/403 is a CONFIGURATION error - a wrong
+                    # chat_id, a revoked token, or a bot that was never added
+                    # to the group. Retrying it three times with sleeps just
+                    # burns ~3s per message and buries the real cause in
+                    # duplicate log lines. Found in the 07-Aug run log:
+                    #   telegram 400: "Bad Request: chat not found"  x3
+                    # on every single send, for the secondary destination.
+                    if r.status_code in (400, 401, 403):
+                        ok = False
+                        break
                     if attempt == 2:
                         ok = False
                 except requests.RequestException as exc:
@@ -157,9 +167,15 @@ class TelegramFanout:
             if i == 0:
                 primary_ok = ok
             elif not ok:
-                log.error("telegram %s destination did not receive the message "
-                          "(primary was fine, so no retry will be attempted)",
-                          label)
+                # BUG 74: say WHICH chat failed. "chat not found" with no id
+                # is unactionable - the 07-Aug logs repeated it on every run
+                # for weeks without ever naming the destination.
+                cid = str(getattr(client, "chat_id", "") or "unset")
+                masked = (cid[:4] + "..." + cid[-3:]) if len(cid) > 8 else cid
+                log.error("telegram %s destination FAILED (chat_id=%s). The "
+                          "primary was fine. Fix TELEGRAM_CHAT_ID_2 / "
+                          "TELEGRAM_BOT_TOKEN_2, or unset them to silence "
+                          "this.", label, masked)
         return primary_ok
 
     def send(self, text: str, disable_preview: bool = True) -> bool:
