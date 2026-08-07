@@ -60,6 +60,10 @@ on:
         description: "Post-close review: only judge completed daily candles"
         type: boolean
         default: false
+      debug_vma:
+        description: "Symbols (comma-separated) to log the raw volume window for"
+        type: string
+        default: ""
 
 concurrency:
   group: btst
@@ -100,7 +104,8 @@ jobs:
         run: |
           python btst.py \
             ${{ inputs.all && '--all' || '' }} \
-            ${{ inputs.after_close && '--after-close' || '' }}
+            ${{ inputs.after_close && '--after-close' || '' }} \
+            ${{ inputs.debug_vma && format('--debug-vma {0}', inputs.debug_vma) || '' }}
 
       - name: Commit the picks file
         if: success()
