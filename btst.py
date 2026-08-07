@@ -2064,6 +2064,12 @@ def main() -> int:
                 "close_pos": round(float(r["close_pos"]), 3),
                 "day_ret": round(float(r["day_ret"]), 2),
                 "rvol": round(float(r.get("rvol") or 0), 2),
+                # BUG 73b: the confirmed dump carries these; the anticipate
+                # file did not, so a questioned rvol here was still
+                # undiagnosable from the artifacts alone.
+                "vol_today": _num(r.get("vol_today"), 0),
+                "vma50": _num(r.get("vma50"), 0),
+                "vma_bars": _num(r.get("vma_bars"), 0),
                 "atr_pct": round(float(r["atr_pct"]), 2),
                 "mcap_cr": r.get("mcap_cr"),
                 "partial_frac": round(float(r.get("partial_frac", 1.0)), 3),
