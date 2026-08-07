@@ -1319,6 +1319,7 @@ def main() -> int:
         ltp_all = {}
 
     aged_pool = []
+    quote_failed = False
     if ltp_all:
         for s in snaps:
             if s.symbol in fired_syms:
@@ -1364,6 +1365,17 @@ def main() -> int:
                  "the close_pos>=%.2f pre-screen (of %d not fired today)",
                  in_band, AGED_EXT_MIN, AGED_EXT_MAX, len(aged_pool),
                  TIER_B_CLOSE_POS - 0.02, len(snaps) - len(fired))
+    else:
+        # BUG 68: the aged pass is built ONLY when the bulk quote returned
+        # something. If it came back empty the pool is silently zero and the
+        # scan degenerates to "names that crossed today" - which is how SBCL
+        # (already +8.2% at close_pos 1.000, but ABOVE its level since the
+        # 09:15 open, so never a fresh cross) was absent at 15:18 and present
+        # at 16:08. That must be loud, not inferred from a small number.
+        log.error("NO BULK QUOTE - the aged tier B pass was skipped entirely. "
+                  "Only names that crossed their level TODAY are in scope; "
+                  "a gap-up above the level is invisible to this run.")
+        quote_failed = True
 
     # ---- BUG 59b: A HARD DEADLINE, NOT A TIMEOUT -------------------------
     # The workflow's timeout-minutes kills the job and produces NOTHING. That
@@ -1880,8 +1892,15 @@ def main() -> int:
     # gets acted on wrongly. Each pick now states its own age.
     n_fresh = sum(1 for r in picks if r.get("fresh"))
     n_aged = len(picks) - n_fresh
+    # BUG 68: "N candle(s) checked" reports only SUCCESSES, so a small pool
+    # and a broken feed look identical. On 07-Aug the 15:18 run said "7
+    # candle(s) checked" and the 16:08 rerun said 17 - the difference was the
+    # POOL (how many names were candidates at all), not lost candles, but the
+    # message gave no way to tell. State the composition explicitly.
     lines = [f"🌙 <b>BTST — {now:%d-%b-%Y} {now:%H:%M} IST</b>",
-             f"<i>{when}, exit tomorrow · {len(rows)} candle(s) checked</i>", ""]
+             f"<i>{when}, exit tomorrow · {len(rows)} of {len(todo)} candidate(s) "
+             f"screened ({len(fired)} broke out today + {len(aged_pool)} aged"
+             f"{f', {len(snaps)} in snapshot' if not aged_pool else ''})</i>", ""]
     # BUG 55: a late run must say so at the TOP, before any price.
     if too_late:
         lines.insert(2, f"⛔ <b>TOO LATE — ran {now:%H:%M}, market closed "
@@ -1905,6 +1924,14 @@ def main() -> int:
         lines.append(f"<i>⏱ Scan stopped at the {deadline:%H:%M} deadline with "
                      f"{stopped_early} name(s) unchecked, so the list may be "
                      f"incomplete. Everything shown was fully screened.</i>")
+        lines.append("")
+    # BUG 68: a missing bulk quote silently disables the entire aged pass.
+    if quote_failed:
+        lines.append(
+            "⚠️ <b>Quote feed unavailable — aged setups were NOT scanned.</b> "
+            "<i>Only names that crossed their level today are in scope, so a "
+            "stock that gapped above its level this morning is invisible to "
+            "this run. Treat the list as partial.</i>")
         lines.append("")
     # BUG 67: never let a data outage read as a quiet market.
     if drops:

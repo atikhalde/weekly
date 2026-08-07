@@ -7118,3 +7118,32 @@ def test_bug52_prefilter_keeps_both_sides_of_the_level():
     body = (ROOT / "btst.py").read_text()
     seg = body.split("PRE-FILTER ON THE FROZEN LEVELS", 1)[1][:2000]
     assert "above" in seg and "ANTICIPATE_ABOVE_MAX" in seg
+
+
+def test_bug68_pool_composition_is_stated_and_quote_failure_is_loud():
+    """
+    THE 07-Aug DIAGNOSIS GAP. The 15:18 run reported "7 candle(s) checked"
+    and the 16:08 rerun "17" - but the message reported only SUCCESSES, so a
+    small candidate POOL and a broken feed were indistinguishable.
+
+    SBCL is the case that exposed it: it gapped ABOVE its 814 level at the
+    09:15 open (843.65), so it was never a fresh CROSS and never entered the
+    fired-today set. It could only reach the scan through the AGED tier B
+    pool - which exists only when the bulk quote returns. If that quote is
+    empty the aged pass is skipped silently and the scan degenerates to
+    "names that crossed today", with nothing in the message to say so.
+    """
+    body = (ROOT / "btst.py").read_text()
+
+    # the header must state pool composition, not just successes
+    assert "candidate(s) \"" in body or "candidate(s) " in body, (
+        "the message must say how many candidates existed, not only how many "
+        "produced a candle")
+    assert "{len(todo)} candidate(s)" in body
+    assert "broke out today + {len(aged_pool)} aged" in body
+
+    # a missing quote must be loud in the log AND the message
+    assert "quote_failed = True" in body
+    assert "NO BULK QUOTE" in body, "a skipped aged pass must be an ERROR"
+    assert "aged setups were NOT scanned" in body, (
+        "the user must be told the aged pass was skipped")
