@@ -707,6 +707,35 @@ def repair_today_bar(df: pd.DataFrame, quote: dict | None,
     return df
 
 
+def vma_debug(prev: pd.DataFrame, symbol: str, n: int = 50) -> None:
+    """
+    BUG 72 INSTRUMENTATION. Log exactly what the volume window contains.
+
+    I have now been wrong TWICE about SONACOMS reporting rvol 3.0x when an
+    independent 50-day average says 1.56x. First I blamed the partial-candle
+    fraction (BUG 70); it was not that. Then I blamed zero-volume rows in the
+    window (BUG 71); the fix went live and the number did not move, so it is
+    not that either.
+
+    Both times I inferred a mechanism from the symptom instead of looking at
+    the input. This prints the actual window so the next diagnosis is made
+    from data. Enabled by --debug-vma; costs nothing when off.
+    """
+    if "volume" not in prev or prev.empty:
+        log.info("VMA %s: no volume column", symbol)
+        return
+    v = pd.to_numeric(prev["volume"], errors="coerce")
+    w = v.tail(n)
+    nz = w[w > 0]
+    log.info("VMA %s: window=%d nonzero=%d nan=%d zero=%d "
+             "mean=%.0f median=%.0f min=%.0f max=%.0f first=%s last=%s",
+             symbol, len(w), len(nz), int(w.isna().sum()), int((w == 0).sum()),
+             nz.mean() if len(nz) else 0, nz.median() if len(nz) else 0,
+             nz.min() if len(nz) else 0, nz.max() if len(nz) else 0,
+             f"{w.iloc[0]:.0f}" if len(w) else "-",
+             f"{w.iloc[-1]:.0f}" if len(w) else "-")
+
+
 def _vma50(prev: pd.DataFrame, n: int = 50) -> float:
     """
     Average daily volume over the last `n` bars that ACTUALLY TRADED.
@@ -733,6 +762,9 @@ def _vma50(prev: pd.DataFrame, n: int = 50) -> float:
     v = pd.to_numeric(prev["volume"], errors="coerce")
     v = v[v > 0].tail(n)
     return float(v.mean()) if len(v) else 0.0
+
+
+_DBG_VMA: set[str] = set()
 
 
 def session_fraction(now_ist, n_bars: int | None = None) -> float:
@@ -914,7 +946,8 @@ def breakout_age(daily: pd.DataFrame, level: float,
 
 
 def classify(daily: pd.DataFrame, level: float,
-             partial_frac: float = 1.0, age: int | None = None) -> dict | None:
+             partial_frac: float = 1.0, age: int | None = None,
+             dbg_symbol: str = "") -> dict | None:
     """
     Score today's breakout candle. Returns None when it cannot be judged.
 
@@ -944,6 +977,8 @@ def classify(daily: pd.DataFrame, level: float,
         return None
 
     prev = d.iloc[:-1]
+    if _DBG_VMA and str(dbg_symbol or '').upper() in _DBG_VMA:
+        vma_debug(prev, str(dbg_symbol))
     vma = _vma50(prev)
     # Pro-rate the benchmark when today's candle is still forming.
     frac = min(max(float(partial_frac), 0.05), 1.0)
@@ -1089,7 +1124,8 @@ def _pre_score_from_daily(d: pd.DataFrame, level: float, px: float) -> tuple[int
 
 
 def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
-                      partial_frac: float = 1.0) -> dict | None:
+                      partial_frac: float = 1.0,
+                      dbg_symbol: str = "") -> dict | None:
     """
     Score a name that has NOT yet broken out, for the anticipation model.
 
@@ -1147,6 +1183,8 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
         "D" if level == level_d else "C")
 
     prev = d.iloc[:-1]
+    if _DBG_VMA and str(dbg_symbol or '').upper() in _DBG_VMA:
+        vma_debug(prev, str(dbg_symbol))
     vma = _vma50(prev)
     frac = min(max(float(partial_frac), 0.05), 1.0)
     vma_cmp = vma * frac
@@ -1235,6 +1273,9 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--debug-vma", default="",
+                    help="comma-separated symbols: log the raw 50-bar volume "
+                         "window used for rvol (BUG 72 instrumentation)")
     ap.add_argument("--all", action="store_true",
                     help="list every breakout with its tier, not just A/B")
     ap.add_argument("--after-close", action="store_true",
@@ -1248,6 +1289,10 @@ def main() -> int:
 
     cfg = load_config(args.config)
     now = datetime.now(IST)
+    dbg_vma = {x.strip().upper() for x in (args.debug_vma or '').split(',') if x.strip()}
+    if dbg_vma:
+        globals()['_DBG_VMA'] = dbg_vma
+        log.info('BUG 72: logging the raw volume window for %s', ', '.join(sorted(dbg_vma)))
     week_s = str(week_start_of(now.date()).date())
 
     # ---- BUG 55: THE ENTRY WINDOW IS HARD ---------------------------------
@@ -1615,7 +1660,8 @@ def main() -> int:
         # never disagree about what "today" means. For the aged pool the age
         # is measured from the daily closes.
         age = 0 if s.symbol in fired_syms else breakout_age(df, s.entry_level)
-        return s, classify(df, s.entry_level, partial_frac=frac, age=age)
+        return s, classify(df, s.entry_level, partial_frac=frac, age=age,
+                           dbg_symbol=s.symbol)
 
     def candle(s):
         """(daily frame incl. today's partial bar, elapsed fraction) or None."""
@@ -1920,7 +1966,8 @@ def main() -> int:
             if df is None:
                 return s, None
             return s, classify_approach(df, s.entry_level, s.hi_short2,
-                                        partial_frac=frac)
+                                        partial_frac=frac,
+                                        dbg_symbol=s.symbol)
 
         # BUG 61: same completion-order guard as the confirmed pass.
         ant_res, ant_stopped = run_until(
