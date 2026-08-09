@@ -151,6 +151,12 @@ MIN_ATR_PCT = 3.0
 # 420 calendar days ~= 288 trading days, which clears 252 with margin for a
 # long holiday run. The cost is a slightly larger daily-history payload per
 # symbol, not an extra request.
+from pathlib import Path
+
+# Matches models.yaml defaults, so the scorecard's "net" means the same thing
+# the paper ledger means.
+COST_ROUND_TRIP = 0.22
+
 HISTORY_DAYS = 420
 
 # BUG 66: wall-clock budget for a POST-CLOSE / --after-close review run, which
@@ -1321,6 +1327,132 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
     return m
 
 
+# --------------------------------------------------------------------------- #
+#  BUG 79 - THE SCORECARD: what happened to the LAST picks?
+#
+#  The alert has always quoted five-year averages ("+3.04%/trade, 65% win") and
+#  never once said what YESTERDAY'S picks actually did. That is the number a
+#  human uses to calibrate trust, and it was the one number missing - you had
+#  to hold the previous message in your head and look each name up by hand.
+#
+#  This reads the picks files the scan itself wrote, fetches the next daily
+#  close, and reports the realised move. It is graded against what was
+#  RECORDED, not re-derived: the entry price is the one in the CSV, so the
+#  scorecard cannot flatter itself by silently re-picking a better entry.
+#
+#  Rows with tradeable=0 (BUG 55: the scan ran after the close) are shown but
+#  marked, and excluded from the totals - counting a fill that was never
+#  available would be lying to ourselves in the one place it matters most.
+# --------------------------------------------------------------------------- #
+def _prior_session_picks(pfile: Path, today: str, back: int = 1) -> tuple[str, list]:
+    """The most recent picks DATE strictly before `today`, and its rows."""
+    if not pfile.exists():
+        return "", []
+    try:
+        df = pd.read_csv(pfile)
+    except Exception:
+        return "", []
+    if df.empty or "date" not in df:
+        return "", []
+    dates = sorted({str(d)[:10] for d in df["date"] if str(d)[:10] < today})
+    if not dates:
+        return "", []
+    d = dates[-min(back, len(dates))]
+    return d, df[df["date"].astype(str).str[:10] == d].to_dict("records")
+
+
+def score_prior_picks(cfg, client, now, caps) -> list[str]:
+    """
+    Telegram lines grading the previous session's picks on their realised
+    next-day EOD move. Returns [] when there is nothing to grade.
+
+    Never raises: a scorecard is a nice-to-have and must not be able to stop
+    tonight's alert from going out.
+    """
+    out: list[str] = []
+    today = f"{now:%Y-%m-%d}"
+    try:
+        for fname, label in ((PICKS_FILE, "BTST"),
+                             (ANTICIPATE_FILE, "ANTICIPATE")):
+            pdate, rows = _prior_session_picks(cfg.paths["root"] / fname, today)
+            if not rows:
+                continue
+
+            graded, skipped = [], 0
+            for r in rows:
+                sym = str(r.get("symbol", "")).strip()
+                try:
+                    entry = float(r.get("entry"))
+                except (TypeError, ValueError):
+                    continue
+                if not sym or entry <= 0:
+                    continue
+                # BUG 55: a pick the scan produced after the close was never
+                # enterable. Show it, but never count it.
+                try:
+                    tr = float(r.get("tradeable", 1))
+                    if tr == tr and int(tr) == 0:
+                        skipped += 1
+                        continue
+                except (TypeError, ValueError):
+                    pass
+
+                snap = next((x for x in (SNAPS_CACHE or [])
+                             if x.symbol == sym), None)
+                if snap is None:
+                    continue
+                try:
+                    df = client.daily_candles(
+                        str(snap.security_id), snap.exchange_segment,
+                        pd.Timestamp(pdate).date() - timedelta(days=10),
+                        now.date())
+                except DhanError:
+                    continue
+                if df is None or df.empty:
+                    continue
+                after = df[pd.to_datetime(df["datetime"]).dt.strftime("%Y-%m-%d")
+                           > pdate]
+                if after.empty:
+                    continue                      # exit bar not printed yet
+                nxt = float(after.iloc[0]["close"])
+                gross = (nxt / entry - 1) * 100.0
+                graded.append((sym, entry, nxt, gross,
+                               gross - COST_ROUND_TRIP,
+                               str(r.get("tier", "") or r.get("side", ""))))
+
+            if not graded and not skipped:
+                continue
+
+            head = f"📊 <b>{label} scorecard — {pdate}</b>"
+            if not graded:
+                out += [head, f"<i>{skipped} pick(s) were not tradeable "
+                              f"(scan ran after the close), so nothing to "
+                              f"grade.</i>", ""]
+                continue
+
+            nets = [g[4] for g in graded]
+            wins = sum(1 for n in nets if n > 0)
+            avg = sum(nets) / len(nets)
+            out.append(head)
+            for sym, entry, nxt, gross, net, tag in graded:
+                mark = "🟢" if net > 0 else ("⚪" if abs(net) < 0.01 else "🔴")
+                t = f" <i>{tag}</i>" if tag else ""
+                out.append(f"{mark} <b>{_esc(sym)}</b>{t}  {_fmt(entry)} → "
+                           f"{_fmt(nxt)}  <b>{net:+.2f}%</b> <i>net</i>")
+            out.append(f"<i>{wins}/{len(graded)} green · average "
+                       f"<b>{avg:+.2f}%</b> net of {COST_ROUND_TRIP}% costs"
+                       + (f" · {skipped} untradeable excluded" if skipped else "")
+                       + "</i>")
+            out.append("")
+    except Exception as exc:                                  # noqa: BLE001
+        log.warning("scorecard skipped: %s", str(exc)[:160])
+        return []
+    return out
+
+
+SNAPS_CACHE: list = []
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -1385,6 +1517,7 @@ def main() -> int:
                     "reliable this early", f"{now:%H:%M}", f"{entry_open:%H:%M}")
 
     snaps = load_snapshots(cfg, week_s)
+    globals()['SNAPS_CACHE'] = snaps or []
     if not snaps:
         # BUG 49: fail loudly. A BTST scan that finds nothing because the
         # snapshot is stale looks identical to a genuinely quiet day.
@@ -2115,6 +2248,12 @@ def main() -> int:
                         "flagged this early still qualify at the close. Wait "
                         "for the 15:20 list before acting.</i>")
         lines.insert(4, "")
+    # BUG 79: how did the LAST set of picks actually do? Placed before
+    # tonight's list, because a result you can check is worth more than an
+    # average you have to trust.
+    _sc = score_prior_picks(cfg, client, now, caps)
+    if _sc:
+        lines += ["━━━━━━━━━━━━━━━━━━━━"] + _sc
     lines.insert(2 if not (too_late or too_early) else 5,
                  "🔥 <b>CONFIRMED — today's setups</b>")
     lines.insert(3 if not (too_late or too_early) else 6, "")
