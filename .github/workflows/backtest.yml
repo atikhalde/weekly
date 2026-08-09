@@ -1,0 +1,90 @@
+name: BTST Backtest (on demand)
+
+# Replay the LIVE BTST tier logic over history and print every trade, so any
+# number quoted in the alert can be checked against the setups behind it.
+#
+# WHY IT IS MANUAL ONLY
+# This downloads ~2,100 symbols of daily history and replays every day of it.
+# It takes 15-30 minutes and answers a research question, not a trading one.
+# Nothing here places orders, sends alerts, or writes to state.json /
+# btst_picks.csv / ab_ledger.csv - it is strictly read-only against the live
+# system, so it can never corrupt a paper record or fire a false signal.
+#
+# WHAT IT PROVES
+# btst_backtest.py imports classify(), exhausted(), conviction() and every
+# threshold from btst.py rather than restating them. Change TIER_B_CLOSE_POS
+# in btst.py and this run changes with it. A backtest that keeps its own copy
+# of the rule measures a different rule the moment either side drifts.
+#
+# The trade list is uploaded as an artifact (CSV) and the summary is printed
+# in the job log, so "show me the trades behind +3.04%" has an answer.
+
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: "Years of history to replay"
+        type: choice
+        default: "2"
+        options: ["1", "2", "3", "5"]
+      symbol:
+        description: "Single symbol (e.g. SBCL) - blank = whole universe"
+        type: string
+        default: ""
+      from_date:
+        description: "Start date YYYY-MM-DD (overrides years)"
+        type: string
+        default: ""
+      to_date:
+        description: "End date YYYY-MM-DD (blank = today)"
+        type: string
+        default: ""
+      trades:
+        description: "Print the individual trade list in the log"
+        type: boolean
+        default: true
+
+concurrency:
+  group: btst-backtest
+  cancel-in-progress: true
+
+permissions:
+  contents: read           # read-only: this must never mutate the repo
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    # A full 5-year, 2,100-symbol replay is the worst case. Generous, because
+    # being killed halfway wastes the whole download.
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Replay the live BTST rule over history
+        run: |
+          python btst_backtest.py \
+            --years "${{ inputs.years || '2' }}" \
+            ${{ inputs.symbol && format('--symbol {0}', inputs.symbol) || '' }} \
+            ${{ inputs.from_date && format('--from {0}', inputs.from_date) || '' }} \
+            ${{ inputs.to_date && format('--to {0}', inputs.to_date) || '' }} \
+            ${{ inputs.trades && '--trades' || '' }} \
+            --top 200 \
+            --csv btst_backtest_trades.csv
+
+      - name: Upload the trade list
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btst-backtest
+          path: btst_backtest_trades.csv
+          if-no-files-found: warn
+          retention-days: 30
