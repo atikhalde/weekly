@@ -7513,3 +7513,82 @@ def test_bug78_backtest_reuses_the_live_rule_and_never_writes():
     assert "schedule:" not in wf, "a 30-minute research job must not be scheduled"
     assert "contents: read" in wf, "the backtest workflow must be read-only"
     assert "git push" not in wf and "git commit" not in wf
+
+
+def test_bug79_scorecard_grades_the_previous_picks():
+    """
+    The alert quoted five-year averages and never said what YESTERDAY'S picks
+    did - the one number a human uses to calibrate trust, and the only one
+    that required holding the last message in your head.
+
+    Graded against what was RECORDED: the entry comes from the picks CSV, so
+    the scorecard cannot flatter itself by silently re-picking a better fill.
+    Rows with tradeable=0 (BUG 55 - scan ran after the close) are excluded
+    from the totals; counting a fill that never existed is the one place
+    self-deception actually costs money.
+    """
+    import types
+    from pathlib import Path
+
+    import pandas as pd
+
+    import btst
+
+    tmp = Path("/tmp/_sc_test")
+    tmp.mkdir(exist_ok=True)
+    pd.DataFrame([
+        dict(date="2026-08-04", symbol="MOREPENLAB", tier="A",
+             entry=69.18, tradeable=1),
+        dict(date="2026-08-04", symbol="RBA", tier="B",
+             entry=84.91, tradeable=1),
+        dict(date="2026-08-04", symbol="LATE", tier="B",
+             entry=100.0, tradeable=0),
+    ]).to_csv(tmp / btst.PICKS_FILE, index=False)
+
+    class Snap:
+        def __init__(self, sym):
+            self.symbol = sym
+            self.security_id = "1"
+            self.exchange_segment = "NSE_EQ"
+
+    btst.SNAPS_CACHE = [Snap("MOREPENLAB"), Snap("RBA"), Snap("LATE")]
+    closes = {"MOREPENLAB": 76.95, "RBA": 87.74}
+
+    class Client:
+        def __init__(self):
+            self.order = ["MOREPENLAB", "RBA"]
+            self.i = 0
+
+        def daily_candles(self, sid, seg, a, b):
+            if self.i >= len(self.order):
+                raise btst.DhanError("no data")
+            sym = self.order[self.i]
+            self.i += 1
+            return pd.DataFrame([{"datetime": pd.Timestamp("2026-08-05"),
+                                  "close": closes[sym]}])
+
+    cfg = types.SimpleNamespace(paths={"root": tmp})
+    now = pd.Timestamp("2026-08-05 15:20", tz="Asia/Kolkata")
+    out = "\n".join(btst.score_prior_picks(cfg, Client(), now, {}))
+
+    # realised next-day EOD move, net of costs
+    assert "+11.01%" in out, "MOREPENLAB 69.18 -> 76.95 net of 0.22%"
+    assert "+3.11%" in out, "RBA 84.91 -> 87.74 net of 0.22%"
+    assert "2/2 green" in out
+    assert "+7.06%" in out
+    # the untradeable pick must be excluded, and said so
+    assert "1 untradeable excluded" in out
+    assert "LATE" not in out.replace("TOO LATE", "")
+
+    # it must never be able to break the alert
+    class Boom:
+        def daily_candles(self, *a, **k):
+            raise RuntimeError("boom")
+
+    assert btst.score_prior_picks(cfg, Boom(), now, {}) == []
+    bad = types.SimpleNamespace(paths={"root": Path("/tmp/_nope_")})
+    assert btst.score_prior_picks(bad, Client(), now, {}) == []
+
+    # wired into the message
+    body = (ROOT / "btst.py").read_text()
+    assert "score_prior_picks(cfg, client, now, caps)" in body
