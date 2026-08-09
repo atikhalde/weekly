@@ -7467,3 +7467,49 @@ def test_bug77_every_picks_field_survives_a_blank_cell():
                      if not ln.lstrip().startswith("#"))
     bad = re.findall(r'int\(float\([a-z_]+\.get\([^)]*\)\s*or\s*0\)\)', code)
     assert not bad, f"unsafe NaN-truthy reads remain in CODE: {bad}"
+
+
+def test_bug78_backtest_reuses_the_live_rule_and_never_writes():
+    """
+    The backtest must MEASURE THE SHIPPED RULE, not a copy of it.
+
+    A backtest that restates thresholds measures a different rule the moment
+    either copy changes, and it drifts in the flattering direction because
+    nobody re-checks a green number. btst_backtest.py therefore imports
+    classify() / exhausted() / conviction() and every constant from btst.py.
+
+    It must also be strictly READ-ONLY against the live system: no Telegram,
+    no state.json, no picks files, no ledger. A research tool that can fire an
+    alert or corrupt a paper record is a liability.
+    """
+    src = (ROOT / "btst_backtest.py").read_text()
+
+    # it uses the live entry points
+    assert "import btst" in src
+    for fn in ("btst.classify(", "btst.breakout_age(", "btst.conviction("):
+        assert fn in src, f"backtest must call the live {fn}"
+    # and the live thresholds, not its own
+    for k in ("btst.TIER_A_DAY", "btst.TIER_B_CLOSE_POS", "btst.AGED_EXT_MIN"):
+        assert k in src, f"backtest must read {k} from btst.py"
+    # it must NOT define its own copies
+    import re
+    for bad in (r"^TIER_A_DAY\s*=", r"^TIER_B_CLOSE_POS\s*=", r"^TIER_B_RVOL\s*="):
+        assert not re.search(bad, src, re.M), (
+            "the backtest must not restate a live threshold")
+
+    # strictly read-only
+    for bad in ("build_telegram", "send(", "state.json", "AlertState"):
+        assert bad not in src, f"the backtest must not touch {bad}"
+    for bad in ("btst_picks.csv", "ab_ledger.csv", "anticipate_picks.csv"):
+        assert bad not in src, f"the backtest must not write {bad}"
+
+    # the outcome must be read AFTER the decision - never the same bar
+    assert "close[j + 1]" in src, "exit must be the NEXT day's close"
+    assert "hist = d.iloc[:j + 1]" in src, (
+        "classify() must only see bars up to and including the decision day")
+
+    # the workflow is manual-only and cannot mutate the repo
+    wf = (ROOT / ".github" / "workflows" / "backtest.yml").read_text()
+    assert "schedule:" not in wf, "a 30-minute research job must not be scheduled"
+    assert "contents: read" in wf, "the backtest workflow must be read-only"
+    assert "git push" not in wf and "git commit" not in wf
