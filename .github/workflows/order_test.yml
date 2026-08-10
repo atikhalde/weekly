@@ -1,0 +1,55 @@
+name: Dhan Order Test (on demand)
+
+# Test the live connection to DhanHQ v2 API, verify Order/Trade books,
+# and validate order routing with a micro test order (Quantity = 1).
+#
+# Safe: Can be run in read-only mode or with a micro limit/market order.
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: "Symbol to test (blank = reads today's paper trade picks)"
+        type: string
+        default: ""
+      read_only:
+        description: "Read-only mode (inspect order/trade books without placing orders)"
+        type: boolean
+        default: true
+      limit_order:
+        description: "Use Limit order at LTP instead of Market order"
+        type: boolean
+        default: false
+
+concurrency:
+  group: order-test
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test_gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Test DhanHQ Order Gateway
+        env:
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+        run: |
+          python order_test.py \
+            ${{ inputs.symbol && format('--symbol {0}', inputs.symbol) || '' }} \
+            ${{ inputs.read_only && '--read-only' || '' }} \
+            ${{ inputs.limit_order && '--limit-order' || '' }}
