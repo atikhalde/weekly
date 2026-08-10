@@ -1087,8 +1087,13 @@ def main() -> int:
                                         # Older files have no column -> 1.
                                         if not _is_tradeable(ap_):
                                             continue
+                                        if (m.strategy.get("anticipate_mode") == "only"
+                                                or m.key == "F_anticipate_only"):
+                                            # Anticipated ONLY: skip if it qualified for confirmed BTST at 15:20
+                                            if picks_lookup.get((day_key, sig.symbol)) is not None:
+                                                continue
                                         sig.price = float(ap_["entry"])
-                                        sig.btst_tier = "F"
+                                        sig.btst_tier = "F_only" if (m.key == "F_anticipate_only") else "F"
                                         sig.btst_day_ret = _f(ap_, "day_ret", 0.0)
                                         sig.btst_rank = int(_f(ap_, "rank", 0.0))
                                         sig.btst_source = "anticipate"
@@ -1098,7 +1103,7 @@ def main() -> int:
                                         rec["model"] = m.key
                                         rec["model_label"] = m.label
                                         rec["horizon"] = m.horizon
-                                        rec["btst_tier"] = "F"
+                                        rec["btst_tier"] = sig.btst_tier
                                         rec["btst_day_ret"] = sig.btst_day_ret
                                         rec["btst_rank"] = sig.btst_rank
                                         rec["btst_source"] = "anticipate"

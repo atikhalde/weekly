@@ -77,6 +77,7 @@ from strategy import build_weekly_bars         # noqa: E402
 
 DATA_DIR = os.environ.get("BTST_BACKTEST_DATA", "/tmp/daily")
 COST_ROUND_TRIP = 0.22          # matches models.yaml defaults
+DEFAULT_CAPITAL = 100000.0      # Rs 1,00,000 per trade
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/120.0 Safari/537.36"}
@@ -238,6 +239,12 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
         entry = close[j]
         nxt = close[j + 1]
         gross = (nxt / entry - 1) * 100.0
+        qty = int(DEFAULT_CAPITAL // entry) if entry > 0 else 0
+        invested = round(qty * entry, 2)
+        gross_pnl = round((nxt - entry) * qty, 2)
+        turnover = (entry + nxt) * qty
+        costs = round(turnover * (COST_ROUND_TRIP / 100.0) / 2.0, 2)
+        net_pnl = round(gross_pnl - costs, 2)
 
         # Confirmed BTST trade
         if want_btst and is_btst:
@@ -248,8 +255,11 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
                 tier=m_btst["tier"],
                 arm=("fresh_A" if m_btst.get("fresh") and m_btst["tier"] == "A"
                      else "fresh_B" if m_btst.get("fresh") else "aged_B"),
-                age=int(m_btst.get("age", 0)), entry=round(entry, 2),
-                exit=round(nxt, 2), level=round(float(level_c), 2),
+                age=int(m_btst.get("age", 0)),
+                qty=qty, invested=invested,
+                entry=round(entry, 2), exit=round(nxt, 2),
+                gross_pnl=gross_pnl, costs=costs, net_pnl=net_pnl,
+                level=round(float(level_c), 2),
                 day_ret=round(m_btst["day_ret"], 2),
                 close_pos=round(m_btst["close_pos"], 3),
                 rvol=round(float(m_btst.get("rvol") or 0), 2),
@@ -277,8 +287,11 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
                 mode="anticipated_only" if (not is_btst) else "anticipated",
                 tier=tier_name,
                 arm=arm,
-                age=0, entry=round(entry, 2),
-                exit=round(nxt, 2), level=round(float(m_ant.get("level", level_c)), 2),
+                age=0,
+                qty=qty, invested=invested,
+                entry=round(entry, 2), exit=round(nxt, 2),
+                gross_pnl=gross_pnl, costs=costs, net_pnl=net_pnl,
+                level=round(float(m_ant.get("level", level_c)), 2),
                 day_ret=round(m_ant.get("day_ret", 0.0), 2),
                 close_pos=round(m_ant.get("close_pos", 0.0), 3),
                 rvol=round(float(m_ant.get("rvol") or 0), 2),
@@ -315,20 +328,24 @@ def _pf(v: pd.Series) -> float:
 
 def _stats(x: pd.DataFrame, label: str) -> str:
     if x.empty:
-        return f"{label:<20}{'-':>8}"
+        return f"{label:<20}{'-':>7}"
     v = x.net_pct
+    pnl = x.net_pnl if "net_pnl" in x.columns else v * 1000.0
     t = v.mean() / (v.std(ddof=1) / np.sqrt(len(v))) if len(v) > 2 else float("nan")
     wks = max((pd.to_datetime(x.date).max() - pd.to_datetime(x.date).min()).days / 7, 1)
-    return (f"{label:<20}{len(v):>8,}{len(v)/wks:>7.1f}{(v>0).mean()*100:>8.1f}"
-            f"{v.mean():>+10.3f}{v.median():>+9.2f}{_pf(v):>7.2f}{t:>7.1f}"
-            f"{(v>=5).mean()*100:>8.1f}{v.min():>9.1f}{v.max():>9.1f}")
+    tot_pnl = float(pnl.sum())
+    avg_pnl = float(pnl.mean())
+    return (f"{label:<20}{len(v):>7,}{len(v)/wks:>6.1f}{(v>0).mean()*100:>7.1f}"
+            f"{v.mean():>+8.2f}%{v.median():>+7.1f}%{_pf(v):>6.2f}{t:>6.1f}"
+            f"{(v>=5).mean()*100:>7.1f}%{tot_pnl:>+13,.0f}{avg_pnl:>+9,.0f}")
 
 
-HDR = (f"{'slice':<20}{'trades':>8}{'/wk':>7}{'win%':>8}{'mean':>10}"
-       f"{'med':>9}{'PF':>7}{'t':>7}{'P(+5%)':>8}{'worst':>9}{'best':>9}")
+HDR = (f"{'slice':<20}{'trades':>7}{'/wk':>6}{'win%':>7}{'mean%':>9}"
+       f"{'med%':>8}{'PF':>6}{'t':>6}{'P(+5%)':>8}{'Net PnL (Rs)':>13}{'Avg Rs':>9}")
 
 
-def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst") -> None:
+def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
+           capital: float = DEFAULT_CAPITAL) -> None:
     if df.empty:
         print(f"\nNo {mode} setups in this window.")
         return
@@ -341,13 +358,15 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst") ->
         "all": "CONFIRMED BTST + ANTICIPATED",
     }.get(mode, mode.upper())
 
-    print("\n" + "=" * 108)
+    tot_net_rs = df.net_pnl.sum() if "net_pnl" in df.columns else df.net_pct.sum() * (capital / 100.0)
+
+    print("\n" + "=" * 115)
     print(f"BTST / ANTICIPATION BACKTEST ({mode_label}) - the LIVE rule replayed over history")
-    print("=" * 108)
+    print("=" * 115)
     print(f"window      {df.date.min()} .. {df.date.max()}")
+    print(f"capital     Rs {capital:,.0f} per trade")
     print(f"names hit   {df.symbol.nunique():,} distinct symbols produced a setup")
-    print(f"cost        {COST_ROUND_TRIP}% round trip, entry = daily close, "
-          f"exit = next close")
+    print(f"net p&l     Rs {tot_net_rs:>+,.0f} (across {len(df):,} trades, net of {COST_ROUND_TRIP}% round trip)")
     print(f"thresholds  TIER_A day>={btst.TIER_A_DAY:g}% cp>={btst.TIER_A_CLOSE_POS} | "
           f"TIER_B cp>={btst.TIER_B_CLOSE_POS} rvol>={btst.TIER_B_RVOL:g} "
           f"atr>={btst.TIER_B_ATR:g}%")
@@ -391,7 +410,7 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst") ->
         print(_stats(g, f"  {y}"))
 
     # a top-5/day book, which is what actually gets traded
-    print("\nTOP-5 PER DAY (the traded book)")
+    print("\nTOP-5 PER DAY (the traded book: Rs 1,00,000 per position)")
     r = df.copy()
     r["_k"] = ((r.arm == "fresh_A") * 300 + (r.arm == "aged_B") * 200
                + (r.arm.str.startswith("ant_")) * 100
@@ -400,29 +419,32 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst") ->
     print(HDR)
     print(_stats(book, "  top-5/day"))
     day = book.groupby("date").net_pct.mean()
+    day_pnl = book.groupby("date").net_pnl.sum() if "net_pnl" in book.columns else day * 1000.0
     eq = (1 + day / 100).cumprod()
     dd = (eq / eq.cummax() - 1).min() * 100
-    print(f"\n  active days {len(day):,}   mean day {day.mean():+.3f}%   "
-          f"max drawdown {dd:.1f}%   worst day {day.min():+.2f}%")
+    print(f"\n  active days {len(day):,}   total net Rs {day_pnl.sum():>+,.0f}   "
+          f"mean day {day.mean():+.3f}% (Rs {day_pnl.mean():>+,.0f}/day)   "
+          f"max drawdown {dd:.1f}%   worst day {day.min():+.2f}% (Rs {day_pnl.min():>+,.0f})")
 
     if show_trades:
-        print("\n" + "=" * 108)
-        print(f"TRADES (most recent {top})")
-        print("=" * 108)
-        print(f"{'date':<12}{'symbol':<13}{'tier':<12}{'arm':<11}{'age':>4}"
-              f"{'entry':>9}{'exit':>9}{'day%':>7}{'rvol':>6}{'pre':>4}{'btst':>5}{'net%':>8}")
+        print("\n" + "=" * 115)
+        print(f"TRADES (most recent {top}) — Rs {capital:,.0f} per trade")
+        print("=" * 115)
+        print(f"{'date':<12}{'symbol':<12}{'tier':<10}{'qty':>5}{'entry':>9}{'exit':>9}"
+              f"{'day%':>6}{'rvol':>5}{'pre':>4}{'net%':>7}{'Net P&L (Rs)':>14}")
         for r_ in df.tail(top).itertuples():
-            btst_tag = getattr(r_, "btst_qualified", "-")
+            pnl_str = f"{r_.net_pnl:>+13,.0f}" if hasattr(r_, "net_pnl") else f"{r_.net_pct*1000:>+13,.0f}"
+            qty_val = getattr(r_, "qty", int(capital // r_.entry))
             pre_val = getattr(r_, "pre", 0)
-            print(f"{r_.date:<12}{r_.symbol:<13}{r_.tier:<12}{r_.arm:<11}{r_.age:>4}"
-                  f"{r_.entry:>9.2f}{r_.exit:>9.2f}{r_.day_ret:>7.1f}"
-                  f"{r_.rvol:>6.1f}{pre_val:>4}{btst_tag:>5}{r_.net_pct:>+8.2f}")
+            print(f"{r_.date:<12}{r_.symbol:<12}{r_.tier:<10}{qty_val:>5d}"
+                  f"{r_.entry:>9.2f}{r_.exit:>9.2f}{r_.day_ret:>6.1f}{r_.rvol:>5.1f}"
+                  f"{pre_val:>4}{r_.net_pct:>+6.2f}%{pnl_str}")
 
-    print("\n" + "-" * 108)
+    print("\n" + "-" * 115)
     print("Entry is the DAILY CLOSE; the live scan buys ~15:20 on a partial "
           "candle (~0.14% cheaper), so this is mildly pessimistic.")
-    print("Yahoo daily data, not Dhan - per-symbol volume can differ, so "
-          "counts may not match live exactly.")
+    print(f"Capital sized at Rs {capital:,.0f} per trade; costs charged at {COST_ROUND_TRIP}% round trip.")
+    print("Yahoo daily data, not Dhan - per-symbol volume can differ, so counts may not match live exactly.")
     print("One regime (2021-2026). Past results are not forward validation.")
 
 
@@ -430,6 +452,8 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst") ->
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--capital", type=float, default=DEFAULT_CAPITAL,
+                    help="rupees deployed per trade (default 1,00,000)")
     ap.add_argument("--mode", choices=["btst", "anticipated", "anticipated_only", "all"],
                     default="btst",
                     help="btst (default): confirmed breakouts | "
@@ -497,7 +521,7 @@ def main() -> int:
     print(f"replayed {len(files):,} symbols in {time.time()-t0:.0f}s -> "
           f"{len(df):,} setups")
 
-    report(df, args.trades or bool(args.symbol), args.top, mode=args.mode)
+    report(df, args.trades or bool(args.symbol), args.top, mode=args.mode, capital=args.capital)
 
     if args.csv and not df.empty:
         df.sort_values("date").to_csv(args.csv, index=False)

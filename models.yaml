@@ -353,7 +353,40 @@ models:
       max_ext_above_level: 0.0
       min_weekly_vol_x: 0.0
       one_per_week: true
-      anticipate_only: true     # trade anticipate_picks.csv, not breakouts
+      anticipate_only: true     # trade anticipate_picks.csv
+      anticipate_mode: "all"    # all anticipated setups
+      btst_top_n: 5
+    exit:
+      rule: "btst"
+      stop_pct: 1.0
+      take_pct: 2.0
+      hold_days: 5
+
+  # ---------------------------------------------------------------------------
+  #  MODEL F-only - "ANTICIPATED ONLY (NON-BTST)"
+  #
+  #  Trades only anticipation picks that did NOT qualify for confirmed BTST at 15:20.
+  #  Pure pre-breakout setups that have not yet fired as Tier A/B breakouts.
+  # ---------------------------------------------------------------------------
+  F_anticipate_only:
+    label: "F-only · ANTICIPATE ONLY (non-BTST setups, 1% stop)"
+    horizon: swing
+    hold_days: 5
+    strategy:
+      strict_entry: true
+      drop_c09: true
+      gate_tolerance: 0
+      volume_mode: "off"
+      require_c03: false
+      require_c11: false
+      rvol_mode: "off"
+      bar_rvol_min: 0.0
+      min_atr_pct: 0.0
+      max_ext_above_level: 0.0
+      min_weekly_vol_x: 0.0
+      one_per_week: true
+      anticipate_only: true
+      anticipate_mode: "only"   # only setups that did NOT qualify for BTST at 15:20
       btst_top_n: 5
     exit:
       rule: "btst"
