@@ -48,6 +48,8 @@ jobs:
         env:
           DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
           DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          HTTPS_PROXY: ${{ secrets.HTTPS_PROXY }}
+          HTTP_PROXY: ${{ secrets.HTTPS_PROXY }}
         run: |
           python order_test.py \
             ${{ inputs.symbol && format('--symbol {0}', inputs.symbol) || '' }} \

@@ -97,6 +97,16 @@ def run_dhan_order_test(cfg, symbol: str | None = None, read_only: bool = False,
     })
 
     # 1. Resolve Symbols to Trade
+    proxy_url = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if proxy_url:
+        masked_proxy = proxy_url.split("@")[-1] if "@" in proxy_url else proxy_url
+        print(f"✓ Static Outbound Proxy: Active ({masked_proxy})")
+    try:
+        source_ip = session.get("https://api.ipify.org", timeout=8).text.strip()
+        print(f"✓ Outbound Source IP (seen by Dhan): {source_ip}")
+    except Exception:
+        print("ℹ️ Source IP lookup: offline or direct")
+
     targets = []
     if symbol:
         targets = [{"symbol": symbol.strip().upper(), "source": "MANUAL", "tier": "TEST", "entry_target": 0.0, "tradeable": 1}]
@@ -217,28 +227,27 @@ def run_dhan_order_test(cfg, symbol: str | None = None, read_only: bool = False,
             resp_json = r_place.json()
             print(f"    Gateway Response   : {json.dumps(resp_json)}")
 
-        if r_place.status_code in (200, 201):
-            order_id = resp_json.get("orderId") or (resp_json.get("data", {}) if isinstance(resp_json.get("data"), dict) else {}).get("orderId")
-            status = resp_json.get("orderStatus", "PLACED")
-            print(f"    ✓ SUCCESS: Order #{order_id} ({status})")
-            executed_orders.append((order_id, ins.symbol))
-        else:
-            err_code = resp_json.get("errorCode", "")
-            err_msg = resp_json.get("errorMessage", resp_json.get("message", r_place.text))
-            print(f"    ℹ️ Gateway Note: {err_code} - {err_msg}")
-            if "Invalid IP" in err_msg or "DH-905" in str(err_code):
-                try:
-                    runner_ip = session.get("https://api.ipify.org", timeout=5).text.strip()
-                except Exception:
-                    runner_ip = "unknown"
-                print(f"\n    ⚠️ CAUSE OF REJECTION (DH-905 Invalid IP):")
-                print(f"       Dhan rejected the order because your DhanHQ API access token has IP Whitelisting enabled,")
-                print(f"       and the current runner IP ({runner_ip}) is not in your whitelisted IP list.")
-                print(f"       FIX:")
-                print(f"       1. Log in to web.dhan.co -> My Profile -> DhanHQ Trading APIs.")
-                print(f"       2. Check the 'IP Setup' section. If a static IP was added, remove the IP restriction")
-                print(f"          (or re-generate the access token without IP restriction to allow cloud runners),")
-                print(f"          then update the DHAN_ACCESS_TOKEN secret.")
+            if r_place.status_code in (200, 201):
+                order_id = resp_json.get("orderId") or (resp_json.get("data", {}) if isinstance(resp_json.get("data"), dict) else {}).get("orderId")
+                status = resp_json.get("orderStatus", "PLACED")
+                print(f"    ✓ SUCCESS: Order #{order_id} ({status})")
+                executed_orders.append((order_id, ins.symbol))
+            else:
+                err_code = resp_json.get("errorCode", "")
+                err_msg = resp_json.get("errorMessage", resp_json.get("message", r_place.text))
+                print(f"    ℹ️ Gateway Note: {err_code} - {err_msg}")
+                if "Invalid IP" in err_msg or "DH-905" in str(err_code):
+                    try:
+                        runner_ip = session.get("https://api.ipify.org", timeout=5).text.strip()
+                    except Exception:
+                        runner_ip = "unknown"
+                    print(f"\n    ⚠️ CAUSE OF REJECTION (DH-905 Invalid IP):")
+                    print(f"       Dhan rejected the order because your DhanHQ API access token has IP Whitelisting enabled,")
+                    print(f"       and the current runner IP ({runner_ip}) is not in your whitelisted IP list.")
+                    print(f"       FIX:")
+                    print(f"       1. Log in to web.dhan.co -> My Profile -> DhanHQ Trading APIs.")
+                    print(f"       2. Check the 'IP Setup' section. Add your static proxy IP to Secondary IP,")
+                    print(f"          then regenerate the access token and set HTTPS_PROXY secret.")
         except Exception as exc:
             print(f"    ❌ Order call failed: {exc}")
 
