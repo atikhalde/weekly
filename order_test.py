@@ -120,8 +120,20 @@ def run_dhan_order_test(cfg, symbol: str | None = None, read_only: bool = False,
         print(f"❌ Scrip master resolution failed: {exc}")
         return 1
 
+    # 2. Query Dhan Registered IP Setup (GET /v2/ip/getIP)
+    print("\n[Step 2/5] Checking Dhan registered Static IP setup ...")
+    try:
+        r_ip = session.get(f"{BASE}/ip/getIP", timeout=10)
+        if r_ip.status_code == 200:
+            ip_data = r_ip.json()
+            print(f"  ✓ Dhan Account Registered IPs: {json.dumps(ip_data)}")
+        else:
+            print(f"  ℹ️ IP query response ({r_ip.status_code}): {r_ip.text[:120]}")
+    except Exception as exc:
+        print(f"  ⚠️ Could not query IP setup: {exc}")
+
     # 3. Read Current Live Books
-    print("\n[Step 2/4] Querying live Order Book, Trade Book, and Positions ...")
+    print("\n[Step 3/5] Querying live Order Book, Trade Book, and Positions ...")
     try:
         r_orders = session.get(f"{BASE}/orders", timeout=12)
         if r_orders.status_code == 200:
