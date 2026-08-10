@@ -93,8 +93,9 @@ def main() -> int:
         instruments = instruments[:args.limit]
 
     if not cfg.secrets.dhan_access_token:
-        log.error("DHAN_ACCESS_TOKEN not set")
-        return 2
+        log.info("DHAN_ACCESS_TOKEN not set - running primarily on yfinance (Dhan fallback disabled)")
+    else:
+        log.info("DHAN_ACCESS_TOKEN configured - yfinance is primary, Dhan is fallback")
 
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
@@ -111,7 +112,7 @@ def main() -> int:
     log.info("preflight: fetching %s to verify API access ...", probe.symbol)
     try:
         test = client.daily_candles(probe.security_id, probe.exchange_segment,
-                                    from_date, to_date)
+                                    from_date, to_date, symbol=probe.symbol)
     except DhanError as exc:
         log.error("PREFLIGHT FAILED for %s: %s", probe.symbol, exc)
         log.error("Nothing was downloaded. Most likely causes:")
@@ -179,7 +180,7 @@ def main() -> int:
         """Returns (instrument, snapshot, reason). reason is None on success."""
         try:
             daily = client.daily_candles(ins.security_id, ins.exchange_segment,
-                                         from_date, to_date)
+                                         from_date, to_date, symbol=ins.symbol)
         except NoDataError:
             # Listed after fromDate - expected, not a failure.
             return ins, None, "nodata"

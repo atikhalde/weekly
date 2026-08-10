@@ -1525,8 +1525,7 @@ def main() -> int:
         report_stale_snapshot(cfg, week_s, "BTST Scan")
         return 2
     if not cfg.secrets.dhan_access_token:
-        log.error("DHAN_ACCESS_TOKEN not set")
-        return 0
+        log.info("DHAN_ACCESS_TOKEN not set - running BTST scan with yfinance as primary source")
 
     # ---- BUG 43 (REVISED BY BUG 53): WHO IS A CANDIDATE --------------------
     # BUG 43 required the breakout to have happened TODAY, for both tiers.
@@ -1763,7 +1762,7 @@ def main() -> int:
     def one(s):
         try:
             df = client.daily_candles(str(s.security_id), s.exchange_segment,
-                                      start, now.date())
+                                      start, now.date(), symbol=s.symbol)
         except DhanError as exc:
             drops["daily error"] += 1
             log.debug("%s: %s", s.symbol, str(exc)[:100])
@@ -1785,7 +1784,7 @@ def main() -> int:
                 m5 = client.intraday_candles(
                     str(s.security_id), s.exchange_segment,
                     datetime.combine(now.date(), dtime(9, 15)),
-                    now.replace(tzinfo=None), interval=5)
+                    now.replace(tzinfo=None), interval=5, symbol=s.symbol)
             except DhanError as exc:
                 log.debug("%s intraday: %s", s.symbol, str(exc)[:100])
             if m5 is not None and not m5.empty:
@@ -1851,7 +1850,7 @@ def main() -> int:
         """(daily frame incl. today's partial bar, elapsed fraction) or None."""
         try:
             df = client.daily_candles(str(s.security_id), s.exchange_segment,
-                                      start, now.date())
+                                      start, now.date(), symbol=s.symbol)
         except DhanError:
             return None, 1.0
         if df.empty:
@@ -1864,7 +1863,7 @@ def main() -> int:
                 m5 = client.intraday_candles(
                     str(s.security_id), s.exchange_segment,
                     datetime.combine(now.date(), dtime(9, 15)),
-                    now.replace(tzinfo=None), interval=5)
+                    now.replace(tzinfo=None), interval=5, symbol=s.symbol)
             except DhanError:
                 return None, 1.0
             if m5 is None or m5.empty:

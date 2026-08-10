@@ -271,8 +271,7 @@ def main() -> int:
         symbols = sorted(pd.read_csv(p, dtype=str)["symbol"].str.upper().unique())
 
     if not cfg.secrets.dhan_access_token:
-        log.error("DHAN_ACCESS_TOKEN not set")
-        return 2
+        log.info("DHAN_ACCESS_TOKEN not set - running Paper Report with yfinance as primary source")
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
                         quote_rate=cfg.runtime.quote_rate_per_sec)
@@ -297,7 +296,7 @@ def main() -> int:
             continue
         sid, seg = sec_map[sym]
         try:
-            daily = client.daily_candles(sid, seg, from_date, to_date)
+            daily = client.daily_candles(sid, seg, from_date, to_date, symbol=sym)
         except DhanError:
             continue
         if daily.empty:

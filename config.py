@@ -199,6 +199,7 @@ class Runtime:
     bar_interval_min: int = 5
     alert_cooldown_bars: int = 0
     dry_run: bool = False
+    data_source: str = "yfinance"
 
 
 @dataclass

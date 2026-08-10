@@ -531,7 +531,7 @@ def fetch_daily_metrics(client: DhanClient, snaps: list[WeeklySnapshot],
     def one(s: WeeklySnapshot):
         try:
             df = client.daily_candles(str(s.security_id), s.exchange_segment,
-                                      start, today)
+                                      start, today, symbol=s.symbol)
         except DhanError as exc:
             log.debug("daily fetch failed for %s: %s", s.symbol, str(exc)[:120])
             return s.symbol, None, None
@@ -718,8 +718,7 @@ def main() -> int:
         report_stale_snapshot(cfg, week_s, "Daily Shortlist")
         return 2
     if not cfg.secrets.dhan_access_token:
-        log.error("DHAN_ACCESS_TOKEN not set")
-        return 0
+        log.info("DHAN_ACCESS_TOKEN not set - running Daily Watchlist with yfinance as primary source")
 
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,

@@ -56,8 +56,7 @@ def main() -> int:
 
     cfg = load_config(args.config)
     if not cfg.secrets.dhan_access_token:
-        print("DHAN_ACCESS_TOKEN not set")
-        return 2
+        print("DHAN_ACCESS_TOKEN not set - running diagnose with yfinance as primary source")
 
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
@@ -99,7 +98,7 @@ def main() -> int:
         sec_id, seg = resolved[key]
 
         try:
-            daily = client.daily_candles(sec_id, seg, from_date, to_date)
+            daily = client.daily_candles(sec_id, seg, from_date, to_date, symbol=sym)
         except DhanError as exc:
             print(f"  daily candles failed: {exc}")
             continue
@@ -126,7 +125,8 @@ def main() -> int:
         try:
             bars = client.intraday_candles(sec_id, seg, from_dt,
                                            now + timedelta(minutes=5),
-                                           interval=cfg.runtime.bar_interval_min)
+                                           interval=cfg.runtime.bar_interval_min,
+                                           symbol=sym)
         except DhanError as exc:
             print(f"  intraday failed: {exc}")
             continue

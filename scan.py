@@ -274,7 +274,8 @@ def scan_symbol(client: DhanClient, snap: WeeklySnapshot, cfg, week_start_dt):
     from_dt = datetime.combine(week_start_dt.date(), dtime(9, 0)).replace(tzinfo=IST)
     to_dt = now + timedelta(minutes=5)
     bars = client.intraday_candles(snap.security_id, snap.exchange_segment,
-                                   from_dt, to_dt, interval=cfg.runtime.bar_interval_min)
+                                   from_dt, to_dt, interval=cfg.runtime.bar_interval_min,
+                                   symbol=snap.symbol)
     if bars.empty:
         return snap, None
 

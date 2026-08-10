@@ -429,8 +429,7 @@ def main() -> int:
         return 2
 
     if not cfg.secrets.dhan_access_token:
-        print("DHAN_ACCESS_TOKEN not set - 5m history requires Dhan")
-        return 2
+        print("DHAN_ACCESS_TOKEN not set - running with yfinance as primary source")
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
                         quote_rate=cfg.runtime.quote_rate_per_sec)
@@ -460,7 +459,7 @@ def main() -> int:
             continue
         sid, seg = sec_map[sym]
         try:
-            daily = client.daily_candles(sid, seg, from_date, to_date)
+            daily = client.daily_candles(sid, seg, from_date, to_date, symbol=sym)
         except DhanError as exc:
             print(f"  {sym}: daily fetch failed ({str(exc)[:60]})")
             continue

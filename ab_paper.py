@@ -990,8 +990,7 @@ def main() -> int:
     else:
         from dhan import DhanClient, DhanError, last_n_years
         if not cfg.secrets.dhan_access_token:
-            print("DHAN_ACCESS_TOKEN not set - use --source yahoo for a dry run")
-            return 2
+            print("DHAN_ACCESS_TOKEN not set - running A/B paper with yfinance as primary source")
         client = DhanClient(cfg.secrets.dhan_client_id,
                             cfg.secrets.dhan_access_token,
                             data_rate=cfg.runtime.data_rate_per_sec,
@@ -1018,7 +1017,7 @@ def main() -> int:
             else:
                 from dhan import DhanError, last_n_years
                 from_date, to_date = last_n_years(cfg.runtime.history_years)
-                daily = client.daily_candles(sid, seg, from_date, to_date)
+                daily = client.daily_candles(sid, seg, from_date, to_date, symbol=sym)
                 five = fetch_5m(
                     client, sid, seg,
                     datetime.combine(start_week.date(), dtime(9, 0)).replace(tzinfo=IST),
