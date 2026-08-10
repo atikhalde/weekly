@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BTST BACKTEST - replay the LIVE tier logic over history and show every trade.
+BTST & ANTICIPATION BACKTEST - replay LIVE tier and approach logic over history.
 
 WHY THIS EXISTS
 The alert says "Tier A measured +3.04%/trade (t 6.4, n=302)". Those numbers came
@@ -9,12 +9,14 @@ the repo. There has been no way to ask "show me the actual trades behind that",
 which is exactly the question worth asking before trusting a number.
 
 This reproduces those figures from the SHIPPED CODE and prints the trade list.
+It also supports replaying the ANTICIPATION model (Model F) - including setups
+that appeared as anticipated but did NOT qualify for confirmed BTST at 15:20.
 
 -----------------------------------------------------------------------------
 THE ONE RULE THAT MAKES THIS TRUSTWORTHY
 -----------------------------------------------------------------------------
-It imports btst.classify(), btst.exhausted(), btst.conviction() and every
-threshold from btst.py. It does NOT reimplement them.
+It imports btst.classify(), btst.classify_approach(), btst.exhausted(),
+btst.conviction() and every threshold from btst.py. It does NOT reimplement them.
 
 A backtest that restates the rule measures a DIFFERENT rule the moment either
 copy changes, and it always drifts in the flattering direction because nobody
@@ -28,7 +30,7 @@ POINT-IN-TIME DISCIPLINE
 For each historical day D:
   * the 26W level uses weekly highs STRICTLY BEFORE the week containing D,
     exactly as the Monday snapshot freezes it
-  * classify() sees daily bars up to and including D, never beyond
+  * classify() and classify_approach() see daily bars up to and including D, never beyond
   * the outcome (D+1 close) is read only AFTER the decision is made
   * age comes from breakout_age() on the same truncated frame
 
@@ -47,11 +49,14 @@ WHAT IT CANNOT TELL YOU
   are worse than the print.
 * One regime. Everything here is 2021-2026, a broadly rising smallcap tape.
 
-    python btst_backtest.py                      # last 2 years, summary
-    python btst_backtest.py --years 5 --trades   # every trade, printed
-    python btst_backtest.py --symbol SBCL        # one stock's history
-    python btst_backtest.py --from 2026-08-01    # a specific window
-    python btst_backtest.py --csv out.csv        # full trade list to CSV
+    python btst_backtest.py                                  # BTST confirmed, 2y summary
+    python btst_backtest.py --mode anticipated_only --trades # anticipated non-BTST trades
+    python btst_backtest.py --mode anticipated               # all anticipated setups
+    python btst_backtest.py --mode all                       # confirmed BTST + anticipated
+    python btst_backtest.py --years 5 --trades               # every trade, printed
+    python btst_backtest.py --symbol SBCL                    # one stock's history
+    python btst_backtest.py --from 2026-08-01                # a specific window
+    python btst_backtest.py --csv out.csv                    # full trade list to CSV
 """
 from __future__ import annotations
 
@@ -145,13 +150,15 @@ def fetch_history(symbols: list[str], out_dir: str, years: int = 6,
 # --------------------------------------------------------------------------- #
 #  REPLAY - one symbol
 # --------------------------------------------------------------------------- #
-def replay_symbol(path: str, start: str, end: str) -> list[dict]:
+def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[dict]:
     """
-    Every day this symbol would have produced a BTST pick, with its outcome.
+    Replay historical days and identify qualifying setups with their outcomes.
 
-    The level is rebuilt weekly from bars strictly before the current week,
-    which is what the Monday snapshot freezes. classify() then sees only bars
-    up to that day.
+    Modes:
+      * 'btst': confirmed BTST breakouts (Tier A / Tier B).
+      * 'anticipated': all pre-breakout anticipation setups (Model F).
+      * 'anticipated_only': anticipation setups that did NOT qualify for BTST at 15:20.
+      * 'all': both confirmed BTST and anticipated setups.
     """
     sym = os.path.basename(path)[:-4]
     try:
@@ -176,8 +183,11 @@ def replay_symbol(path: str, start: str, end: str) -> list[dict]:
     # 26W high as of the LAST CLOSED week, per the live snapshot
     n_wk = len(wk_hi)
     lvl_by_week = np.full(n_wk, np.nan)
+    lvl_d_by_week = np.full(n_wk, np.nan)
     for i in range(26, n_wk):
         lvl_by_week[i] = wk_hi[i - 26:i].max()
+        if i >= 27:
+            lvl_d_by_week[i] = wk_hi[i - 27:i - 1].max()
 
     close = d.close.to_numpy(float)
     lo_i = int(np.searchsorted(dt.values, np.datetime64(start)))
@@ -186,46 +196,96 @@ def replay_symbol(path: str, start: str, end: str) -> list[dict]:
     hi_i = min(hi_i, len(d) - 1)          # need D+1 for the outcome
 
     out = []
+    want_btst = mode in ("btst", "all")
+    want_ant = mode in ("anticipated", "anticipate", "anticipated_only", "anticipated_non_btst", "all")
+    ant_only = mode in ("anticipated_only", "anticipated_non_btst")
+
     for j in range(lo_i, hi_i):
         w = wi[j]
         if w is None or (isinstance(w, float) and np.isnan(w)):
             continue
-        level = lvl_by_week[int(w)]
-        if not np.isfinite(level) or level <= 0:
+        level_c = lvl_by_week[int(w)]
+        if not np.isfinite(level_c) or level_c <= 0:
             continue
+        level_d = lvl_d_by_week[int(w)] if np.isfinite(lvl_d_by_week[int(w)]) else level_c
 
         hist = d.iloc[:j + 1]                       # bars up to and incl. D
-        age = btst.breakout_age(hist, float(level))
-        m = btst.classify(hist, float(level), partial_frac=1.0, age=age)
-        if not m or not m.get("tier"):
-            continue
+        age = btst.breakout_age(hist, float(level_c))
 
-        conv, why = btst.conviction(m)
+        m_btst = btst.classify(hist, float(level_c), partial_frac=1.0, age=age)
+        is_btst = bool(m_btst and m_btst.get("tier"))
+
+        m_ant = None
+        if want_ant:
+            m_ant = btst.classify_approach(hist, float(level_c), float(level_d),
+                                          partial_frac=1.0, dbg_symbol=sym)
+        is_ant = bool(m_ant and m_ant.get("ok"))
+
         entry = close[j]
         nxt = close[j + 1]
         gross = (nxt / entry - 1) * 100.0
-        out.append(dict(
-            date=dt.iloc[j].date().isoformat(), symbol=sym, tier=m["tier"],
-            arm=("fresh_A" if m.get("fresh") and m["tier"] == "A"
-                 else "fresh_B" if m.get("fresh") else "aged_B"),
-            age=int(m.get("age", 0)), entry=round(entry, 2),
-            exit=round(nxt, 2), level=round(float(level), 2),
-            day_ret=round(m["day_ret"], 2),
-            close_pos=round(m["close_pos"], 3),
-            rvol=round(float(m.get("rvol") or 0), 2),
-            atr_pct=round(m["atr_pct"], 2),
-            ext_pct=round(float(m.get("ext_pct") or 0), 2),
-            ret_12m=btst._num(m.get("ret_12m"), 1),
-            conviction=conv, why=";".join(why),
-            gross_pct=round(gross, 3),
-            net_pct=round(gross - COST_ROUND_TRIP, 3),
-        ))
+
+        # Confirmed BTST trade
+        if want_btst and is_btst:
+            conv, why = btst.conviction(m_btst)
+            out.append(dict(
+                date=dt.iloc[j].date().isoformat(), symbol=sym,
+                mode="btst",
+                tier=m_btst["tier"],
+                arm=("fresh_A" if m_btst.get("fresh") and m_btst["tier"] == "A"
+                     else "fresh_B" if m_btst.get("fresh") else "aged_B"),
+                age=int(m_btst.get("age", 0)), entry=round(entry, 2),
+                exit=round(nxt, 2), level=round(float(level_c), 2),
+                day_ret=round(m_btst["day_ret"], 2),
+                close_pos=round(m_btst["close_pos"], 3),
+                rvol=round(float(m_btst.get("rvol") or 0), 2),
+                atr_pct=round(m_btst["atr_pct"], 2),
+                ext_pct=round(float(m_btst.get("ext_pct") or 0), 2),
+                ret_12m=btst._num(m_btst.get("ret_12m"), 1),
+                pre=int(m_btst.get("pre", 0)),
+                conviction=conv, why=";".join(why),
+                btst_qualified="yes",
+                gross_pct=round(gross, 3),
+                net_pct=round(gross - COST_ROUND_TRIP, 3),
+            ))
+
+        # Anticipated trade
+        if want_ant and is_ant:
+            if ant_only and is_btst:
+                # User selected anticipated-only (non-BTST): skip if it qualified for BTST
+                continue
+            side = str(m_ant.get("side", "below"))
+            arm = f"ant_{side}"
+            tier_name = f"ANT_{side.upper()}"
+            why_ant = [f"PRE={m_ant.get('pre', 0)}/8", f"side={side}", f"gap={m_ant.get('gap_pct', 0):.1f}%"]
+            out.append(dict(
+                date=dt.iloc[j].date().isoformat(), symbol=sym,
+                mode="anticipated_only" if (not is_btst) else "anticipated",
+                tier=tier_name,
+                arm=arm,
+                age=0, entry=round(entry, 2),
+                exit=round(nxt, 2), level=round(float(m_ant.get("level", level_c)), 2),
+                day_ret=round(m_ant.get("day_ret", 0.0), 2),
+                close_pos=round(m_ant.get("close_pos", 0.0), 3),
+                rvol=round(float(m_ant.get("rvol") or 0), 2),
+                atr_pct=round(m_ant.get("atr_pct", 0.0), 2),
+                ext_pct=round(float(-m_ant.get("gap_pct", 0.0) if side == "above" else 0.0), 2),
+                ret_12m=btst._num(m_ant.get("ret_12m"), 1),
+                pre=int(m_ant.get("pre", 0)),
+                conviction=int(m_ant.get("pre", 0) >= 7),
+                why=";".join(why_ant),
+                btst_qualified="yes" if is_btst else "no",
+                gross_pct=round(gross, 3),
+                net_pct=round(gross - COST_ROUND_TRIP, 3),
+            ))
+
     return out
 
 
 def _rs(args):
     try:
-        return replay_symbol(*args)
+        path, start, end, mode = args
+        return replay_symbol(path, start, end, mode=mode)
     except Exception:
         return []
 
@@ -254,18 +314,23 @@ HDR = (f"{'slice':<20}{'trades':>8}{'/wk':>7}{'win%':>8}{'mean':>10}"
        f"{'med':>9}{'PF':>7}{'t':>7}{'P(+5%)':>8}{'worst':>9}{'best':>9}")
 
 
-def report(df: pd.DataFrame, show_trades: bool, top: int) -> None:
+def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst") -> None:
     if df.empty:
-        print("\nNo BTST setups in this window.")
+        print(f"\nNo {mode} setups in this window.")
         return
     df = df.sort_values("date").reset_index(drop=True)
 
+    mode_label = {
+        "btst": "CONFIRMED BTST",
+        "anticipated_only": "ANTICIPATED ONLY (DID NOT QUALIFY FOR BTST)",
+        "anticipated": "ALL ANTICIPATED SETUPS",
+        "all": "CONFIRMED BTST + ANTICIPATED",
+    }.get(mode, mode.upper())
+
     print("\n" + "=" * 108)
-    print("BTST BACKTEST - the LIVE rule replayed over history")
+    print(f"BTST / ANTICIPATION BACKTEST ({mode_label}) - the LIVE rule replayed over history")
     print("=" * 108)
     print(f"window      {df.date.min()} .. {df.date.max()}")
-    # NOT the universe size - the number of names that ever produced a setup.
-    # Labelling it "symbols" implied only 412 stocks were scanned.
     print(f"names hit   {df.symbol.nunique():,} distinct symbols produced a setup")
     print(f"cost        {COST_ROUND_TRIP}% round trip, entry = daily close, "
           f"exit = next close")
@@ -274,18 +339,37 @@ def report(df: pd.DataFrame, show_trades: bool, top: int) -> None:
           f"atr>={btst.TIER_B_ATR:g}%")
     print(f"            aged band {btst.AGED_EXT_MIN:+g}..{btst.AGED_EXT_MAX:+g}%, "
           f"exhaustion base<{btst.MAX_BASE_FROM_HIGH:g}% & 3m<={btst.MAX_RET_3M_PRIOR:g}%")
+    print(f"            anticipate near <={btst.ANTICIPATE_NEAR:g}% below / +{btst.ANTICIPATE_ABOVE_MAX:g}% above, "
+          f"cp>={btst.ANTICIPATE_CLOSE_POS}, pre>={btst.MIN_PRE_CONFIRM}, ret_12m>={btst.MIN_RET_12M:g}%")
 
     print("\n" + HDR)
     print(_stats(df, "ALL"))
     print()
-    for arm in ("fresh_A", "fresh_B", "aged_B"):
-        print(_stats(df[df.arm == arm], f"  {arm}"))
-    print()
-    for tier in ("A", "B"):
-        print(_stats(df[df.tier == tier], f"  TIER {tier}"))
-    print()
-    for c in sorted(df.conviction.unique()):
-        print(_stats(df[df.conviction == c], f"  conviction {c}/4"))
+
+    # Slices
+    arms = sorted(df.arm.dropna().unique())
+    if len(arms) > 1:
+        for arm in arms:
+            print(_stats(df[df.arm == arm], f"  {arm}"))
+        print()
+
+    tiers = sorted(df.tier.dropna().unique())
+    if len(tiers) > 1:
+        for tier in tiers:
+            print(_stats(df[df.tier == tier], f"  {tier}"))
+        print()
+
+    if "btst_qualified" in df.columns and df.btst_qualified.nunique() > 1:
+        for bq in sorted(df.btst_qualified.unique()):
+            label = "BTST qualified" if bq == "yes" else "BTST not qualified"
+            print(_stats(df[df.btst_qualified == bq], f"  {label}"))
+        print()
+
+    if "pre" in df.columns and df.pre.max() > 0:
+        for p in sorted(df.pre.unique()):
+            if p >= 5:
+                print(_stats(df[df.pre == p], f"  PRE score {p}/8"))
+        print()
 
     print("\nBY YEAR")
     print(HDR)
@@ -293,10 +377,11 @@ def report(df: pd.DataFrame, show_trades: bool, top: int) -> None:
         print(_stats(g, f"  {y}"))
 
     # a top-5/day book, which is what actually gets traded
-    print("\nTOP-5 PER DAY (the traded book: fresh A first, then aged, by rvol)")
+    print("\nTOP-5 PER DAY (the traded book)")
     r = df.copy()
-    r["_k"] = ((r.arm == "fresh_A") * 200 + (r.arm == "aged_B") * 100
-               + r.rvol.clip(0, 50))
+    r["_k"] = ((r.arm == "fresh_A") * 300 + (r.arm == "aged_B") * 200
+               + (r.arm.str.startswith("ant_")) * 100
+               + r.rvol.fillna(0).clip(0, 50))
     book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(5)
     print(HDR)
     print(_stats(book, "  top-5/day"))
@@ -310,18 +395,20 @@ def report(df: pd.DataFrame, show_trades: bool, top: int) -> None:
         print("\n" + "=" * 108)
         print(f"TRADES (most recent {top})")
         print("=" * 108)
-        print(f"{'date':<12}{'symbol':<13}{'tier':<5}{'arm':<9}{'age':>4}"
-              f"{'entry':>10}{'exit':>10}{'day%':>7}{'rvol':>7}{'cv':>4}{'net%':>8}")
+        print(f"{'date':<12}{'symbol':<13}{'tier':<12}{'arm':<11}{'age':>4}"
+              f"{'entry':>9}{'exit':>9}{'day%':>7}{'rvol':>6}{'pre':>4}{'btst':>5}{'net%':>8}")
         for r_ in df.tail(top).itertuples():
-            print(f"{r_.date:<12}{r_.symbol:<13}{r_.tier:<5}{r_.arm:<9}{r_.age:>4}"
-                  f"{r_.entry:>10.2f}{r_.exit:>10.2f}{r_.day_ret:>7.1f}"
-                  f"{r_.rvol:>7.1f}{r_.conviction:>4}{r_.net_pct:>+8.2f}")
+            btst_tag = getattr(r_, "btst_qualified", "-")
+            pre_val = getattr(r_, "pre", 0)
+            print(f"{r_.date:<12}{r_.symbol:<13}{r_.tier:<12}{r_.arm:<11}{r_.age:>4}"
+                  f"{r_.entry:>9.2f}{r_.exit:>9.2f}{r_.day_ret:>7.1f}"
+                  f"{r_.rvol:>6.1f}{pre_val:>4}{btst_tag:>5}{r_.net_pct:>+8.2f}")
 
     print("\n" + "-" * 108)
     print("Entry is the DAILY CLOSE; the live scan buys ~15:20 on a partial "
           "candle (~0.14% cheaper), so this is mildly pessimistic.")
     print("Yahoo daily data, not Dhan - per-symbol volume can differ, so "
-          "rvol-gated TIER B counts may not match live exactly.")
+          "counts may not match live exactly.")
     print("One regime (2021-2026). Past results are not forward validation.")
 
 
@@ -329,6 +416,12 @@ def report(df: pd.DataFrame, show_trades: bool, top: int) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--mode", choices=["btst", "anticipated", "anticipated_only", "all"],
+                    default="btst",
+                    help="btst (default): confirmed breakouts | "
+                         "anticipated_only: anticipated setups that did NOT qualify for BTST at 15:20 | "
+                         "anticipated: all pre-breakout anticipation setups | "
+                         "all: confirmed BTST + anticipated setups")
     ap.add_argument("--years", type=float, default=2.0,
                     help="how far back to replay (default 2)")
     ap.add_argument("--from", dest="from_date", default="",
@@ -355,7 +448,7 @@ def main() -> int:
         uni = pd.read_csv(args.universe)
         syms = sorted(uni.symbol.astype(str).str.strip().unique())
 
-    print(f"BTST backtest  {start} .. {end}   {len(syms):,} symbol(s)")
+    print(f"BTST / Anticipation backtest ({args.mode})  {start} .. {end}   {len(syms):,} symbol(s)")
     print(f"cache: {args.data}")
 
     if not args.no_fetch:
@@ -374,7 +467,7 @@ def main() -> int:
 
     t0 = time.time()
     rows: list[dict] = []
-    jobs = [(f, start, end) for f in files]
+    jobs = [(f, start, end, args.mode) for f in files]
     if len(files) > 8:
         with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
             for i, r in enumerate(ex.map(_rs, jobs, chunksize=8)):
@@ -389,7 +482,7 @@ def main() -> int:
     print(f"replayed {len(files):,} symbols in {time.time()-t0:.0f}s -> "
           f"{len(df):,} setups")
 
-    report(df, args.trades or bool(args.symbol), args.top)
+    report(df, args.trades or bool(args.symbol), args.top, mode=args.mode)
 
     if args.csv and not df.empty:
         df.sort_values("date").to_csv(args.csv, index=False)

@@ -22,6 +22,11 @@ name: BTST Backtest (on demand)
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: "Replay mode: btst (confirmed), anticipated_only (non-BTST), anticipated, or all"
+        type: choice
+        default: "btst"
+        options: ["btst", "anticipated_only", "anticipated", "all"]
       years:
         description: "Years of history to replay"
         type: choice
@@ -73,6 +78,7 @@ jobs:
         run: |
           python btst_backtest.py \
             --years "${{ inputs.years || '2' }}" \
+            --mode "${{ inputs.mode || 'btst' }}" \
             ${{ inputs.symbol && format('--symbol {0}', inputs.symbol) || '' }} \
             ${{ inputs.from_date && format('--from {0}', inputs.from_date) || '' }} \
             ${{ inputs.to_date && format('--to {0}', inputs.to_date) || '' }} \
