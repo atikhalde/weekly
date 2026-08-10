@@ -454,6 +454,54 @@ HDR = (f"{'slice':<20}{'trades':>7}{'/wk':>6}{'win%':>7}{'mean%':>9}"
        f"{'med%':>8}{'PF':>6}{'t':>6}{'P(+5%)':>8}{'Net PnL (Rs)':>13}{'Avg Rs':>9}")
 
 
+def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital: float = DEFAULT_CAPITAL) -> dict:
+    """
+    Simulate daily compounding (CAGR method) starting at Rs 1,00,000.
+    Every next day adjusts the trading capital according to cumulative PnL.
+    """
+    if df.empty:
+        return {"initial": initial_capital, "equity": initial_capital, "net_pnl": 0.0,
+                "total_return_pct": 0.0, "cagr_pct": 0.0, "max_dd_pct": 0.0, "active_days": 0}
+    r = df.copy()
+    r["_k"] = ((r.arm == "fresh_A") * 300 + (r.arm == "aged_B") * 200
+               + (r.arm.str.startswith("ant_")) * 100
+               + r.rvol.fillna(0).clip(0, 50))
+    book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(5)
+    days = sorted(book.date.unique())
+    equity = initial_capital
+    curve = [equity]
+    for d in days:
+        sub = book[book.date == d]
+        n_pos = max(len(sub), 1)
+        cap_pos = equity / n_pos
+        day_pnl = 0.0
+        for _, row in sub.iterrows():
+            day_pnl += cap_pos * (float(row["net_pct"]) / 100.0)
+        equity += day_pnl
+        curve.append(equity)
+
+    tot_ret = (equity - initial_capital) / initial_capital * 100.0
+    d0 = pd.to_datetime(days[0])
+    d1 = pd.to_datetime(days[-1])
+    years = max((d1 - d0).days / 365.25, 0.05)
+    cagr = (((equity / initial_capital) ** (1.0 / years)) - 1.0) * 100.0 if equity > 0 else -100.0
+
+    arr = np.array(curve)
+    peaks = np.maximum.accumulate(arr)
+    dd = (arr - peaks) / peaks * 100.0 if len(peaks) else np.array([0.0])
+    max_dd = float(dd.min())
+
+    return {
+        "initial": initial_capital,
+        "equity": equity,
+        "net_pnl": equity - initial_capital,
+        "total_return_pct": tot_ret,
+        "cagr_pct": cagr,
+        "max_dd_pct": max_dd,
+        "active_days": len(days),
+    }
+
+
 def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
            capital: float = DEFAULT_CAPITAL) -> None:
     if df.empty:
@@ -469,14 +517,15 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
     }.get(mode, mode.upper())
 
     tot_net_rs = df.net_pnl.sum() if "net_pnl" in df.columns else df.net_pct.sum() * (capital / 100.0)
+    comp = calculate_compounding_portfolio(df, initial_capital=capital)
 
     print("\n" + "=" * 115)
     print(f"BTST / ANTICIPATION BACKTEST ({mode_label}) - the LIVE rule replayed over history")
     print("=" * 115)
-    print(f"window      {df.date.min()} .. {df.date.max()}")
-    print(f"capital     Rs {capital:,.0f} per trade")
+    print(f"window      {df.date.min()} .. {df.date.max()} ({comp['active_days']} active sessions)")
+    print(f"capital     Rs {capital:,.0f} initial -> Compounded Equity: Rs {comp['equity']:,.0f} (Net: Rs {comp['net_pnl']:+,.0f}, {comp['total_return_pct']:+.2f}%)")
+    print(f"cagr        {comp['cagr_pct']:+.2f}% CAGR · Compounded Max Drawdown: {comp['max_dd_pct']:.2f}%")
     print(f"names hit   {df.symbol.nunique():,} distinct symbols produced a setup")
-    print(f"net p&l     Rs {tot_net_rs:>+,.0f} (across {len(df):,} trades, net of {COST_ROUND_TRIP}% round trip)")
     print(f"thresholds  TIER_A day>={btst.TIER_A_DAY:g}% cp>={btst.TIER_A_CLOSE_POS} | "
           f"TIER_B cp>={btst.TIER_B_CLOSE_POS} rvol>={btst.TIER_B_RVOL:g} "
           f"atr>={btst.TIER_B_ATR:g}%")

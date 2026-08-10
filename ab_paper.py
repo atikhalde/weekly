@@ -638,10 +638,10 @@ def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int]:
 # --------------------------------------------------------------------------- #
 #  Reporting
 # --------------------------------------------------------------------------- #
-def summarise(df: pd.DataFrame) -> dict:
+def summarise(df: pd.DataFrame, initial_capital: float = 100000.0) -> dict:
     if df.empty:
         return dict(n=0)
-    closed = df[df.exit_reason != "NO_FILL"]
+    closed = df[df.exit_reason != "NO_FILL"].copy()
     if closed.empty:
         return dict(n=0)
     pnl = closed["pnl"].astype(float)
@@ -649,12 +649,49 @@ def summarise(df: pd.DataFrame) -> dict:
     wins = pnl[pnl > 0]
     losses = pnl[pnl <= 0]
     gw, gl = wins.sum(), abs(losses.sum())
+
+    # Dynamic daily compounding (CAGR method) starting from initial capital
+    df_sorted = closed.sort_values("signal_date").copy()
+    days = sorted(df_sorted["signal_date"].astype(str).unique())
+    equity = initial_capital
+    curve = [equity]
+    for d in days:
+        sub = df_sorted[df_sorted["signal_date"].astype(str) == d]
+        n_pos = max(len(sub), 1)
+        cap_pos = equity / n_pos
+        day_pnl = 0.0
+        for _, r in sub.iterrows():
+            trade_pct = float(r.get("pnl_pct", 0.0) or 0.0)
+            day_pnl += cap_pos * (trade_pct / 100.0)
+        equity += day_pnl
+        curve.append(equity)
+
+    tot_comp_ret = (equity - initial_capital) / initial_capital * 100.0
+    if len(days) >= 2:
+        d0 = pd.to_datetime(days[0])
+        d1 = pd.to_datetime(days[-1])
+        years = max((d1 - d0).days / 365.25, 0.05)
+        cagr = (((equity / initial_capital) ** (1.0 / years)) - 1.0) * 100.0 if equity > 0 else -100.0
+    else:
+        years = 1.0 / 252.0
+        cagr = tot_comp_ret
+
+    arr = np.array(curve)
+    peaks = np.maximum.accumulate(arr)
+    dd = (arr - peaks) / peaks * 100.0 if len(peaks) else np.array([0.0])
+    max_dd = float(dd.min())
+
     return dict(
         n=len(closed),
         win=100.0 * (pnl > 0).mean(),
         net=pnl.sum(),
         gross=closed["gross_pnl"].astype(float).sum(),
         costs=closed["costs"].astype(float).sum(),
+        comp_equity=equity,
+        comp_net=equity - initial_capital,
+        comp_ret=tot_comp_ret,
+        cagr=cagr,
+        comp_max_dd=max_dd,
         avg_pct=pct.mean(),
         med_pct=pct.median(),
         pf=(gw / gl) if gl > 0 else float("inf"),
@@ -690,7 +727,12 @@ def print_report(ledger: pd.DataFrame, models: list[Model]) -> None:
     rows = [
         ("Trades", "n", "{:.0f}"),
         ("Win rate %", "win", "{:.1f}"),
-        ("Net P&L Rs", "net", "{:,.0f}"),
+        ("Compounded Equity Rs", "comp_equity", "{:,.0f}"),
+        ("Compounded Net P&L Rs", "comp_net", "{:+,.0f}"),
+        ("Compounded Return %", "comp_ret", "{:+,.2f}"),
+        ("CAGR %", "cagr", "{:+,.2f}"),
+        ("Compounded MaxDD %", "comp_max_dd", "{:.2f}"),
+        ("Net P&L (Fixed 1L) Rs", "net", "{:,.0f}"),
         ("Gross P&L Rs", "gross", "{:,.0f}"),
         ("Costs Rs", "costs", "{:,.0f}"),
         ("Avg per trade %", "avg_pct", "{:+.2f}"),
@@ -858,11 +900,11 @@ def telegram_summary(ledger: pd.DataFrame, models: list[Model]) -> str:
         icon = "🟢" if s["net"] > 0 else ("🔴" if s["net"] < 0 else "⚪")
         lines += [
             f"{icon} <b>{m.key}</b> · {m.label.split('·')[-1].strip()}",
+            f"   Equity <b>Rs {s.get('comp_equity', 100000):,.0f}</b> · CAGR <b>{s.get('cagr', 0):+.1f}%</b> · Net <b>Rs {s.get('comp_net', s['net']):+,.0f} ({s.get('comp_ret', 0):+.1f}%)</b>",
             f"   trades <b>{s['n']}</b> · win <b>{s['win']:.0f}%</b> · "
-            f"PF <b>{s['pf']:.2f}</b>",
-            f"   net <b>Rs {s['net']:,.0f}</b> · avg <b>{s['avg_pct']:+.2f}%</b> "
-            f"· avgR <b>{s['avg_r']:+.2f}</b>",
-            f"   +5% MFE <b>{s['big']:.0f}%</b> · held low <b>{s['held']:.0f}%</b>",
+            f"PF <b>{s['pf']:.2f}</b> · MaxDD <b>{s.get('comp_max_dd', 0):.1f}%</b>",
+            f"   avg trade <b>{s['avg_pct']:+.2f}%</b> "
+            f"· avgR <b>{s['avg_r']:+.2f}</b> · +5% MFE <b>{s['big']:.0f}%</b>",
             "",
         ]
     live = [(m.key, stats[m.key]) for m in models if stats[m.key].get("n")]
