@@ -20,6 +20,10 @@ on:
         description: "Use Limit order at LTP instead of Market order"
         type: boolean
         default: false
+      amo:
+        description: "Force After-Market Order (AMO) mode"
+        type: boolean
+        default: false
 
 concurrency:
   group: order-test
@@ -54,4 +58,5 @@ jobs:
           python order_test.py \
             ${{ inputs.symbol && format('--symbol {0}', inputs.symbol) || '' }} \
             ${{ inputs.read_only && '--read-only' || '' }} \
-            ${{ inputs.limit_order && '--limit-order' || '' }}
+            ${{ inputs.limit_order && '--limit-order' || '' }} \
+            ${{ inputs.amo && '--amo' || '' }}
