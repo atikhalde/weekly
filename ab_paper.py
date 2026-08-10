@@ -557,18 +557,44 @@ def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
             t.exit_note = f"rode upper circuit into D+2 close {c2:,.2f}"
             t.bars_held = 2
             t.exit_date, t.exit_time = d2, "close"
-        # 3. Standard Morning Open Gap Exit (09:15)
+        # 3. 50/50 Asymmetric Hybrid: 50% sold at morning open, 50% multi-day runner
         else:
-            t.exit = o1
-            t.exit_reason = "OPEN_GAP"
-            t.exit_note = f"exited at morning open {o1:,.2f}"
-            t.bars_held = 1
-            t.exit_date, t.exit_time = d1, "open"
+            part1_exit = o1
+            # Leg 2: Runner carried if D+1 closed green above entry
+            if c1 > entry and len(daily_after) >= 2:
+                trail_stop = max(l1, entry * 1.003)  # breakeven floor
+                bar2 = daily_after.iloc[1]
+                l2 = float(bar2["low"]); c2 = float(bar2["close"])
+                if l2 <= trail_stop:
+                    part2_exit = trail_stop
+                    bars_held = 2
+                elif len(daily_after) >= 3 and c2 > c1:
+                    bar3 = daily_after.iloc[2]
+                    l3 = float(bar3["low"]); c3 = float(bar3["close"])
+                    trail_stop2 = max(l2, trail_stop)
+                    if l3 <= trail_stop2:
+                        part2_exit = trail_stop2
+                    else:
+                        part2_exit = c3
+                    bars_held = 3
+                else:
+                    part2_exit = c2
+                    bars_held = 2
+            else:
+                part2_exit = c1
+                bars_held = 1
+
+            t.exit = 0.5 * part1_exit + 0.5 * part2_exit
+            t.exit_reason = "50_OPEN_50_RUNNER"
+            t.exit_note = f"50% @ open {o1:,.2f} + 50% runner @ {part2_exit:,.2f}"
+            t.bars_held = bars_held
+            t.exit_date, t.exit_time = d1, "open+runner"
 
         t.gross_pnl = (t.exit - entry) * qty
         turnover = (entry + t.exit) * qty
         t.costs = turnover * (cost_round_trip / 100.0) / 2.0
         t.pnl = t.gross_pnl - t.costs
+        t.pnl_pct = (t.exit / entry - 1.0) * 100.0 - cost_round_trip
         return t
 
     hi = lo = entry
