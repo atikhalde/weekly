@@ -2355,8 +2355,16 @@ def main() -> int:
         cv_line = (f"    ⚡ <b>{cv}/{CONVICTION_MAX} explosive</b> "
                    f"<i>· {', '.join(r.get('conv_why') or []) or 'none'}"
                    f"{' · high tail, lower hit-rate' if cv >= 3 else ''}</i>")
+        # Prime Entry #2 Tag
+        is_fresh = bool(r.get("fresh"))
+        rvol_val = float(r.get("rvol") or 0.0)
+        close_pos_val = float(r.get("close_pos") or 0.0)
+        prime2_tag = " · 🔥 <b>PRIME ENTRY #2</b>" if (is_fresh and (r["tier"] == "A" or rvol_val >= 5.0) and close_pos_val >= 0.98) else ""
+
+        qty_1l = int(100000 // close_val) if close_val > 0 else 0
+
         lines += [
-            f"{badge}{pre_tag}  <b>{_esc(r['symbol'])}</b>  "
+            f"{badge}{pre_tag}{prime2_tag}  <b>{_esc(r['symbol'])}</b>  "
             f"{_fmt(r['close'])}{cap}{prov}{age_tag}",
             f"    day <b>{r['day_ret']:+.1f}%</b> · closed at "
             f"<b>{r['close_pos']*100:.0f}%</b> of range · "
@@ -2371,8 +2379,8 @@ def main() -> int:
             (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> "
              f"<i>· {when_txt} · scan ran after the close, not tradeable</i>"
              if too_late else
-             f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
-             f"<i>· {when_txt} · exit tomorrow's close if &gt;+2%</i>"), ""]
+             f"    <b>BUY NOW ~{_fmt(r['close'])}</b> (Qty: <b>{qty_1l}</b> shares · ₹1,00,000 max) "
+             f"<i>· SELL at 09:15 open (hold if UC locked; cut if open ≤ -1.5%)</i>"), ""]
 
     if dropped:
         extra = ", ".join(_esc(r["symbol"]) for r in qualified[TOP_N:])
@@ -2403,10 +2411,14 @@ def main() -> int:
             cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
             prov = " <i>(forming)</i>" if float(
                 r.get("partial_frac", 1.0)) < 0.999 else ""
+            prime1_tag = " · ⭐ <b>PRIME ENTRY #1</b>" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
+            ant_close_val = float(r.get("close") or 0.0)
+            ant_qty_1l = int(100000 // ant_close_val) if ant_close_val > 0 else 0
+
             lines += [
                 f"<b>#{r['rank']}</b> "
                 f"{'🚀' if r.get('side') == 'above' else '🔭'} "
-                f"<b>{r.get('pre', 0)}/8</b> "
+                f"<b>{r.get('pre', 0)}/8</b>{prime1_tag} "
                 f"<b>{_esc(r['symbol'])}</b>  {_fmt(r['close'])}{cap}{prov}",
                 (f"    <b>{abs(r['gap_pct']):.2f}% above</b> the {r['which']} "
                  f"level <code>{_fmt(r['level'])}</code>"
@@ -2427,8 +2439,8 @@ def main() -> int:
                 (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> "
                  f"<i>· scan ran after the close, not tradeable</i>"
                  if too_late else
-                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> "
-                 f"<i>· exit tomorrow's close</i>"), ""]
+                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> (Qty: <b>{ant_qty_1l}</b> shares · ₹1,00,000 max) "
+                 f"<i>· SELL at 09:15 open (hold if UC locked; cut if open ≤ -1.5%)</i>"), ""]
         if ant_dropped:
             lines.append(f"<i>{ant_dropped} more qualified, cap is top "
                          f"{ANTICIPATE_TOP_N}</i>")
