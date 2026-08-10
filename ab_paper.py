@@ -1059,6 +1059,23 @@ def main() -> int:
     start_day = today - timedelta(days=max(args.days * 2, args.days + 4))
     start_week = week_start_of(start_day)
 
+    # Scope active symbols for the requested window to finish in seconds
+    if args.from_snapshot and not getattr(args, "all", False):
+        from state import AlertState
+        target_days = {str(today - timedelta(days=i)) for i in range(max(args.days * 2, 7))}
+        active_syms = {s.upper() for (d, s) in picks_lookup.keys() if d in target_days}
+        active_syms |= {s.upper() for (d, s) in ant_lookup.keys() if d in target_days}
+        st = AlertState(cfg.paths["state"])
+        for w, m in getattr(st, "_data", {}).items():
+            if isinstance(m, dict):
+                for k in m.keys():
+                    k_str = str(k).upper()
+                    if k_str not in ("STALE", "") and len(k_str) >= 2:
+                        active_syms.add(k_str)
+        if active_syms:
+            symbols = sorted([s for s in symbols if s in active_syms])
+            print(f"  scoped to {len(symbols)} active candidate(s) across target sessions")
+
     if args.source == "yahoo":
         fetch = _yahoo_fetch
         sec_map = {s: (s, "NSE_EQ") for s in symbols}
