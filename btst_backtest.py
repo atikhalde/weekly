@@ -217,8 +217,22 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
 
         m_ant = None
         if want_ant:
-            m_ant = btst.classify_approach(hist, float(level_c), float(level_d),
-                                          partial_frac=1.0, dbg_symbol=sym)
+            # Fast O(1) screen: only evaluate full metrics for days in the anticipation band
+            rng = float(d.iloc[j]["high"]) - float(d.iloc[j]["low"])
+            cp_quick = ((close[j] - float(d.iloc[j]["low"])) / rng) if rng > 0 else 0.0
+            if cp_quick >= (btst.ANTICIPATE_CLOSE_POS - 0.02):
+                cand = [level_c, level_d]
+                above = [x for x in cand if close[j] <= x]
+                in_band = False
+                if above:
+                    lvl = min(above)
+                    in_band = ((lvl - close[j]) / lvl * 100.0 <= btst.ANTICIPATE_NEAR + 0.1)
+                else:
+                    lvl = max(cand)
+                    in_band = ((close[j] / lvl - 1) * 100.0 <= btst.ANTICIPATE_ABOVE_MAX + 0.1)
+                if in_band:
+                    m_ant = btst.classify_approach(hist, float(level_c), float(level_d),
+                                                  partial_frac=1.0, dbg_symbol=sym)
         is_ant = bool(m_ant and m_ant.get("ok"))
 
         entry = close[j]
@@ -452,12 +466,13 @@ def main() -> int:
     print(f"cache: {args.data}")
 
     if not args.no_fetch:
-        have = len(glob.glob(os.path.join(args.data, "*.csv")))
-        if have < len(syms):
-            print(f"fetching daily history ({have} cached) ...")
+        missing = [s for s in syms if not os.path.exists(os.path.join(args.data, f"{s}.csv"))]
+        if missing:
+            print(f"fetching daily history for {len(missing)} symbol(s) ...")
             t0 = time.time()
-            got = fetch_history(syms, args.data)
-            print(f"  {got:,} symbols available in {time.time()-t0:.0f}s")
+            years_fetch = max(int(args.years) + 3, 5)
+            got = fetch_history(missing, args.data, years=years_fetch)
+            print(f"  {got:,} symbols downloaded in {time.time()-t0:.0f}s")
 
     files = [os.path.join(args.data, f"{s}.csv") for s in syms]
     files = [f for f in files if os.path.exists(f)]
