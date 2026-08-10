@@ -45,8 +45,8 @@ name: BTST Scan (15:20 IST)
 # It never places orders and never touches state.json.
 on:
   schedule:
-    # 09:50 UTC = 15:20 IST. FALLBACK ONLY - see the note above.
-    - cron: "50 9 * * 1-5"
+    # 09:45 UTC = 15:15 IST (Runs early so runner boots in time for 15:18-15:20 scan)
+    - cron: "45 9 * * 1-5"
   # Primary trigger: cron-job.org POSTs {"event_type":"btst"} at 15:18 IST.
   repository_dispatch:
     types: [btst]

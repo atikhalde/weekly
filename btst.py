@@ -1457,9 +1457,44 @@ def score_prior_picks(cfg, client, now, caps) -> list[str]:
 
             head = f"📊 <b>{label} scorecard — {pdate}</b>"
             if not graded:
-                out += [head, f"<i>{skipped} pick(s) were not tradeable "
-                              f"(scan ran after the close), so nothing to "
-                              f"grade.</i>", ""]
+                # Calculate actual outcomes for the unfillable/late picks to display real price action
+                late_graded = []
+                for r in rows:
+                    sym = str(r.get("symbol", "")).strip()
+                    try:
+                        entry = float(r.get("entry"))
+                    except (TypeError, ValueError):
+                        continue
+                    if not sym or entry <= 0:
+                        continue
+                    snap = next((x for x in (SNAPS_CACHE or []) if x.symbol == sym), None)
+                    if snap is None:
+                        continue
+                    try:
+                        df = client.daily_candles(
+                            str(snap.security_id), snap.exchange_segment,
+                            pd.Timestamp(pdate).date() - timedelta(days=10),
+                            now.date(), symbol=snap.symbol)
+                    except DhanError:
+                        continue
+                    if df is None or df.empty:
+                        continue
+                    after = df[pd.to_datetime(df["datetime"]).dt.strftime("%Y-%m-%d") > pdate]
+                    if after.empty:
+                        continue
+                    nxt = float(after.iloc[0]["close"])
+                    gross = (nxt / entry - 1) * 100.0
+                    late_graded.append((sym, entry, nxt, gross, gross - COST_ROUND_TRIP))
+
+                if late_graded:
+                    out.append(head)
+                    out.append(f"<i>⚠️ {len(late_graded)} pick(s) ran after close (untradeable), but here is what they did:</i>")
+                    for sym, entry, nxt, gross, net in late_graded:
+                        mark = "🟢" if net > 0 else ("⚪" if abs(net) < 0.01 else "🔴")
+                        out.append(f"  {mark} <b>{sym}</b>  {_fmt(entry)} → {_fmt(nxt)}  <b>{net:+.2f}%</b> <i>net [late scan]</i>")
+                    out.append("")
+                else:
+                    out += [head, f"<i>{skipped} pick(s) were not tradeable (scan ran after the close), so nothing to grade.</i>", ""]
                 continue
 
             nets = [g[4] for g in graded]
