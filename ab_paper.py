@@ -491,23 +491,20 @@ def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
                   exit_rule: dict, hold_days: int = 10,
                   cost_round_trip: float = COST_ROUND_TRIP) -> PaperTrade:
     """
-    BTST: buy the breakout-day CLOSE, decide again at every following close.
+    BTST simulation: buy the breakout/anticipation close at 15:20.
 
-        stop      : `stop_pct` below entry, checked intraday, GAP AWARE -
-                    when the day opens below the stop the fill is the OPEN,
-                    not the stop, because that is what actually happens
-        take      : exit at a close >= entry * (1 + take_pct/100)
-        carry     : any other close -> hold another day
-        time exit : `hold_days` sessions
-
-    Pessimistic intrabar ordering: if a day's low breaches the stop AND its
-    close clears the target, the STOP is taken. Daily bars cannot tell us which
-    came first, so the unfavourable branch is the honest one.
+    Exit rules:
+      * 'morning_open' (Recommended Playbook): Sell at next morning 09:15 open
+        to capture overnight gap profits. Hold if opened locked at Upper Circuit;
+        cut if opened gap-down <= -1.5%.
+      * 'btst': Standard 1% stop / 2% target on close.
+      * 'swing': Multi-day hold with stop and target.
     """
     entry = float(sig.price)
     sig_d, sig_t = _stamp(sig.bar_time)
 
-    stop_pct = float(exit_rule.get("stop_pct", 5.0) or 5.0)
+    rule_name = str(exit_rule.get("rule", "btst")).lower()
+    stop_pct = float(exit_rule.get("stop_pct", 2.0) or 2.0)
     take_pct = float(exit_rule.get("take_pct", 2.0) or 2.0)
     hold = int(exit_rule.get("hold_days", hold_days) or hold_days)
 
@@ -536,6 +533,43 @@ def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
         return t
     t.qty = qty
     t.invested = qty * entry
+
+    # Morning Open Exit Rule (Optimized Playbook)
+    if rule_name == "morning_open":
+        bar1 = daily_after.iloc[0]
+        o1 = float(bar1["open"]); h1 = float(bar1["high"]); l1 = float(bar1["low"]); c1 = float(bar1["close"])
+        d1, _ = _stamp(bar1["datetime"])
+
+        # 1. Gap-down cut (cut at open if opened <= -1.5%)
+        if o1 <= entry * (1.0 - 0.015):
+            t.exit = o1
+            t.exit_reason = "GAP_DOWN_CUT"
+            t.exit_note = f"opened gap-down {o1:,.2f} (cut at 09:15 open)"
+            t.bars_held = 1
+            t.exit_date, t.exit_time = d1, "open"
+        # 2. Upper circuit rider (if opened locked at UC >= +4.5%, ride into D+2)
+        elif o1 >= entry * 1.045 and (h1 - c1) / max(c1, 1) < 0.005 and len(daily_after) >= 2:
+            bar2 = daily_after.iloc[1]
+            c2 = float(bar2["close"])
+            d2, _ = _stamp(bar2["datetime"])
+            t.exit = c2
+            t.exit_reason = "CIRCUIT_RIDER_D2"
+            t.exit_note = f"rode upper circuit into D+2 close {c2:,.2f}"
+            t.bars_held = 2
+            t.exit_date, t.exit_time = d2, "close"
+        # 3. Standard Morning Open Gap Exit (09:15)
+        else:
+            t.exit = o1
+            t.exit_reason = "OPEN_GAP"
+            t.exit_note = f"exited at morning open {o1:,.2f}"
+            t.bars_held = 1
+            t.exit_date, t.exit_time = d1, "open"
+
+        t.gross_pnl = (t.exit - entry) * qty
+        turnover = (entry + t.exit) * qty
+        t.costs = turnover * (cost_round_trip / 100.0) / 2.0
+        t.pnl = t.gross_pnl - t.costs
+        return t
 
     hi = lo = entry
     done = False
