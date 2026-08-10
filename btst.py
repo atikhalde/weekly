@@ -947,6 +947,38 @@ def fetch_ohlc(client, snaps: list) -> dict:
     return out
 
 
+def get_circuit_info(prev_close: float, current_price: float, high: float = 0.0) -> dict:
+    """
+    Computes upper circuit price, band (5%, 10%, 20%), distance to circuit,
+    whether locked, and pre-circuit entry zone.
+    """
+    if prev_close <= 0 or current_price <= 0:
+        return {"band": 10.0, "uc_limit": 0.0, "dist_to_uc": 0.0, "is_locked": False, "pre_entry": 0.0}
+    day_gain = (current_price / prev_close - 1.0) * 100.0
+    if day_gain >= 14.0:
+        band = 20.0
+    elif day_gain >= 7.5:
+        band = 10.0
+    elif day_gain >= 3.5:
+        band = 5.0
+    else:
+        band = 2.0
+
+    uc_limit = round(prev_close * (1.0 + band / 100.0), 2)
+    dist_to_uc = round((uc_limit - current_price) / current_price * 100.0, 2)
+    hi = max(high, current_price)
+    is_locked = (abs(current_price - uc_limit) / uc_limit <= 0.003) or (hi >= uc_limit * 0.998 and (hi - current_price) / current_price < 0.001)
+    pre_entry = round(uc_limit * 0.992, 2)
+
+    return {
+        "band": band,
+        "uc_limit": uc_limit,
+        "dist_to_uc": dist_to_uc,
+        "is_locked": is_locked,
+        "pre_entry": pre_entry,
+    }
+
+
 def cheap_close_pos(q: dict) -> tuple[float, float]:
     """
     (close_pos, day_ret) from a bulk OHLC payload alone. NaN when unusable.
@@ -2304,6 +2336,19 @@ def main() -> int:
         where = ("above" if float(r.get("ext_pct") or 0) >= 0 else "below")
         when_txt = ("broke out today" if r.get("fresh")
                     else f"broke out {age} session(s) ago")
+        # Circuit tracking
+        day_ret_val = float(r.get("day_ret") or 0.0)
+        close_val = float(r.get("close") or 0.0)
+        pc_val = close_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else close_val
+        ckt = get_circuit_info(pc_val, close_val, float(r.get("high") or close_val))
+        ckt_line = f"    🎯 <b>Circuit:</b> ₹{_fmt(ckt['uc_limit'])} (+{int(ckt['band'])}%) · {ckt['dist_to_uc']:+.1f}% to lock"
+        if ckt["is_locked"]:
+            ckt_action = f"    🔒 <b>LOCKED AT UPPER CIRCUIT (+{int(ckt['band'])}%)</b> <i>· 0 sellers at 15:20 (unfillable)</i>"
+        elif 0.2 <= ckt["dist_to_uc"] <= 1.5:
+            ckt_action = f"    ⚡ <b>PRE-CIRCUIT ZONE:</b> <i>Enter ~{_fmt(ckt['pre_entry'])} BEFORE circuit locks at {_fmt(ckt['uc_limit'])}</i>"
+        else:
+            ckt_action = ""
+
         # BUG 54b: conviction is about the SIZE of the move, not the odds of
         # a win. Labelled so it cannot be misread as "safest".
         cv = int(r.get("conviction", 0))
@@ -2318,7 +2363,11 @@ def main() -> int:
             f"rvol <b>{r['rvol']:.1f}x</b>{_rvol_detail(r)} · atr {r['atr_pct']:.1f}%",
             f"    <i>{r['ext_pct']:+.1f}% {where} the 26W level "
             f"{_fmt(r['level'])}</i>",
-            cv_line,
+            ckt_line,
+            cv_line]
+        if ckt_action:
+            lines.append(ckt_action)
+        lines += [
             (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> "
              f"<i>· {when_txt} · scan ran after the close, not tradeable</i>"
              if too_late else
@@ -2369,6 +2418,7 @@ def main() -> int:
                 f"{_rvol_detail(r)}",
                 f"    <i>12m {r.get('ret_12m', 0):+.0f}% · "
                 f"{r.get('dist_200dma', 0):+.0f}% over the 200DMA</i>",
+                f"    🎯 <b>Circuit:</b> ₹{_fmt(round(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0)*(1.0+get_circuit_info(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0), float(r.get('close',0)))['band']/100.0),2))} (+{int(get_circuit_info(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0), float(r.get('close',0)))['band'])}%) · {get_circuit_info(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0), float(r.get('close',0)))['dist_to_uc']:+.1f}% to lock",
                 # BUG 63: this line ignored too_late. At 20:43 the confirmed
                 # list correctly read MISSED while the anticipation list still
                 # said BUY NOW on the same dead entry - the exact failure

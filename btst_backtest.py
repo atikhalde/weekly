@@ -149,9 +149,74 @@ def fetch_history(symbols: list[str], out_dir: str, years: int = 6,
 
 
 # --------------------------------------------------------------------------- #
+#  CIRCUIT-LOCK DETECTION & PRE-CIRCUIT ENTRY TRACKING
+# --------------------------------------------------------------------------- #
+def get_circuit_tracking(d: pd.DataFrame, idx: int) -> dict:
+    """
+    Track daily upper circuit (UC) band (5%, 10%, 20%), distance to circuit,
+    lock status, and pre-circuit entry price just before circuit was touched.
+    """
+    if idx <= 0 or idx >= len(d):
+        return {"band": 10.0, "uc_limit": 0.0, "dist_to_uc": 0.0, "is_locked": False,
+                "lock_reason": "fillable", "pre_entry": 0.0}
+    row = d.iloc[idx]
+    prev = d.iloc[idx - 1]
+    c = float(row["close"])
+    h = float(row["high"])
+    l = float(row["low"])
+    pc = float(prev["close"])
+    if pc <= 0 or c <= 0:
+        return {"band": 10.0, "uc_limit": 0.0, "dist_to_uc": 0.0, "is_locked": False,
+                "lock_reason": "fillable", "pre_entry": 0.0}
+    day_gain = (c / pc - 1.0) * 100.0
+    rng = h - l
+    cp = ((c - l) / rng) if rng > 0 else 1.0
+
+    if day_gain >= 14.0:
+        band = 20.0
+    elif day_gain >= 7.5:
+        band = 10.0
+    elif day_gain >= 3.5:
+        band = 5.0
+    else:
+        band = 2.0
+
+    uc_limit = round(pc * (1.0 + band / 100.0), 2)
+    dist_to_uc = round((uc_limit - c) / c * 100.0, 2)
+    is_locked = False
+    lock_reason = "fillable"
+
+    # 1. Flat open-to-close lock (0 range, locked all day)
+    if (h - l) / c < 0.002 and day_gain >= 1.9:
+        is_locked = True
+        lock_reason = f"flat_uc_{round(day_gain)}%"
+    # 2. Closed at exact high (cp >= 0.99) at standard Indian circuit bands (2%, 5%, 10%, 20%)
+    elif (h - c) / c < 0.002 and cp >= 0.99:
+        for b in (2.0, 5.0, 10.0, 20.0):
+            if abs(day_gain - b) <= 0.18:
+                is_locked = True
+                lock_reason = f"uc_locked_{int(b)}%"
+                break
+
+    # Pre-circuit entry price: 0.8% below the upper circuit limit (entered on ramp before lock)
+    pre_entry = round(uc_limit * 0.992, 2) if is_locked else c
+
+    return {
+        "band": band,
+        "uc_limit": uc_limit,
+        "dist_to_uc": dist_to_uc,
+        "is_locked": is_locked,
+        "lock_reason": lock_reason,
+        "pre_entry": pre_entry,
+    }
+
+
+# --------------------------------------------------------------------------- #
 #  REPLAY - one symbol
 # --------------------------------------------------------------------------- #
-def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[dict]:
+def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
+                  exclude_circuit_locks: bool = False,
+                  use_pre_circuit_entry: bool = False) -> list[dict]:
     """
     Replay historical days and identify qualifying setups with their outcomes.
 
@@ -236,13 +301,20 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
                                                   partial_frac=1.0, dbg_symbol=sym)
         is_ant = bool(m_ant and m_ant.get("ok"))
 
-        entry = close[j]
+        # Circuit tracking: upper circuit level, band, distance, and pre-circuit entry
+        ckt = get_circuit_tracking(d, j)
+        is_locked = ckt["is_locked"]
+        if exclude_circuit_locks and is_locked:
+            continue
+
+        # Effective entry price: pre-circuit entry if enabled and locked, else regular close
+        entry_eff = ckt["pre_entry"] if (use_pre_circuit_entry and is_locked) else close[j]
         nxt = close[j + 1]
-        gross = (nxt / entry - 1) * 100.0
-        qty = int(DEFAULT_CAPITAL // entry) if entry > 0 else 0
-        invested = round(qty * entry, 2)
-        gross_pnl = round((nxt - entry) * qty, 2)
-        turnover = (entry + nxt) * qty
+        gross = (nxt / entry_eff - 1) * 100.0
+        qty = int(DEFAULT_CAPITAL // entry_eff) if entry_eff > 0 else 0
+        invested = round(qty * entry_eff, 2)
+        gross_pnl = round((nxt - entry_eff) * qty, 2)
+        turnover = (entry_eff + nxt) * qty
         costs = round(turnover * (COST_ROUND_TRIP / 100.0) / 2.0, 2)
         net_pnl = round(gross_pnl - costs, 2)
 
@@ -257,7 +329,7 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
                      else "fresh_B" if m_btst.get("fresh") else "aged_B"),
                 age=int(m_btst.get("age", 0)),
                 qty=qty, invested=invested,
-                entry=round(entry, 2), exit=round(nxt, 2),
+                entry=round(entry_eff, 2), exit=round(nxt, 2),
                 gross_pnl=gross_pnl, costs=costs, net_pnl=net_pnl,
                 level=round(float(level_c), 2),
                 day_ret=round(m_btst["day_ret"], 2),
@@ -268,6 +340,13 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
                 ret_12m=btst._num(m_btst.get("ret_12m"), 1),
                 pre=int(m_btst.get("pre", 0)),
                 conviction=conv, why=";".join(why),
+                circuit_band=f"{int(ckt['band'])}%",
+                uc_limit=ckt["uc_limit"],
+                dist_to_uc=ckt["dist_to_uc"],
+                circuit_locked="yes" if is_locked else "no",
+                lock_reason=ckt["lock_reason"],
+                pre_circuit_entry=ckt["pre_entry"],
+                fillable="no" if is_locked else "yes",
                 btst_qualified="yes",
                 gross_pct=round(gross, 3),
                 net_pct=round(gross - COST_ROUND_TRIP, 3),
@@ -289,7 +368,7 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
                 arm=arm,
                 age=0,
                 qty=qty, invested=invested,
-                entry=round(entry, 2), exit=round(nxt, 2),
+                entry=round(entry_eff, 2), exit=round(nxt, 2),
                 gross_pnl=gross_pnl, costs=costs, net_pnl=net_pnl,
                 level=round(float(m_ant.get("level", level_c)), 2),
                 day_ret=round(m_ant.get("day_ret", 0.0), 2),
@@ -301,6 +380,13 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
                 pre=int(m_ant.get("pre", 0)),
                 conviction=int(m_ant.get("pre", 0) >= 7),
                 why=";".join(why_ant),
+                circuit_band=f"{int(ckt['band'])}%",
+                uc_limit=ckt["uc_limit"],
+                dist_to_uc=ckt["dist_to_uc"],
+                circuit_locked="yes" if is_locked else "no",
+                lock_reason=ckt["lock_reason"],
+                pre_circuit_entry=ckt["pre_entry"],
+                fillable="no" if is_locked else "yes",
                 btst_qualified="yes" if is_btst else "no",
                 gross_pct=round(gross, 3),
                 net_pct=round(gross - COST_ROUND_TRIP, 3),
@@ -308,11 +394,16 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst") -> list[d
 
     return out
 
+    return out
+
+    return out
+
 
 def _rs(args):
     try:
-        path, start, end, mode = args
-        return replay_symbol(path, start, end, mode=mode)
+        path, start, end, mode, excl_locks, pre_ckt = args
+        return replay_symbol(path, start, end, mode=mode, exclude_circuit_locks=excl_locks,
+                             use_pre_circuit_entry=pre_ckt)
     except Exception:
         return []
 
@@ -392,6 +483,11 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
             print(_stats(df[df.tier == tier], f"  {tier}"))
         print()
 
+    if "circuit_locked" in df.columns and df.circuit_locked.nunique() > 1:
+        print(_stats(df[df.circuit_locked == "no"], "  fillable (no lock)"))
+        print(_stats(df[df.circuit_locked == "yes"], "  circuit locked (UC)"))
+        print()
+
     if "btst_qualified" in df.columns and df.btst_qualified.nunique() > 1:
         for bq in sorted(df.btst_qualified.unique()):
             label = "BTST qualified" if bq == "yes" else "BTST not qualified"
@@ -427,22 +523,24 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
           f"max drawdown {dd:.1f}%   worst day {day.min():+.2f}% (Rs {day_pnl.min():>+,.0f})")
 
     if show_trades:
-        print("\n" + "=" * 115)
+        print("\n" + "=" * 128)
         print(f"TRADES (most recent {top}) — Rs {capital:,.0f} per trade")
-        print("=" * 115)
+        print("=" * 128)
         print(f"{'date':<12}{'symbol':<12}{'tier':<10}{'qty':>5}{'entry':>9}{'exit':>9}"
-              f"{'day%':>6}{'rvol':>5}{'pre':>4}{'net%':>7}{'Net P&L (Rs)':>14}")
+              f"{'day%':>6}{'rvol':>5}{'pre':>4}{'circuit':>8}{'fillable':>9}{'net%':>7}{'Net P&L (Rs)':>14}")
         for r_ in df.tail(top).itertuples():
             pnl_str = f"{r_.net_pnl:>+13,.0f}" if hasattr(r_, "net_pnl") else f"{r_.net_pct*1000:>+13,.0f}"
             qty_val = getattr(r_, "qty", int(capital // r_.entry))
             pre_val = getattr(r_, "pre", 0)
+            ckt_band = getattr(r_, "circuit_band", "-")
+            fill_stat = "🔒 UC_LOCK" if getattr(r_, "circuit_locked", "no") == "yes" else "✅ OPEN"
             print(f"{r_.date:<12}{r_.symbol:<12}{r_.tier:<10}{qty_val:>5d}"
                   f"{r_.entry:>9.2f}{r_.exit:>9.2f}{r_.day_ret:>6.1f}{r_.rvol:>5.1f}"
-                  f"{pre_val:>4}{r_.net_pct:>+6.2f}%{pnl_str}")
+                  f"{pre_val:>4}{ckt_band:>8}{fill_stat:>9}{r_.net_pct:>+6.2f}%{pnl_str}")
 
-    print("\n" + "-" * 115)
-    print("Entry is the DAILY CLOSE; the live scan buys ~15:20 on a partial "
-          "candle (~0.14% cheaper), so this is mildly pessimistic.")
+    print("\n" + "-" * 128)
+    print("CIRCUIT ENTRY: When a stock hits upper circuit, entries at 15:20 close are unfillable (0 sellers).")
+    print("Use --pre-circuit to simulate buying on the ramp ~0.8% before the circuit level was touched.")
     print(f"Capital sized at Rs {capital:,.0f} per trade; costs charged at {COST_ROUND_TRIP}% round trip.")
     print("Yahoo daily data, not Dhan - per-symbol volume can differ, so counts may not match live exactly.")
     print("One regime (2021-2026). Past results are not forward validation.")
@@ -460,6 +558,10 @@ def main() -> int:
                          "anticipated_only: anticipated setups that did NOT qualify for BTST at 15:20 | "
                          "anticipated: all pre-breakout anticipation setups | "
                          "all: confirmed BTST + anticipated setups")
+    ap.add_argument("--exclude-circuit-locks", action="store_true",
+                    help="exclude trades where stock closed locked at upper circuit (unfillable at 15:20)")
+    ap.add_argument("--pre-circuit", action="store_true",
+                    help="simulate pre-circuit entry (entered ~0.8% before circuit level was touched)")
     ap.add_argument("--years", type=float, default=2.0,
                     help="how far back to replay (default 2)")
     ap.add_argument("--from", dest="from_date", default="",
@@ -506,7 +608,7 @@ def main() -> int:
 
     t0 = time.time()
     rows: list[dict] = []
-    jobs = [(f, start, end, args.mode) for f in files]
+    jobs = [(f, start, end, args.mode, args.exclude_circuit_locks, args.pre_circuit) for f in files]
     if len(files) > 8:
         with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
             for i, r in enumerate(ex.map(_rs, jobs, chunksize=8)):

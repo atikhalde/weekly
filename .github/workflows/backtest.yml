@@ -48,6 +48,14 @@ on:
         description: "Print the individual trade list in the log"
         type: boolean
         default: true
+      pre_circuit:
+        description: "Pre-circuit entry: simulate entering on the ramp before circuit was locked"
+        type: boolean
+        default: false
+      exclude_circuit_locks:
+        description: "Exclude unfillable circuit-locked trades"
+        type: boolean
+        default: false
 
 concurrency:
   group: btst-backtest
@@ -79,6 +87,8 @@ jobs:
           python btst_backtest.py \
             --years "${{ inputs.years || '2' }}" \
             --mode "${{ inputs.mode || 'btst' }}" \
+            ${{ inputs.pre_circuit && '--pre-circuit' || '' }} \
+            ${{ inputs.exclude_circuit_locks && '--exclude-circuit-locks' || '' }} \
             ${{ inputs.symbol && format('--symbol {0}', inputs.symbol) || '' }} \
             ${{ inputs.from_date && format('--from {0}', inputs.from_date) || '' }} \
             ${{ inputs.to_date && format('--to {0}', inputs.to_date) || '' }} \
