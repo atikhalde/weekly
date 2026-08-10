@@ -69,7 +69,7 @@ def load_today_picks() -> list[dict]:
 
 
 def run_dhan_order_test(cfg, symbol: str | None = None, read_only: bool = False,
-                        use_limit: bool = False) -> int:
+                        use_limit: bool = False, use_amo: bool = False) -> int:
     client_id = cfg.secrets.dhan_client_id
     token = cfg.secrets.dhan_access_token
 
@@ -202,6 +202,13 @@ def run_dhan_order_test(cfg, symbol: str | None = None, read_only: bool = False,
         order_type_str = "LIMIT" if use_limit else "MARKET"
         price_val = round(ltp, 2) if use_limit else 0.0
 
+        is_amo = use_amo
+        if not is_amo:
+            now_t = pd.Timestamp.now(tz=IST).time()
+            # If after 15:30 or before 09:15 on weekdays, or on weekends -> can place AMO
+            if now_t > pd.Timestamp("15:30").time() or now_t < pd.Timestamp("09:15").time():
+                is_amo = True
+
         payload = {
             "dhanClientId": client_id,
             "correlationId": corr_id,
@@ -216,7 +223,7 @@ def run_dhan_order_test(cfg, symbol: str | None = None, read_only: bool = False,
             "disclosedQuantity": 0,
             "price": price_val,
             "triggerPrice": 0.0,
-            "afterMarketOrder": False,
+            "afterMarketOrder": is_amo,
             "amoTime": "OPEN"
         }
 
@@ -267,11 +274,13 @@ def main() -> int:
     ap.add_argument("--symbol", default=None, help="specific symbol for test order (default: read from today's paper picks)")
     ap.add_argument("--read-only", action="store_true", help="inspect order & trade books without placing orders")
     ap.add_argument("--limit-order", action="store_true", help="place limit order at LTP instead of market order")
+    ap.add_argument("--amo", action="store_true", help="place After-Market Order (AMO) when market is closed")
     ap.add_argument("--config", default=None)
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    return run_dhan_order_test(cfg, symbol=args.symbol, read_only=args.read_only, use_limit=args.limit_order)
+    return run_dhan_order_test(cfg, symbol=args.symbol, read_only=args.read_only,
+                              use_limit=args.limit_order, use_amo=args.amo)
 
 
 if __name__ == "__main__":
