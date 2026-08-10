@@ -190,6 +190,9 @@ class DhanClient:
         self._data_limiter = RateLimiter(data_rate)
         self._quote_limiter = RateLimiter(quote_rate)
         self._session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100, max_retries=3)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
         if self.access_token:
             self._session.headers.update({
                 "Accept": "application/json",
@@ -198,6 +201,8 @@ class DhanClient:
                 "client-id": self.client_id,
             })
         self._yahoo_session = requests.Session()
+        self._yahoo_session.mount("https://", adapter)
+        self._yahoo_session.mount("http://", adapter)
         self._yahoo_session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json",

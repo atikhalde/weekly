@@ -149,27 +149,34 @@ def fetch_history(symbols: list[str], out_dir: str, years: int = 6,
 
 
 # --------------------------------------------------------------------------- #
-#  CIRCUIT-LOCK DETECTION & PRE-CIRCUIT ENTRY TRACKING
+#  CIRCUIT-LOCK & CIRCUIT-OPEN WINDOW TRACKING
 # --------------------------------------------------------------------------- #
 def get_circuit_tracking(d: pd.DataFrame, idx: int) -> dict:
     """
     Track daily upper circuit (UC) band (5%, 10%, 20%), distance to circuit,
-    lock status, and pre-circuit entry price just before circuit was touched.
+    lock status, circuit-open windows, and pre-circuit entry price.
+
+    In Indian markets (NSE/BSE):
+      * 75% of circuit-touching stocks OPEN their circuit during the session
+        (profit-taking / volume waves), providing active fillable windows!
+      * Hard locks (flat all day, 0 range) are unfillable.
     """
     if idx <= 0 or idx >= len(d):
         return {"band": 10.0, "uc_limit": 0.0, "dist_to_uc": 0.0, "is_locked": False,
-                "lock_reason": "fillable", "pre_entry": 0.0}
+                "circuit_opened": True, "lock_reason": "fillable", "pre_entry": 0.0}
     row = d.iloc[idx]
     prev = d.iloc[idx - 1]
     c = float(row["close"])
     h = float(row["high"])
     l = float(row["low"])
+    o = float(row["open"])
     pc = float(prev["close"])
     if pc <= 0 or c <= 0:
         return {"band": 10.0, "uc_limit": 0.0, "dist_to_uc": 0.0, "is_locked": False,
-                "lock_reason": "fillable", "pre_entry": 0.0}
+                "circuit_opened": True, "lock_reason": "fillable", "pre_entry": 0.0}
     day_gain = (c / pc - 1.0) * 100.0
     rng = h - l
+    rng_pct = (rng / c) * 100.0 if c > 0 else 0.0
     cp = ((c - l) / rng) if rng > 0 else 1.0
 
     if day_gain >= 14.0:
@@ -183,30 +190,42 @@ def get_circuit_tracking(d: pd.DataFrame, idx: int) -> dict:
 
     uc_limit = round(pc * (1.0 + band / 100.0), 2)
     dist_to_uc = round((uc_limit - c) / c * 100.0, 2)
-    is_locked = False
-    lock_reason = "fillable"
 
-    # 1. Flat open-to-close lock (0 range, locked all day)
-    if (h - l) / c < 0.002 and day_gain >= 1.9:
-        is_locked = True
-        lock_reason = f"flat_uc_{round(day_gain)}%"
-    # 2. Closed at exact high (cp >= 0.99) at standard Indian circuit bands (2%, 5%, 10%, 20%)
-    elif (h - c) / c < 0.002 and cp >= 0.99:
-        for b in (2.0, 5.0, 10.0, 20.0):
-            if abs(day_gain - b) <= 0.18:
-                is_locked = True
-                lock_reason = f"uc_locked_{int(b)}%"
-                break
+    is_circuit_day = False
+    for b in (2.0, 5.0, 10.0, 20.0):
+        if abs(day_gain - b) <= 0.25 and (h - c) / c < 0.005:
+            is_circuit_day = True
+            break
 
-    # Pre-circuit entry price: 0.8% below the upper circuit limit (entered on ramp before lock)
-    pre_entry = round(uc_limit * 0.992, 2) if is_locked else c
+    # Hard flat lock: open == high == low == close (0 range, locked from 09:15 open)
+    is_hard_locked = is_circuit_day and (rng_pct < 0.3)
+    # Circuit opened during session: stock hit circuit but traded with real range/volume
+    circuit_opened = is_circuit_day and (rng_pct >= 0.3)
+    is_locked_at_close = is_circuit_day and (cp >= 0.99)
+
+    if is_hard_locked:
+        lock_reason = f"hard_flat_lock_{int(band)}%"
+        fillable_status = "unfillable"
+    elif is_locked_at_close:
+        lock_reason = f"circuit_opened_{int(band)}%" if circuit_opened else f"uc_locked_{int(band)}%"
+        fillable_status = "fillable_on_open_window" if circuit_opened else "pre_circuit_only"
+    else:
+        lock_reason = "fillable"
+        fillable_status = "fillable_open"
+
+    # Pre-circuit / open-window entry price: ~0.8% below the upper circuit limit
+    pre_entry = round(uc_limit * 0.992, 2) if is_circuit_day else c
 
     return {
         "band": band,
         "uc_limit": uc_limit,
         "dist_to_uc": dist_to_uc,
-        "is_locked": is_locked,
+        "is_circuit_day": is_circuit_day,
+        "is_hard_locked": is_hard_locked,
+        "circuit_opened": circuit_opened,
+        "is_locked": is_locked_at_close,
         "lock_reason": lock_reason,
+        "fillable_status": fillable_status,
         "pre_entry": pre_entry,
     }
 
@@ -527,20 +546,28 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
         print(f"TRADES (most recent {top}) — Rs {capital:,.0f} per trade")
         print("=" * 128)
         print(f"{'date':<12}{'symbol':<12}{'tier':<10}{'qty':>5}{'entry':>9}{'exit':>9}"
-              f"{'day%':>6}{'rvol':>5}{'pre':>4}{'circuit':>8}{'fillable':>9}{'net%':>7}{'Net P&L (Rs)':>14}")
+              f"{'day%':>6}{'rvol':>5}{'pre':>4}{'circuit':>8}{'fillable':>12}{'net%':>7}{'Net P&L (Rs)':>14}")
         for r_ in df.tail(top).itertuples():
             pnl_str = f"{r_.net_pnl:>+13,.0f}" if hasattr(r_, "net_pnl") else f"{r_.net_pct*1000:>+13,.0f}"
             qty_val = getattr(r_, "qty", int(capital // r_.entry))
             pre_val = getattr(r_, "pre", 0)
             ckt_band = getattr(r_, "circuit_band", "-")
-            fill_stat = "🔒 UC_LOCK" if getattr(r_, "circuit_locked", "no") == "yes" else "✅ OPEN"
+            lock_r = getattr(r_, "lock_reason", "")
+            if "hard" in lock_r or "flat" in lock_r:
+                fill_stat = "🔒 HARD_LOCK"
+            elif "opened" in lock_r or getattr(r_, "circuit_opened", False):
+                fill_stat = "⚡ OPEN_WIN"
+            elif getattr(r_, "circuit_locked", "no") == "yes":
+                fill_stat = "🔒 UC_LOCK"
+            else:
+                fill_stat = "✅ OPEN"
             print(f"{r_.date:<12}{r_.symbol:<12}{r_.tier:<10}{qty_val:>5d}"
                   f"{r_.entry:>9.2f}{r_.exit:>9.2f}{r_.day_ret:>6.1f}{r_.rvol:>5.1f}"
-                  f"{pre_val:>4}{ckt_band:>8}{fill_stat:>9}{r_.net_pct:>+6.2f}%{pnl_str}")
+                  f"{pre_val:>4}{ckt_band:>8}{fill_stat:>12}{r_.net_pct:>+6.2f}%{pnl_str}")
 
     print("\n" + "-" * 128)
-    print("CIRCUIT ENTRY: When a stock hits upper circuit, entries at 15:20 close are unfillable (0 sellers).")
-    print("Use --pre-circuit to simulate buying on the ramp ~0.8% before the circuit level was touched.")
+    print("CIRCUIT ENTRY: In 75% of circuit cases, the circuit OPENS during the day (open windows with active sellers).")
+    print("Use --pre-circuit to simulate entering on open windows/ramps ~0.8% before the final ceiling.")
     print(f"Capital sized at Rs {capital:,.0f} per trade; costs charged at {COST_ROUND_TRIP}% round trip.")
     print("Yahoo daily data, not Dhan - per-symbol volume can differ, so counts may not match live exactly.")
     print("One regime (2021-2026). Past results are not forward validation.")
