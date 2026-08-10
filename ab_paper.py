@@ -1097,7 +1097,7 @@ def main() -> int:
                 five = fetch_5m(
                     client, sid, seg,
                     datetime.combine(start_week.date(), dtime(9, 0)).replace(tzinfo=IST),
-                    datetime.now(IST), interval)
+                    datetime.now(IST), interval, symbol=sym)
         except Exception as exc:                       # noqa: BLE001
             print(f"  {sym}: fetch failed ({str(exc)[:60]})")
             continue

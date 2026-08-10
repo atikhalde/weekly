@@ -123,6 +123,7 @@ class Strategy:
     # stock to close in the top 10% of its daily range turns that into
     # +0.688% (t 7.73, +0.701% out of sample). Inert unless a model sets it.
     anticipate_only: bool = False
+    anticipate_mode: str = "all"
 
     # --- Gate rows that MEASURED NEGATIVE at a multi-day horizon -------------
     # Both default to True (Pine behaviour, unchanged for the live scanner).

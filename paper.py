@@ -295,14 +295,14 @@ def simulate(sig, bars_after: pd.DataFrame, capital: float,
 #  Data
 # --------------------------------------------------------------------------- #
 def fetch_5m(client, sec_id: str, seg: str, start: datetime, end: datetime,
-             interval: int) -> pd.DataFrame:
+             interval: int, symbol: str | None = None) -> pd.DataFrame:
     """5m candles across a long window, in Dhan's 90-day slices."""
     frames, cursor = [], start
     while cursor < end:
         chunk_end = min(cursor + timedelta(days=85), end)
         try:
             part = client.intraday_candles(sec_id, seg, cursor, chunk_end,
-                                           interval=interval)
+                                           interval=interval, symbol=symbol)
             if not part.empty:
                 frames.append(part)
         except DhanError as exc:
