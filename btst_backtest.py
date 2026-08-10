@@ -77,7 +77,8 @@ from strategy import build_weekly_bars         # noqa: E402
 
 DATA_DIR = os.environ.get("BTST_BACKTEST_DATA", "/tmp/daily")
 COST_ROUND_TRIP = 0.22          # matches models.yaml defaults
-DEFAULT_CAPITAL = 100000.0      # Rs 1,00,000 per trade
+DEFAULT_CAPITAL = 100000.0      # Rs 1,00,000 per trade (single trade max 1L without CAGR)
+MAX_DAILY_TRADES = 3            # max 3 trades taken per day
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/120.0 Safari/537.36"}
@@ -330,7 +331,9 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
         entry_eff = ckt["pre_entry"] if (use_pre_circuit_entry and is_locked) else close[j]
         nxt = close[j + 1]
         gross = (nxt / entry_eff - 1) * 100.0
-        qty = int(DEFAULT_CAPITAL // entry_eff) if entry_eff > 0 else 0
+        # Sizing: strictly capped at Rs 1,00,000 max per single trade without CAGR
+        cap_trade = min(DEFAULT_CAPITAL, 100000.0)
+        qty = int(cap_trade // entry_eff) if entry_eff > 0 else 0
         invested = round(qty * entry_eff, 2)
         gross_pnl = round((nxt - entry_eff) * qty, 2)
         turnover = (entry_eff + nxt) * qty
@@ -454,37 +457,43 @@ HDR = (f"{'slice':<20}{'trades':>7}{'/wk':>6}{'win%':>7}{'mean%':>9}"
        f"{'med%':>8}{'PF':>6}{'t':>6}{'P(+5%)':>8}{'Net PnL (Rs)':>13}{'Avg Rs':>9}")
 
 
-def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital: float = DEFAULT_CAPITAL) -> dict:
+def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital_per_slot: float = DEFAULT_CAPITAL,
+                                    max_trades_per_day: int = MAX_DAILY_TRADES,
+                                    initial_capital: float | None = None) -> dict:
     """
-    Simulate daily compounding (CAGR method) starting at Rs 1,00,000.
-    Every next day adjusts the trading capital according to cumulative PnL.
+    Simulate daily compounding (CAGR method) starting with 3 slots of Rs 1,00,000 (Rs 3,00,000 total portfolio).
+    Takes at most max_trades_per_day (3) trades per day.
+    Every next day adjusts position sizing according to cumulative PnL.
     """
+    if initial_capital is not None:
+        initial_capital_per_slot = initial_capital
+    total_initial = initial_capital_per_slot * max_trades_per_day
     if df.empty:
-        return {"initial": initial_capital, "equity": initial_capital, "net_pnl": 0.0,
+        return {"initial": total_initial, "equity": total_initial, "net_pnl": 0.0,
                 "total_return_pct": 0.0, "cagr_pct": 0.0, "max_dd_pct": 0.0, "active_days": 0}
     r = df.copy()
     r["_k"] = ((r.arm == "fresh_A") * 300 + (r.arm == "aged_B") * 200
                + (r.arm.str.startswith("ant_")) * 100
                + r.rvol.fillna(0).clip(0, 50))
-    book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(5)
+    book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(max_trades_per_day)
     days = sorted(book.date.unique())
-    equity = initial_capital
+    equity = total_initial
     curve = [equity]
     for d in days:
         sub = book[book.date == d]
-        n_pos = max(len(sub), 1)
-        cap_pos = equity / n_pos
+        n_pos = min(len(sub), max_trades_per_day)
+        cap_pos = equity / max_trades_per_day
         day_pnl = 0.0
         for _, row in sub.iterrows():
             day_pnl += cap_pos * (float(row["net_pct"]) / 100.0)
         equity += day_pnl
         curve.append(equity)
 
-    tot_ret = (equity - initial_capital) / initial_capital * 100.0
+    tot_ret = (equity - total_initial) / total_initial * 100.0
     d0 = pd.to_datetime(days[0])
     d1 = pd.to_datetime(days[-1])
     years = max((d1 - d0).days / 365.25, 0.05)
-    cagr = (((equity / initial_capital) ** (1.0 / years)) - 1.0) * 100.0 if equity > 0 else -100.0
+    cagr = (((equity / total_initial) ** (1.0 / years)) - 1.0) * 100.0 if equity > 0 else -100.0
 
     arr = np.array(curve)
     peaks = np.maximum.accumulate(arr)
@@ -492,9 +501,9 @@ def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital: float = D
     max_dd = float(dd.min())
 
     return {
-        "initial": initial_capital,
+        "initial": total_initial,
         "equity": equity,
-        "net_pnl": equity - initial_capital,
+        "net_pnl": equity - total_initial,
         "total_return_pct": tot_ret,
         "cagr_pct": cagr,
         "max_dd_pct": max_dd,
@@ -573,15 +582,15 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
     for y, g in df.assign(y=pd.to_datetime(df.date).dt.year).groupby("y"):
         print(_stats(g, f"  {y}"))
 
-    # a top-5/day book, which is what actually gets traded
-    print("\nTOP-5 PER DAY (the traded book: Rs 1,00,000 per position)")
+    # a top-3/day book (max 3 trades per day)
+    print(f"\nTOP-{MAX_DAILY_TRADES} PER DAY (the traded portfolio: max {MAX_DAILY_TRADES} trades/day, Rs {capital:,.0f}/trade max)")
     r = df.copy()
     r["_k"] = ((r.arm == "fresh_A") * 300 + (r.arm == "aged_B") * 200
                + (r.arm.str.startswith("ant_")) * 100
                + r.rvol.fillna(0).clip(0, 50))
-    book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(5)
+    book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(MAX_DAILY_TRADES)
     print(HDR)
-    print(_stats(book, "  top-5/day"))
+    print(_stats(book, f"  top-{MAX_DAILY_TRADES}/day"))
     day = book.groupby("date").net_pct.mean()
     day_pnl = book.groupby("date").net_pnl.sum() if "net_pnl" in book.columns else day * 1000.0
     eq = (1 + day / 100).cumprod()
