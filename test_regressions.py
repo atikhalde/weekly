@@ -7592,3 +7592,35 @@ def test_bug79_scorecard_grades_the_previous_picks():
     # wired into the message
     body = (ROOT / "btst.py").read_text()
     assert "score_prior_picks(cfg, client, now, caps)" in body
+
+
+def test_bug80_snapshot_failure_names_the_cause():
+    """
+    THE 09/10-Aug OUTAGE. The Sunday snapshot failed with DH-901 (the Dhan
+    access token had expired - they last ~30 days). Every 5-minute scan on
+    Monday morning then refused to run:
+
+        NO USABLE SNAPSHOT ROWS for week 2026-08-10 at logic_version 3.
+        Refusing to scan rather than alert against stale breakout levels.
+
+    That refusal is CORRECT and the health check flagged it correctly. What
+    was missing was the reason: the Telegram notice said only "FAILED", so the
+    single actionable fact - renew the token - sat in a log nobody opened,
+    and five scans were lost before it was noticed.
+    """
+    wf = (ROOT / ".github" / "workflows" / "snapshot.yml").read_text()
+
+    # the build output must be captured for the notifier to inspect
+    assert "tee build.log" in wf, "the build must record its output"
+    assert "set -o pipefail" in wf, (
+        "piping to tee without pipefail masks a failed build as success")
+
+    # and the failure notice must name the cause
+    assert "DH-901" in wf and "Invalid_Authentication" in wf
+    assert "DHAN_ACCESS_TOKEN is expired" in wf
+    assert "web.dhan.co" in wf, "tell the user WHERE to renew it"
+    assert "rate limit" in wf, "a 429 build is a different fix"
+
+    # the refusal-to-run behaviour must stay - it is the safety property
+    scan = (ROOT / "scan.py").read_text()
+    assert "report_stale_snapshot" in scan
