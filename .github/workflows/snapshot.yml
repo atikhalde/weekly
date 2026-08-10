@@ -62,9 +62,15 @@ jobs:
           DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
           DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
         run: |
+          # tee to build.log so the failure notice can name the CAUSE
+          # (expired token vs rate limit) instead of just "FAILED".
+          # PIPESTATUS keeps the real exit code - piping to tee would
+          # otherwise mask a failure as success.
+          set -o pipefail
           python build_snapshot.py \
             ${{ inputs.fresh && '--fresh' || '' }} \
-            ${{ inputs.limit && format('--limit {0}', inputs.limit) || '' }}
+            ${{ inputs.limit && format('--limit {0}', inputs.limit) || '' }} \
+            2>&1 | tee build.log
 
       # Keep the output even if the commit step later fails, so a 2-hour build
       # is never lost to a git problem.
@@ -156,6 +162,19 @@ jobs:
             MSG=$'✅ <b>Weekly snapshot rebuilt</b>\n'"${ROWS} symbols armed for the week."
           else
             MSG=$'🚨 <b>Weekly snapshot FAILED</b>\n'
+            # Name the CAUSE, not just the symptom. On 09-Aug this failed with
+            # DH-901 (expired Dhan token) and the alert said only "FAILED", so
+            # the real reason sat in a log nobody opened. Every scan on 10-Aug
+            # then refused to run until the token was renewed - correct
+            # behaviour, but the 90 seconds of "why" was missing.
+            if grep -q "DH-901\|Invalid_Authentication\|auth failed" build.log 2>/dev/null; then
+              MSG+=$'<b>Cause: the DHAN_ACCESS_TOKEN is expired or invalid (DH-901).</b>\n'
+              MSG+=$'Dhan tokens last ~30 days.\n'
+              MSG+=$'Fix: generate a new token at web.dhan.co → My Profile → DhanHQ Trading APIs,\n'
+              MSG+=$'then update the DHAN_ACCESS_TOKEN repo secret and re-run this workflow.\n\n'
+            elif grep -q "429\|rate limit" build.log 2>/dev/null; then
+              MSG+=$'<b>Cause: Dhan rate-limited the build.</b> Re-running usually clears it.\n\n'
+            fi
             MSG+=$'The scanner does NOT fall back to old levels - it refuses to run.\n'
             MSG+=$'Expect NO alerts, NO shortlist and NO BTST scan until this is rebuilt.\n\n'
             MSG+=$'Re-run: Actions → Weekly Snapshot → Run workflow (tick <b>fresh</b>).'
