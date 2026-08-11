@@ -2493,6 +2493,68 @@ def main() -> int:
                      "🔭 below-level beat 🚀 above (+1.33% vs +0.89%). "
                      "Most still do not run — it pays through the tail.</i>")
 
+    # ---- ACTIONABLE PORTFOLIO BUY LIST (Top 3 Fillable Setups) -------------
+    actionable = []
+    excluded_locked = []
+
+    # 1. Confirmed picks
+    for r in picks:
+        c_val = float(r.get("close") or 0.0)
+        day_ret_val = float(r.get("day_ret") or 0.0)
+        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
+        if ckt["is_locked"]:
+            excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
+        else:
+            q_val = int(100000 // c_val) if c_val > 0 else 0
+            actionable.append({
+                "symbol": r["symbol"],
+                "badge": "🟢 Confirmed",
+                "tier": r["tier"],
+                "price": c_val,
+                "qty": q_val,
+                "invest": q_val * c_val,
+                "prime": "🔥 Prime #2" if (r["tier"] == "A" or float(r.get("rvol") or 0) >= 5.0) else ""
+            })
+
+    # 2. Anticipate picks
+    for r in ant_picks:
+        c_val = float(r.get("close") or 0.0)
+        day_ret_val = float(r.get("day_ret") or 0.0)
+        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
+        if ckt["is_locked"]:
+            excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
+        else:
+            q_val = int(100000 // c_val) if c_val > 0 else 0
+            actionable.append({
+                "symbol": r["symbol"],
+                "badge": "🔭 Anticipate",
+                "tier": f"PRE {r.get('pre', 0)}/8",
+                "price": c_val,
+                "qty": q_val,
+                "invest": q_val * c_val,
+                "prime": "⭐ Prime #1" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
+            })
+
+    # Top 3 actionable orders
+    top3_actionable = actionable[:3]
+    if top3_actionable and not too_late:
+        lines += ["━━━━━━━━━━━━━━━━━━━━",
+                  "🛒 <b>TODAY'S ACTIONABLE BUY LIST (Max 3 · ₹1,00,000 / trade)</b>",
+                  "<i>Place these market buy orders between 15:15 and 15:25 IST:</i>"]
+        for idx, act in enumerate(top3_actionable, 1):
+            tag_str = f" · {act['prime']}" if act['prime'] else ""
+            lines.append(
+                f"<b>{idx}. {act['badge']}</b> · <b>{act['symbol']}</b>{tag_str}\n"
+                f"   ► Buy <b>{act['qty']}</b> shares @ ~₹{_fmt(act['price'])} (Total: ₹{act['invest']:,.0f})\n"
+                f"   ► Exit: Sell at tomorrow's 09:15 open (hold if UC locked; cut if open ≤ -1.5%)"
+            )
+        if excluded_locked:
+            lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
+            lines.append(f"\n🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>")
+        lines.append("━━━━━━━━━━━━━━━━━━━━\n")
+
     # BUG 58: these footers quoted the ORIGINAL tier study (+1.75%/+0.83%,
     # "win rate ~50%"). Those numbers described the pre-BUG-53/54/57 rule and
     # were left untouched through three threshold changes, so the message was
