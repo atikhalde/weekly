@@ -127,7 +127,7 @@ jobs:
           git commit -m "BTST picks $(date -u +%Y-%m-%d)"
           # the 5m scan commits state.json on the same repo; rebase with -X theirs
           for attempt in 1 2 3 4 5; do
-            if git pull --rebase -X theirs origin "${{ github.ref_name }}" && git push origin "${{ github.ref_name }}"; then
+            if git pull --rebase --autostash -X theirs origin "${{ github.ref_name }}" && git push origin "${{ github.ref_name }}"; then
               echo "pushed on attempt $attempt"
               exit 0
             fi

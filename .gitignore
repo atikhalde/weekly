@@ -6,3 +6,10 @@ venv/
 *.tmp
 .pytest_cache/
 .DS_Store
+btst_20*.csv
+watchlist_20*.csv
+watchlist_actionable.csv
+btst_backtest_trades.csv
+build.log
+rows.txt
+
