@@ -2282,217 +2282,6 @@ def main() -> int:
             log.info("wrote %s (%d today, %d total)",
                      afile.name, len(ant_picks), len(aout))
 
-    # ---- BUG 53d: THE MESSAGE MUST NOT CLAIM EVERYTHING BROKE OUT TODAY ----
-    # The header used to say "broke out TODAY only" unconditionally. With aged
-    # tier B in the list that would be a lie, and a name 55 days past its
-    # cross presented as a fresh breakout is exactly the kind of thing that
-    # gets acted on wrongly. Each pick now states its own age.
-    n_fresh = sum(1 for r in picks if r.get("fresh"))
-    n_aged = len(picks) - n_fresh
-    # BUG 68: "N candle(s) checked" reports only SUCCESSES, so a small pool
-    # and a broken feed look identical. On 07-Aug the 15:18 run said "7
-    # candle(s) checked" and the 16:08 rerun said 17 - the difference was the
-    # POOL (how many names were candidates at all), not lost candles, but the
-    # message gave no way to tell. State the composition explicitly.
-    lines = [f"🌙 <b>BTST — {now:%d-%b-%Y} {now:%H:%M} IST</b>",
-             f"<i>{when}, exit tomorrow · {len(rows)} of {len(todo)} candidate(s) "
-             f"screened ({len(fired)} broke out today + {len(aged_pool)} aged"
-             f"{f', {len(snaps)} in snapshot' if not aged_pool else ''})</i>", ""]
-    # BUG 55: a late run must say so at the TOP, before any price.
-    if too_late:
-        lines.insert(2, f"⛔ <b>TOO LATE — ran {now:%H:%M}, market closed "
-                        f"{entry_close:%H:%M}</b>")
-        lines.insert(3, "<i>These are NOT tradeable today. The buy-at-close "
-                        "entry is gone; they are logged for the record only. "
-                        "Do not chase them at tomorrow's open — that forfeits "
-                        "the overnight move this model exists to capture.</i>")
-        lines.insert(4, "")
-    elif too_early:
-        lines.insert(2, f"⏳ <b>PROVISIONAL — ran {now:%H:%M}, before "
-                        f"{entry_open:%H:%M}</b>")
-        lines.insert(3, "<i>The candle is still changing; only ~70% of names "
-                        "flagged this early still qualify at the close. Wait "
-                        "for the 15:20 list before acting.</i>")
-        lines.insert(4, "")
-    # BUG 79: how did the LAST set of picks actually do? Placed before
-    # tonight's list, because a result you can check is worth more than an
-    # average you have to trust.
-    _sc = score_prior_picks(cfg, client, now, caps)
-    if _sc:
-        lines += ["━━━━━━━━━━━━━━━━━━━━"] + _sc
-    lines.insert(2 if not (too_late or too_early) else 5,
-                 "🔥 <b>CONFIRMED — today's setups</b>")
-    lines.insert(3 if not (too_late or too_early) else 6, "")
-    if stopped_early:
-        lines.append(f"<i>⏱ Scan stopped at the {deadline:%H:%M} deadline with "
-                     f"{stopped_early} name(s) unchecked, so the list may be "
-                     f"incomplete. Everything shown was fully screened.</i>")
-        lines.append("")
-    # BUG 68: a missing bulk quote silently disables the entire aged pass.
-    if quote_failed:
-        lines.append(
-            "⚠️ <b>Quote feed unavailable — aged setups were NOT scanned.</b> "
-            "<i>Only names that crossed their level today are in scope, so a "
-            "stock that gapped above its level this morning is invisible to "
-            "this run. Treat the list as partial.</i>")
-        lines.append("")
-    # BUG 67: never let a data outage read as a quiet market.
-    if drops:
-        lost = sum(v for k, v in drops.items() if k != "quote fallback")
-        if lost:
-            lines.append(
-                f"⚠️ <b>{lost} of {len(todo)} candidate(s) returned no candle</b> "
-                f"<i>— {', '.join(f'{k}: {v}' for k, v in drops.items() if k != 'quote fallback')}. "
-                f"This list is INCOMPLETE; a setup may exist that was never "
-                f"screened.</i>")
-            lines.append("")
-        if drops.get("quote fallback"):
-            lines.append(
-                f"<i>ℹ️ {drops['quote fallback']} name(s) judged from the bulk "
-                f"quote (intraday feed unavailable) — no volume, so TIER B "
-                f"could not be tested on them.</i>")
-            lines.append("")
-    if not picks:
-        lines.append("<i>No setup qualified today. That is the normal case — "
-                     "the tiers fire ~4 times a week combined.</i>")
-    elif n_aged:
-        lines.append(f"<i>{n_fresh} broke out today · {n_aged} already above "
-                     f"the level (Tier B holds with age; Tier A does not).</i>")
-        lines.append("")
-    for r in picks:
-        badge = ("🔥 <b>TIER A</b>" if r["tier"] == "A" else "⭐ <b>TIER B</b>")
-        badge = f"<b>#{r['rank']}</b> {badge}"
-        cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
-        prov = " <i>(candle still forming)</i>" if float(
-            r.get("partial_frac", 1.0)) < 0.999 else ""
-        pre_tag = f" <b>{r['pre']}/8</b>" if r.get("pre") is not None else ""
-        age = int(r.get("age", 0))
-        age_tag = "" if r.get("fresh") else f" <i>· {age}d old</i>"
-        where = ("above" if float(r.get("ext_pct") or 0) >= 0 else "below")
-        when_txt = ("broke out today" if r.get("fresh")
-                    else f"broke out {age} session(s) ago")
-        # Circuit tracking
-        day_ret_val = float(r.get("day_ret") or 0.0)
-        close_val = float(r.get("close") or 0.0)
-        pc_val = close_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else close_val
-        ckt = get_circuit_info(pc_val, close_val, float(r.get("high") or close_val))
-        ckt_line = f"    🎯 <b>Circuit:</b> ₹{_fmt(ckt['uc_limit'])} (+{int(ckt['band'])}%) · {ckt['dist_to_uc']:+.1f}% to lock"
-        if ckt["is_locked"]:
-            ckt_action = f"    🔒 <b>LOCKED AT UPPER CIRCUIT (+{int(ckt['band'])}%)</b> <i>· 0 sellers at 15:20 (unfillable)</i>"
-        elif 0.2 <= ckt["dist_to_uc"] <= 1.5:
-            ckt_action = f"    ⚡ <b>PRE-CIRCUIT ZONE:</b> <i>Enter ~{_fmt(ckt['pre_entry'])} BEFORE circuit locks at {_fmt(ckt['uc_limit'])}</i>"
-        else:
-            ckt_action = ""
-
-        # BUG 54b: conviction is about the SIZE of the move, not the odds of
-        # a win. Labelled so it cannot be misread as "safest".
-        cv = int(r.get("conviction", 0))
-        cv_line = (f"    ⚡ <b>{cv}/{CONVICTION_MAX} explosive</b> "
-                   f"<i>· {', '.join(r.get('conv_why') or []) or 'none'}"
-                   f"{' · high tail, lower hit-rate' if cv >= 3 else ''}</i>")
-        # Prime Entry #2 Tag
-        is_fresh = bool(r.get("fresh"))
-        rvol_val = float(r.get("rvol") or 0.0)
-        close_pos_val = float(r.get("close_pos") or 0.0)
-        prime2_tag = " · 🔥 <b>PRIME ENTRY #2</b>" if (is_fresh and (r["tier"] == "A" or rvol_val >= 5.0) and close_pos_val >= 0.98) else ""
-
-        qty_1l = int(100000 // close_val) if close_val > 0 else 0
-
-        lines += [
-            f"{badge}{pre_tag}{prime2_tag}  <b>{_esc(r['symbol'])}</b>  "
-            f"{_fmt(r['close'])}{cap}{prov}{age_tag}",
-            f"    day <b>{r['day_ret']:+.1f}%</b> · closed at "
-            f"<b>{r['close_pos']*100:.0f}%</b> of range · "
-            f"rvol <b>{r['rvol']:.1f}x</b>{_rvol_detail(r)} · atr {r['atr_pct']:.1f}%",
-            f"    <i>{r['ext_pct']:+.1f}% {where} the 26W level "
-            f"{_fmt(r['level'])}</i>",
-            ckt_line,
-            cv_line]
-        if ckt_action:
-            lines.append(ckt_action)
-        lines += [
-            (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> "
-             f"<i>· {when_txt} · scan ran after the close, not tradeable</i>"
-             if too_late else
-             f"    <b>BUY NOW ~{_fmt(r['close'])}</b> (Qty: <b>{qty_1l}</b> shares · ₹1,00,000 max) "
-             f"<i>· SELL at 09:15 open (hold if UC locked; cut if open ≤ -1.5%)</i>"), ""]
-
-    if dropped:
-        extra = ", ".join(_esc(r["symbol"]) for r in qualified[TOP_N:])
-        lines.append(f"<i>{dropped} more qualified but the cap is top "
-                     f"{TOP_N}: {extra}</i>")
-        lines.append("")
-
-    if args.all:
-        rest = [r for r in rows if not r.get("tier")]
-        if rest:
-            lines += [f"<i>no tier ({len(rest)}): "
-                      + ", ".join(_esc(r["symbol"]) for r in rest[:40]) + "</i>", ""]
-
-    # ---- SECTION 2: anticipation, kept visually separate ------------------
-    if not args.no_anticipate:
-        lines += ["", "━━━━━━━━━━━━━━━━━━━━",
-                  f"🔭 <b>ANTICIPATE — about to break out</b>",
-                  f"<i>🚀 above the level (to +{ANTICIPATE_ABOVE_MAX:g}%) or "
-                  f"🔭 within {ANTICIPATE_NEAR:g}% below · closed in the top "
-                  f"{int((1-ANTICIPATE_CLOSE_POS)*100)}% of today's range · "
-                  f"PRE ≥{MIN_PRE_CONFIRM} · 12m ≥{MIN_RET_12M:.0f}% · "
-                  f"≥{MIN_DIST_200DMA:.0f}% over 200DMA · "
-                  f"{len(ant_rows)} screened</i>", ""]
-        if not ant_picks:
-            lines.append("<i>Nothing qualified. Normal — this fires ~5x a "
-                         "week.</i>")
-        for r in ant_picks:
-            cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
-            prov = " <i>(forming)</i>" if float(
-                r.get("partial_frac", 1.0)) < 0.999 else ""
-            prime1_tag = " · ⭐ <b>PRIME ENTRY #1</b>" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
-            ant_close_val = float(r.get("close") or 0.0)
-            ant_qty_1l = int(100000 // ant_close_val) if ant_close_val > 0 else 0
-
-            lines += [
-                f"<b>#{r['rank']}</b> "
-                f"{'🚀' if r.get('side') == 'above' else '🔭'} "
-                f"<b>{r.get('pre', 0)}/8</b>{prime1_tag} "
-                f"<b>{_esc(r['symbol'])}</b>  {_fmt(r['close'])}{cap}{prov}",
-                (f"    <b>{abs(r['gap_pct']):.2f}% above</b> the {r['which']} "
-                 f"level <code>{_fmt(r['level'])}</code>"
-                 if r.get("side") == "above" else
-                 f"    <b>{r['gap_pct']:.2f}% below</b> the {r['which']} level "
-                 f"<code>{_fmt(r['level'])}</code>") +
-                f" · closed at <b>{r['close_pos']*100:.0f}%</b> of range · "
-                f"day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x"
-                f"{_rvol_detail(r)}",
-                f"    <i>12m {r.get('ret_12m', 0):+.0f}% · "
-                f"{r.get('dist_200dma', 0):+.0f}% over the 200DMA</i>",
-                f"    🎯 <b>Circuit:</b> ₹{_fmt(round(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0)*(1.0+get_circuit_info(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0), float(r.get('close',0)))['band']/100.0),2))} (+{int(get_circuit_info(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0), float(r.get('close',0)))['band'])}%) · {get_circuit_info(float(r.get('close',0))/(1+float(r.get('day_ret',0))/100.0), float(r.get('close',0)))['dist_to_uc']:+.1f}% to lock",
-                # BUG 63: this line ignored too_late. At 20:43 the confirmed
-                # list correctly read MISSED while the anticipation list still
-                # said BUY NOW on the same dead entry - the exact failure
-                # BUG 55 was written to stop, left in the one place it was not
-                # applied.
-                (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> "
-                 f"<i>· scan ran after the close, not tradeable</i>"
-                 if too_late else
-                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> (Qty: <b>{ant_qty_1l}</b> shares · ₹1,00,000 max) "
-                 f"<i>· SELL at 09:15 open (hold if UC locked; cut if open ≤ -1.5%)</i>"), ""]
-        if ant_dropped:
-            lines.append(f"<i>{ant_dropped} more qualified, cap is top "
-                         f"{ANTICIPATE_TOP_N}</i>")
-        # BUG 58: re-measured. The old line claimed above-level BEAT below
-        # (+0.82% vs +0.58%) - that was BUG 47's number, taken on a different
-        # population (no PRE floor, no trend floor, any distance). Inside the
-        # window this list actually screens, the ordering is REVERSED:
-        #     BELOW the level  n=810   +1.325%  t  9.4  OOS +1.418%
-        #     ABOVE the level  n=2,795 +0.886%  t 10.6  OOS +0.918%
-        # The sort still puts above-level first and that is left alone: at
-        # top-5 the cap almost never binds, so both orderings measure the
-        # SAME (+0.964%/trade, 55.9% win). Only the false claim is removed.
-        lines.append("<i>close_pos≥0.90 + 12m≥50% + 200DMA≥25% measured "
-                     "+0.99%/trade (t 13.7, n=3,605), +1.03% out of sample. "
-                     "🔭 below-level beat 🚀 above (+1.33% vs +0.89%). "
-                     "Most still do not run — it pays through the tail.</i>")
-
     # ---- ACTIONABLE PORTFOLIO BUY LIST (Top 3 Fillable Setups) -------------
     actionable = []
     excluded_locked = []
@@ -2537,52 +2326,115 @@ def main() -> int:
                 "prime": "⭐ Prime #1" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
             })
 
-    # Top 3 actionable orders
     top3_actionable = actionable[:3]
+
+    # ---- BUILD THE TELEGRAM MESSAGE ----------------------------------------
+    n_fresh = sum(1 for r in picks if r.get("fresh"))
+    n_aged = len(picks) - n_fresh
+
+    lines = [f"🌙 <b>BTST EXECUTION ORDERS — {now:%d-%b-%Y} {now:%H:%M} IST</b>",
+             f"<i>{when} · Max 3 trades · ₹1,00,000 / trade · {len(rows)} of {len(todo)} candidate(s) screened ({len(fired)} broke out today + {len(aged_pool)} aged)</i>", ""]
+
+    if too_late:
+        lines.insert(2, f"⛔ <b>TOO LATE — ran {now:%H:%M}, market closed {entry_close:%H:%M}</b>")
+        lines.insert(3, "<i>These are NOT tradeable today. Logged for audit only.</i>")
+        lines.insert(4, "")
+    elif too_early:
+        lines.insert(2, f"⏳ <b>PROVISIONAL — ran {now:%H:%M}, before {entry_open:%H:%M}</b>")
+        lines.insert(3, "<i>The candle is still forming (~70% reliable). Wait for 15:20 list before acting.</i>")
+        lines.insert(4, "")
+
+    # 1. Actionable buy list at the very top
     if top3_actionable and not too_late:
-        lines += ["━━━━━━━━━━━━━━━━━━━━",
-                  "🛒 <b>TODAY'S ACTIONABLE BUY LIST (Max 3 · ₹1,00,000 / trade)</b>",
-                  "<i>Place these market buy orders between 15:15 and 15:25 IST:</i>"]
+        lines += ["🛒 <b>TODAY'S ACTIONABLE BUY LIST (Top 3)</b>",
+                  "━━━━━━━━━━━━━━━━━━━━"]
         for idx, act in enumerate(top3_actionable, 1):
             tag_str = f" · {act['prime']}" if act['prime'] else ""
             lines.append(
                 f"<b>{idx}. {act['badge']}</b> · <b>{act['symbol']}</b>{tag_str}\n"
                 f"   ► Buy <b>{act['qty']}</b> shares @ ~₹{_fmt(act['price'])} (Total: ₹{act['invest']:,.0f})\n"
-                f"   ► Exit: Sell at tomorrow's 09:15 open (hold if UC locked; cut if open ≤ -1.5%)"
+                f"   ► Exit: Sell 50% at 09:15 open (hold if UC locked; cut if open ≤ -1.5%)"
             )
         if excluded_locked:
             lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
             lines.append(f"\n🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>")
         lines.append("━━━━━━━━━━━━━━━━━━━━\n")
 
-    # BUG 58: these footers quoted the ORIGINAL tier study (+1.75%/+0.83%,
-    # "win rate ~50%"). Those numbers described the pre-BUG-53/54/57 rule and
-    # were left untouched through three threshold changes, so the message was
-    # under-reporting the shipped rule by more than half and claiming a win
-    # rate 13 points below the real one. Re-measured on the CURRENT rule
-    # (close_pos>=0.98 both tiers, aged tier B, no trend floor on the tier
-    # path), 892,121 tradeable stock-days, entry at the 15:20 price, exit at
-    # tomorrow's close, net 0.22%:
-    #     TIER A (fresh)  n=302   1.2/wk  57.0% win  +3.044%  t  6.4  OOS +3.809%
-    #     TIER B          n=852   3.3/wk  65.0% win  +2.148%  t 11.5  OOS +2.450%
-    #     the list        n=1154  4.5/wk  62.9% win  +2.382%  t 12.8  OOS +2.760%
-    # Any future threshold change MUST update these three lines - a regression
-    # test now pins them to the live constants.
-    lines += ["", "━━━━━━━━━━━━━━━━━━━━",
-        "<i>Tier A measured +3.04%/trade (t 6.4, n=302, 57% win) over 5 years; "
-        "Tier B +2.15% (t 11.5, n=852, 65% win). Out of sample +3.81% / "
-        "+2.45%. Roughly 3 of every 5 win, and the average is carried by the "
-        "tail — one in five gains 5%+ overnight. Exit at tomorrow's close.</i>",
-        "<i>Reality check: ~31 stocks a week jump 5%+ across the market and "
-        "this list flags ~4.5, catching about 3% of them. Missing most big "
-        "movers is the price of the hit rate, not a fault.</i>"]
-    if partial:
+    # 2. Scorecard of yesterday's picks
+    _sc = score_prior_picks(cfg, client, now, caps)
+    if _sc:
+        lines += ["━━━━━━━━━━━━━━━━━━━━"] + _sc
+
+    # 3. Confirmed breakouts breakdown
+    lines += ["🔥 <b>CONFIRMED — today's setups</b>", ""]
+    if quote_failed:
         lines.append(
-            "<i>⚠ Judged on a partial candle. Measured at this cutoff, 82% of "
-            "flagged names still qualify at the bell — so roughly one in five "
-            "breaks down in the last ten minutes. Check the close before "
-            "sizing up.</i>")
-    lines.append("<i>Paper only. No orders are placed.</i>")
+            "⚠️ <b>Quote feed unavailable — aged setups were NOT scanned.</b> "
+            "<i>Only names that crossed their level today are in scope.</i>\n")
+    if drops:
+        lost = sum(v for k, v in drops.items() if k != "quote fallback")
+        if lost:
+            lines.append(
+                f"⚠️ <b>{lost} of {len(todo)} candidate(s) returned no candle</b> "
+                f"<i>— {', '.join(f'{k}: {v}' for k, v in drops.items() if k != 'quote fallback')}. "
+                f"This list is INCOMPLETE; a setup may exist that was never screened.</i>\n")
+    if not picks:
+        lines.append("<i>No setup qualified today. Disciplined execution waits for the right setups.</i>")
+    else:
+        if n_aged:
+            lines.append(f"<i>{n_fresh} broke out today · {n_aged} already above level (Tier B holds with age; Tier A does not).</i>\n")
+        for r in picks:
+            badge = ("🔥 <b>TIER A</b>" if r["tier"] == "A" else "⭐ <b>TIER B</b>")
+            badge = f"<b>#{r['rank']}</b> {badge}"
+            cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
+            prov = " <i>(still forming)</i>" if float(r.get("partial_frac", 1.0)) < 0.999 else ""
+            pre_tag = f" <b>{r['pre']}/8</b>" if r.get("pre") is not None else ""
+            age = int(r.get("age", 0))
+            age_tag = "" if r.get("fresh") else f" <i>· {age}d old</i>"
+            where = ("above" if float(r.get("ext_pct") or 0) >= 0 else "below")
+            when_txt = ("broke out today" if r.get("fresh") else f"broke out {age} session(s) ago")
+            close_val = float(r.get("close") or 0.0)
+            day_ret_val = float(r.get("day_ret") or 0.0)
+            pc_val = close_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else close_val
+            ckt = get_circuit_info(pc_val, close_val, float(r.get("high") or close_val))
+            ckt_line = f"    🎯 <b>Circuit:</b> ₹{_fmt(ckt['uc_limit'])} (+{int(ckt['band'])}%) · {ckt['dist_to_uc']:+.1f}% to lock"
+            is_fresh = bool(r.get("fresh"))
+            rvol_val = float(r.get("rvol") or 0.0)
+            close_pos_val = float(r.get("close_pos") or 0.0)
+            prime2_tag = " · 🔥 <b>PRIME ENTRY #2</b>" if (is_fresh and (r["tier"] == "A" or rvol_val >= 5.0) and close_pos_val >= 0.98) else ""
+            qty_1l = int(100000 // close_val) if close_val > 0 else 0
+
+            lines += [
+                f"{badge}{pre_tag}{prime2_tag}  <b>{_esc(r['symbol'])}</b>  {_fmt(r['close'])}{cap}{prov}{age_tag}",
+                f"    day <b>{r['day_ret']:+.1f}%</b> · closed at <b>{r['close_pos']*100:.0f}%</b> of range · rvol <b>{r['rvol']:.1f}x</b>{_rvol_detail(r)} · atr {r['atr_pct']:.1f}%",
+                ckt_line,
+                (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b> <i>· {when_txt}</i>"
+                 if too_late else
+                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> (Qty: <b>{qty_1l}</b> shares · ₹1,00,000 max)"), ""]
+
+    # 4. Anticipate breakdown
+    if not args.no_anticipate:
+        lines += ["", "━━━━━━━━━━━━━━━━━━━━",
+                  "🔭 <b>ANTICIPATE — about to break out</b>", ""]
+        if not ant_picks:
+            lines.append("<i>Nothing qualified today.</i>")
+        for r in ant_picks:
+            cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
+            prime1_tag = " · ⭐ <b>PRIME ENTRY #1</b>" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
+            ant_close_val = float(r.get("close") or 0.0)
+            ant_qty_1l = int(100000 // ant_close_val) if ant_close_val > 0 else 0
+            lines += [
+                f"<b>#{r['rank']}</b> {'🚀' if r.get('side') == 'above' else '🔭'} <b>{r.get('pre', 0)}/8</b>{prime1_tag} <b>{_esc(r['symbol'])}</b>  {_fmt(r['close'])}{cap}",
+                f"    <b>{abs(r['gap_pct']):.2f}% {r.get('side', 'below')}</b> level <code>{_fmt(r['level'])}</code> · closed at <b>{r['close_pos']*100:.0f}%</b> · day {r['day_ret']:+.1f}% · rvol {r.get('rvol', 0):.1f}x{_rvol_detail(r)}",
+                f"    <i>12m {r.get('ret_12m', 0):+.0f}% · {r.get('dist_200dma', 0):+.0f}% over the 200DMA</i>",
+                (f"    ⛔ <b>MISSED ~{_fmt(r['close'])}</b>"
+                 if too_late else
+                 f"    <b>BUY NOW ~{_fmt(r['close'])}</b> (Qty: <b>{ant_qty_1l}</b> shares · ₹1,00,000 max)"), ""]
+
+    # Footers
+    lines += ["", "━━━━━━━━━━━━━━━━━━━━",
+        "<i>Tier A measured +3.04%/trade (t 6.4, n=302, 57% win); Tier B +2.15% (t 11.5, n=852, 65% win). 🔭 below-level beat 🚀 above. 82% precision at 15:20 cutoff. RECALL: disciplined execution catches ~3% of market runners with high hit rate.</i>",
+        "<i>Paper execution only. No real orders placed.</i>"]
     msg = "\n".join(lines)
 
     if args.dry_run:
