@@ -130,7 +130,8 @@ def fetch_history(symbols: list[str], out_dir: str, years: int = 6,
                                   .normalize(),
                     "open": q["open"], "high": q["high"], "low": q["low"],
                     "close": q["close"], "volume": q["volume"]}).dropna()
-                if len(df) < 300:
+                min_bars = min(max(int(years * 100), 120), 250)
+                if len(df) < min_bars:
                     return "short"
                 df.to_csv(p, index=False)
                 return "ok"
