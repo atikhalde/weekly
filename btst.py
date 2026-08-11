@@ -2334,6 +2334,8 @@ def main() -> int:
             })
 
     top3_actionable = actionable[:3]
+    taken_syms = {act["symbol"] for act in top3_actionable}
+    next_anticipated = [r for r in (aq if 'aq' in locals() and aq else ant_picks) if r["symbol"] not in taken_syms][:2]
 
     # ---- BUILD THE TELEGRAM MESSAGE ----------------------------------------
     n_fresh = sum(1 for r in picks if r.get("fresh"))
@@ -2364,12 +2366,27 @@ def main() -> int:
             )
         if excluded_locked:
             lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
-            lines.append(f"🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>\n")
+            lines.append(f"\n🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>")
         lines.append("━━━━━━━━━━━━━━━━━━━━\n")
     elif not picks and not ant_picks:
         lines.append("<i>No setups qualified today matching quality filters.</i>\n")
 
-    # 2. Scorecard of yesterday's picks
+    # 2. Next 2 Closest Anticipated Watchlist for Tomorrow
+    if next_anticipated and not too_late:
+        lines += ["🔭 <b>CLOSEST ANTICIPATED WATCHLIST (Next 2 For Tomorrow)</b>",
+                  "━━━━━━━━━━━━━━━━━━━━"]
+        for idx, r in enumerate(next_anticipated, 1):
+            cap = f" <i>{r['mcap_cr']:,.0f}Cr</i>" if r.get("mcap_cr") else ""
+            side_txt = "above" if r.get("side") == "above" else "below"
+            lines.append(
+                f"<b>{idx}. 🔭 {_esc(r['symbol'])}</b> ~₹{_fmt(r['close'])}{cap}\n"
+                f"   ► <b>{abs(r['gap_pct']):.2f}% {side_txt}</b> level <code>{_fmt(r['level'])}</code> · PRE <b>{r.get('pre', 0)}/8</b>\n"
+                f"   ► Day {r['day_ret']:+.1f}% · closed at {r['close_pos']*100:.0f}% of range · rvol {r.get('rvol', 0):.1f}x\n"
+                f"   ► <i>Watch for tomorrow's breakout cross</i>"
+            )
+        lines.append("━━━━━━━━━━━━━━━━━━━━\n")
+
+    # 3. Scorecard of yesterday's picks
     _sc = score_prior_picks(cfg, client, now, caps)
     if _sc:
         lines += ["━━━━━━━━━━━━━━━━━━━━"] + _sc
