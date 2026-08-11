@@ -45,9 +45,9 @@ name: BTST Scan (15:20 IST)
 # It never places orders and never touches state.json.
 on:
   schedule:
-    # Multi-cron buffer triggers: 15:10 IST (warmup) and 15:15 IST (primary)
+    # 15:15 IST (Primary 15:15-15:20 BTST execution scan) and 15:10 IST (Warmup & early heads-up)
+    - cron: "45 9 * * 1-5" # 09:45 UTC = 15:15 IST (Primary 15:15-15:20 BTST execution scan)
     - cron: "40 9 * * 1-5" # 09:40 UTC = 15:10 IST (Early heads-up & cache warmup)
-    - cron: "45 9 * * 1-5" # 09:45 UTC = 15:15 IST (Primary scan trigger)
   # Primary zero-latency trigger: cron-job.org POSTs {"event_type":"btst"} at 15:16 IST.
   repository_dispatch:
     types: [btst]
