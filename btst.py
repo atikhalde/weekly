@@ -2303,6 +2303,9 @@ def main() -> int:
                 "price": c_val,
                 "qty": q_val,
                 "invest": q_val * c_val,
+                "day_ret": day_ret_val,
+                "rvol": float(r.get("rvol") or 0.0),
+                "close_pos": float(r.get("close_pos") or 1.0),
                 "prime": "🔥 Prime #2" if (r["tier"] == "A" or float(r.get("rvol") or 0) >= 5.0) else ""
             })
 
@@ -2323,6 +2326,10 @@ def main() -> int:
                 "price": c_val,
                 "qty": q_val,
                 "invest": q_val * c_val,
+                "day_ret": day_ret_val,
+                "rvol": float(r.get("rvol") or 0.0),
+                "close_pos": float(r.get("close_pos") or 1.0),
+                "gap_pct": float(r.get("gap_pct") or 0.0),
                 "prime": "⭐ Prime #1" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
             })
 
@@ -2357,8 +2364,10 @@ def main() -> int:
             )
         if excluded_locked:
             lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
-            lines.append(f"\n🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>")
+            lines.append(f"🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>\n")
         lines.append("━━━━━━━━━━━━━━━━━━━━\n")
+    elif not picks and not ant_picks:
+        lines.append("<i>No setups qualified today matching quality filters.</i>\n")
 
     # 2. Scorecard of yesterday's picks
     _sc = score_prior_picks(cfg, client, now, caps)
