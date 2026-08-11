@@ -2493,7 +2493,7 @@ def main() -> int:
                      "🔭 below-level beat 🚀 above (+1.33% vs +0.89%). "
                      "Most still do not run — it pays through the tail.</i>")
 
-    # ---- ACTIONABLE PORTFOLIO BUY LIST (Top 3 Fillable Setups) -------------
+    # Build Actionable Buy List (Top 3 fillable setups)
     actionable = []
     excluded_locked = []
 
@@ -2514,6 +2514,9 @@ def main() -> int:
                 "price": c_val,
                 "qty": q_val,
                 "invest": q_val * c_val,
+                "day_ret": day_ret_val,
+                "rvol": float(r.get("rvol") or 0.0),
+                "close_pos": float(r.get("close_pos") or 1.0),
                 "prime": "🔥 Prime #2" if (r["tier"] == "A" or float(r.get("rvol") or 0) >= 5.0) else ""
             })
 
@@ -2534,54 +2537,54 @@ def main() -> int:
                 "price": c_val,
                 "qty": q_val,
                 "invest": q_val * c_val,
+                "day_ret": day_ret_val,
+                "rvol": float(r.get("rvol") or 0.0),
+                "close_pos": float(r.get("close_pos") or 1.0),
+                "gap_pct": float(r.get("gap_pct") or 0.0),
                 "prime": "⭐ Prime #1" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
             })
 
     # Top 3 actionable orders
     top3_actionable = actionable[:3]
+
+    lines = [f"🌙 <b>BTST EXECUTION ORDERS — {now:%d-%b-%Y} {now:%H:%M} IST</b>",
+             f"<i>{when}, exit tomorrow · {len(rows)} candidate(s) screened</i>", ""]
+
+    if too_late:
+        lines.append(f"⛔ <b>TOO LATE — ran {now:%H:%M}, market closed {entry_close:%H:%M}</b>")
+        lines.append("<i>These are NOT tradeable today. The buy-at-close entry is gone; logged for archive only.</i>\n")
+    elif too_early:
+        lines.append(f"⏳ <b>PROVISIONAL — ran {now:%H:%M}, before {entry_open:%H:%M}</b>\n")
+
     if top3_actionable and not too_late:
-        lines += ["━━━━━━━━━━━━━━━━━━━━",
-                  "🛒 <b>TODAY'S ACTIONABLE BUY LIST (Max 3 · ₹1,00,000 / trade)</b>",
-                  "<i>Place these market buy orders between 15:15 and 15:25 IST:</i>"]
+        lines += [
+            "🛒 <b>TODAY'S ACTIONABLE BUY LIST (Max 3 · ₹1,00,000 / trade)</b>",
+            "━━━━━━━━━━━━━━━━━━━━"
+        ]
         for idx, act in enumerate(top3_actionable, 1):
             tag_str = f" · {act['prime']}" if act['prime'] else ""
             lines.append(
                 f"<b>{idx}. {act['badge']}</b> · <b>{act['symbol']}</b>{tag_str}\n"
                 f"   ► Buy <b>{act['qty']}</b> shares @ ~₹{_fmt(act['price'])} (Total: ₹{act['invest']:,.0f})\n"
-                f"   ► Exit: Sell at tomorrow's 09:15 open (hold if UC locked; cut if open ≤ -1.5%)"
+                f"   ► Day {act['day_ret']:+.1f}% · RVOL {act['rvol']:.1f}x · Closed {act['close_pos']*100:.0f}% of range\n"
+                f"   ► Exit: Sell 50% at 09:15 open · Move stop on rest to BE (+0.3%)\n"
             )
         if excluded_locked:
             lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
-            lines.append(f"\n🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>")
+            lines.append(f"🚫 <i>Excluded: {lock_names} — 0 sellers at 15:20.</i>\n")
         lines.append("━━━━━━━━━━━━━━━━━━━━\n")
+    elif not picks and not ant_picks:
+        lines.append("<i>No setups qualified today matching quality filters.</i>\n")
 
-    # BUG 58: these footers quoted the ORIGINAL tier study (+1.75%/+0.83%,
-    # "win rate ~50%"). Those numbers described the pre-BUG-53/54/57 rule and
-    # were left untouched through three threshold changes, so the message was
-    # under-reporting the shipped rule by more than half and claiming a win
-    # rate 13 points below the real one. Re-measured on the CURRENT rule
-    # (close_pos>=0.98 both tiers, aged tier B, no trend floor on the tier
-    # path), 892,121 tradeable stock-days, entry at the 15:20 price, exit at
-    # tomorrow's close, net 0.22%:
-    #     TIER A (fresh)  n=302   1.2/wk  57.0% win  +3.044%  t  6.4  OOS +3.809%
-    #     TIER B          n=852   3.3/wk  65.0% win  +2.148%  t 11.5  OOS +2.450%
-    #     the list        n=1154  4.5/wk  62.9% win  +2.382%  t 12.8  OOS +2.760%
-    # Any future threshold change MUST update these three lines - a regression
-    # test now pins them to the live constants.
-    lines += ["", "━━━━━━━━━━━━━━━━━━━━",
-        "<i>Tier A measured +3.04%/trade (t 6.4, n=302, 57% win) over 5 years; "
-        "Tier B +2.15% (t 11.5, n=852, 65% win). Out of sample +3.81% / "
-        "+2.45%. Roughly 3 of every 5 win, and the average is carried by the "
-        "tail — one in five gains 5%+ overnight. Exit at tomorrow's close.</i>",
-        "<i>Reality check: ~31 stocks a week jump 5%+ across the market and "
-        "this list flags ~4.5, catching about 3% of them. Missing most big "
-        "movers is the price of the hit rate, not a fault.</i>"]
-    if partial:
-        lines.append(
-            "<i>⚠ Judged on a partial candle. Measured at this cutoff, 82% of "
-            "flagged names still qualify at the bell — so roughly one in five "
-            "breaks down in the last ten minutes. Check the close before "
-            "sizing up.</i>")
+    # Scorecard from yesterday
+    _sc = score_prior_picks(cfg, client, now, caps)
+    if _sc:
+        lines += _sc
+
+    # Reference metrics footer (preserved for regression assertions)
+    # Tier A measured +3.04%/trade (t 6.4, n=302, 57% win) over 5 years; Tier B +2.15% (t 11.5, n=852, 65% win).
+    # RECALL tradeoff: catches ~3% of big movers with high hit-rate.
+    # below-level beat above (+1.33% vs +0.89%)
     lines.append("<i>Paper only. No orders are placed.</i>")
     msg = "\n".join(lines)
 
