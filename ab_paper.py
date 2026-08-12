@@ -37,7 +37,7 @@ import yaml
 from config import load_config
 from mcap import load_table as load_mcap_table
 from paper import COST_ROUND_TRIP, SL_BUFFER, SQUARE_OFF, PaperTrade, _stamp, fetch_5m
-from strategy import (IST_TZ as IST, build_snapshot, replay_week, week_start_of)
+from strategy import (IST_TZ as IST, Signal, build_snapshot, replay_week, week_start_of)
 
 import indicators as ind
 
@@ -283,6 +283,10 @@ def simulate_swing(sig, daily_after: pd.DataFrame, capital: float,
     stop = entry * (1.0 - stop_pct / 100.0)
     risk = entry - stop
 
+    eval_obj = getattr(sig, "evaluation", None)
+    rsi_val = float(eval_obj.values.get("rsi", float("nan"))) if (eval_obj and hasattr(eval_obj, "values")) else float("nan")
+    macd_val = float(eval_obj.values.get("macd_hist", float("nan"))) if (eval_obj and hasattr(eval_obj, "values")) else float("nan")
+
     t = PaperTrade(
         symbol=sig.symbol, week=sig.week_start,
         signal_date=sig_d, signal_time=sig_t, signal_close=entry,
@@ -290,8 +294,8 @@ def simulate_swing(sig, daily_after: pd.DataFrame, capital: float,
         qty=0, invested=0.0, bar_low=float(getattr(sig, "bar_low", 0.0) or 0.0),
         stop=stop, level_26w=float(sig.entry_level),
         level_52w=float(sig.level_52), trigger=sig.trigger,
-        rsi=float(sig.evaluation.values.get("rsi", float("nan"))),
-        macd_hist=float(sig.evaluation.values.get("macd_hist", float("nan"))),
+        rsi=rsi_val,
+        macd_hist=macd_val,
     )
     if daily_after.empty or risk <= 0:
         t.exit_reason = "NO_FILL"
@@ -512,6 +516,10 @@ def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
     risk = entry - stop
     target = entry * (1.0 + take_pct / 100.0)
 
+    eval_obj = getattr(sig, "evaluation", None)
+    rsi_val = float(eval_obj.values.get("rsi", float("nan"))) if (eval_obj and hasattr(eval_obj, "values")) else float("nan")
+    macd_val = float(eval_obj.values.get("macd_hist", float("nan"))) if (eval_obj and hasattr(eval_obj, "values")) else float("nan")
+
     t = PaperTrade(
         symbol=sig.symbol, week=sig.week_start,
         signal_date=sig_d, signal_time=sig_t, signal_close=entry,
@@ -519,8 +527,8 @@ def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
         qty=0, invested=0.0, bar_low=float(getattr(sig, "bar_low", 0.0) or 0.0),
         stop=stop, level_26w=float(sig.entry_level),
         level_52w=float(sig.level_52), trigger=sig.trigger,
-        rsi=float(sig.evaluation.values.get("rsi", float("nan"))),
-        macd_hist=float(sig.evaluation.values.get("macd_hist", float("nan"))),
+        rsi=rsi_val,
+        macd_hist=macd_val,
     )
     if daily_after.empty or risk <= 0:
         t.exit_reason = "NO_FILL"
@@ -1318,6 +1326,88 @@ def main() -> int:
                                 busy_until = (bu.tz_localize(IST)
                                               if bu.tzinfo is None else bu)
                 wk += pd.Timedelta(days=7)
+
+        # ---- DIRECT PICKS SIMULATION (MODELS E, E-WIDE, F, F-ONLY) ---------
+        # Ensure 100% of the 15:20 alerted picks from btst_picks.csv and
+        # anticipate_picks.csv are faithfully simulated regardless of 5m cross.
+        import types
+        for (day_k, p_sym), pick in picks_lookup.items():
+            if p_sym.upper() != sym.upper() or not _is_tradeable(pick):
+                continue
+            try:
+                p_entry = float(pick.get("entry") or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if p_entry <= 0:
+                continue
+            sig_day = pd.Timestamp(day_k).normalize().tz_localize(None)
+            dafter = d[d["_day"] > sig_day]
+            sig = types.SimpleNamespace(
+                symbol=sym, bar_time=pd.Timestamp(f"{day_k} 15:20:00"),
+                price=p_entry, trigger="cross",
+                entry_level=float(pick.get("level", 0.0) or 0.0),
+                level_52=float(pick.get("level_52", 0.0) or 0.0),
+                week_start=str(week_start_of(pd.Timestamp(day_k).date()).date()),
+                bar_low=0.0, evaluation=None,
+                btst_tier=str(pick.get("tier") or ""),
+                btst_day_ret=_f(pick, "day_ret", 0.0),
+                btst_rank=int(_f(pick, "rank", 0.0)),
+                btst_source="picks",
+                btst_arm=str(pick.get("arm") or ""),
+                btst_age=int(_f(pick, "age", 0.0)),
+            )
+            for m in [mm for mm in models if mm.key in ("E_btst", "E_btst_wide")]:
+                tr = simulate_btst(sig, dafter, capital, m.exit, m.hold_days, cost)
+                rec = dict(tr.__dict__)
+                rec["model"] = m.key
+                rec["model_label"] = m.label
+                rec["horizon"] = m.horizon
+                rec["btst_tier"] = sig.btst_tier
+                rec["btst_day_ret"] = sig.btst_day_ret
+                rec["btst_rank"] = sig.btst_rank
+                rec["btst_source"] = "picks"
+                rec["btst_arm"] = sig.btst_arm
+                rec["btst_age"] = sig.btst_age
+                rows.append(rec)
+                per_model_counts[m.key] += 1
+
+        for (day_k, a_sym), ap_ in ant_lookup.items():
+            if a_sym.upper() != sym.upper() or not _is_tradeable(ap_):
+                continue
+            try:
+                a_entry = float(ap_.get("entry") or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if a_entry <= 0:
+                continue
+            sig_day = pd.Timestamp(day_k).normalize().tz_localize(None)
+            dafter = d[d["_day"] > sig_day]
+            sig = types.SimpleNamespace(
+                symbol=sym, bar_time=pd.Timestamp(f"{day_k} 15:20:00"),
+                price=a_entry, trigger="anticipate",
+                entry_level=float(ap_.get("level", 0.0) or 0.0),
+                level_52=float(ap_.get("level_52", 0.0) or 0.0),
+                week_start=str(week_start_of(pd.Timestamp(day_k).date()).date()),
+                bar_low=0.0, evaluation=None,
+                btst_day_ret=_f(ap_, "day_ret", 0.0),
+                btst_rank=int(_f(ap_, "rank", 0.0)),
+                btst_source="anticipate",
+            )
+            for m in [mm for mm in models if mm.key in ("F_anticipate", "F_anticipate_only")]:
+                if m.key == "F_anticipate_only" and picks_lookup.get((day_k, sym)) is not None:
+                    continue
+                sig.btst_tier = "F_only" if (m.key == "F_anticipate_only") else "F"
+                tr = simulate_btst(sig, dafter, capital, m.exit, m.hold_days, cost)
+                rec = dict(tr.__dict__)
+                rec["model"] = m.key
+                rec["model_label"] = m.label
+                rec["horizon"] = m.horizon
+                rec["btst_tier"] = sig.btst_tier
+                rec["btst_day_ret"] = sig.btst_day_ret
+                rec["btst_rank"] = sig.btst_rank
+                rec["btst_source"] = "anticipate"
+                rows.append(rec)
+                per_model_counts[m.key] += 1
 
         if len(symbols) > 25 and n % 25 == 0:
             print(f"  ...{n}/{len(symbols)}  {len(rows)} trades so far")
