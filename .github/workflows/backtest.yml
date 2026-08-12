@@ -23,14 +23,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Replay mode: btst (confirmed), anticipated_only (non-BTST), anticipated, or all"
+        description: "Replay mode: all (BTST + Anticipate), btst (confirmed), anticipated_only, or anticipated"
         type: choice
-        default: "btst"
-        options: ["btst", "anticipated_only", "anticipated", "all"]
+        default: "all"
+        options: ["all", "btst", "anticipated_only", "anticipated"]
       years:
         description: "Years of history to replay"
         type: choice
-        default: "2"
+        default: "5"
         options: ["1", "2", "3", "5"]
       symbol:
         description: "Single symbol (e.g. SBCL) - blank = whole universe"
@@ -51,11 +51,11 @@ on:
       pre_circuit:
         description: "Pre-circuit entry: simulate entering on the ramp before circuit was locked"
         type: boolean
-        default: false
+        default: true
       exclude_circuit_locks:
         description: "Exclude unfillable circuit-locked trades"
         type: boolean
-        default: false
+        default: true
 
 concurrency:
   group: btst-backtest

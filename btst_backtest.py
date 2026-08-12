@@ -690,13 +690,15 @@ def main() -> int:
     ap.add_argument("--capital", type=float, default=DEFAULT_CAPITAL,
                     help="rupees deployed per trade (default 1,00,000)")
     ap.add_argument("--mode", choices=["btst", "anticipated", "anticipated_only", "all"],
-                    default="btst",
-                    help="btst (default): confirmed breakouts | "
+                    default="all",
+                    help="all (default): confirmed BTST + anticipated setups | "
+                         "btst: confirmed breakouts only | "
                          "anticipated_only: anticipated setups that did NOT qualify for BTST at 15:20 | "
-                         "anticipated: all pre-breakout anticipation setups | "
-                         "all: confirmed BTST + anticipated setups")
+                         "anticipated: all pre-breakout anticipation setups")
     ap.add_argument("--exclude-circuit-locks", action="store_true",
                     help="exclude trades where stock closed locked at upper circuit (unfillable at 15:20)")
+    ap.add_argument("--all-candidates", action="store_true",
+                    help="write all qualifying candidates to CSV instead of the Top-3 traded book")
     ap.add_argument("--pre-circuit", action="store_true",
                     help="simulate pre-circuit entry (entered ~0.8% before circuit level was touched)")
     ap.add_argument("--years", type=float, default=2.0,
@@ -763,8 +765,14 @@ def main() -> int:
     report(df, args.trades or bool(args.symbol), args.top, mode=args.mode, capital=args.capital)
 
     if args.csv and not df.empty:
-        df.sort_values("date").to_csv(args.csv, index=False)
-        print(f"\nwrote {args.csv} ({len(df):,} rows)")
+        r = df.copy()
+        r["_k"] = _calc_priority(r)
+        if args.all_candidates:
+            out_df = r.sort_values(["date", "_k"], ascending=[True, False]).drop(columns=["_k"], errors="ignore")
+        else:
+            out_df = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(MAX_DAILY_TRADES).drop(columns=["_k"], errors="ignore")
+        out_df.sort_values("date").to_csv(args.csv, index=False)
+        print(f"\nwrote {args.csv} ({len(out_df):,} traded rows)")
     return 0
 
 
