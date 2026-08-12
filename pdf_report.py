@@ -324,8 +324,6 @@ def build_pdf_report(
     open_runners = [
         ["COMSYN", "2026-08-07", 224.83, 269.25, 225.50, +19.76, "🟡 Active (50% Runner D+3 · BE locked)"],
         ["SBCL", "2026-08-07", 913.57, 1026.65, 916.31, +12.38, "🟡 Active (50% Runner D+3 · BE locked)"],
-        ["LUMAXTECH", "2026-08-10", 1738.20, 2039.30, 1743.40, +17.32, "🟡 Active (50% Runner D+2 · BE locked)"],
-        ["AARTIPHARM", "2026-08-10", 823.00, 888.70, 825.45, +7.98, "🟡 Active (50% Runner D+2 · BE locked)"],
     ]
     t3_rows = [[
         Paragraph("<b>Symbol</b>", cell_head),
