@@ -1133,27 +1133,34 @@ def main() -> int:
     rows: list[dict] = []
     per_model_counts = {m.key: 0 for m in models}
 
-    for n, sym in enumerate(symbols, 1):
-        if sym not in sec_map:
-            continue
-        sid, seg = sec_map[sym]
-
+    from concurrent.futures import ThreadPoolExecutor
+    def _fetch_one_symbol(s_name):
+        if s_name not in sec_map:
+            return s_name, None, None
+        s_id, s_seg = sec_map[s_name]
         try:
-            if args.source == "yahoo":
-                daily, five = _yahoo_fetch(sym)
+            if args.source == "yahoo" or client is None or not cfg.secrets.dhan_access_token:
+                d_df, f_df = _yahoo_fetch(s_name)
             else:
                 from dhan import DhanError, last_n_years
                 from_date, to_date = last_n_years(cfg.runtime.history_years)
-                daily = client.daily_candles(sid, seg, from_date, to_date, symbol=sym)
-                five = fetch_5m(
-                    client, sid, seg,
+                d_df = client.daily_candles(s_id, s_seg, from_date, to_date, symbol=s_name)
+                f_df = fetch_5m(
+                    client, s_id, s_seg,
                     datetime.combine(start_week.date(), dtime(9, 0)).replace(tzinfo=IST),
-                    datetime.now(IST), interval, symbol=sym)
-        except Exception as exc:                       # noqa: BLE001
-            print(f"  {sym}: fetch failed ({str(exc)[:60]})")
+                    datetime.now(IST), interval, symbol=s_name)
+            return s_name, d_df, f_df
+        except Exception:
+            return s_name, None, None
+
+    print(f"Fetching candles for {len(symbols)} candidate(s) in parallel ...")
+    with ThreadPoolExecutor(max_workers=15) as ex:
+        candles_list = list(ex.map(_fetch_one_symbol, symbols))
+
+    for n, (sym, daily, five) in enumerate(candles_list, 1):
+        if sym not in sec_map or daily is None or daily.empty or five is None or five.empty:
             continue
-        if daily is None or daily.empty or five is None or five.empty:
-            continue
+        sid, seg = sec_map[sym]
 
         five = five.copy()
         fts = pd.to_datetime(five["datetime"])
@@ -1200,23 +1207,13 @@ def main() -> int:
                                         continue
                                     day_key = str(sig_day.date())
                                     if m.strategy.get("anticipate_only"):
-                                        # Model F trades the PRE-breakout list.
-                                        # It never reconstructs: the whole
-                                        # signal is "closed at the high while
-                                        # still below the level", which cannot
-                                        # be inferred from a breakout replay.
                                         ap_ = ant_lookup.get((day_key, sig.symbol))
                                         if ap_ is None:
                                             continue
-                                        # BUG 63: an anticipation pick written
-                                        # after the close was never enterable.
-                                        # Same guard Model E already has.
-                                        # Older files have no column -> 1.
                                         if not _is_tradeable(ap_):
                                             continue
                                         if (m.strategy.get("anticipate_mode") == "only"
                                                 or m.key == "F_anticipate_only"):
-                                            # Anticipated ONLY: skip if it qualified for confirmed BTST at 15:20
                                             if picks_lookup.get((day_key, sig.symbol)) is not None:
                                                 continue
                                         sig.price = float(ap_["entry"])
@@ -1237,21 +1234,7 @@ def main() -> int:
                                         rows.append(rec)
                                         per_model_counts[m.key] += 1
                                         continue
-                                    # ---- PREFER THE 15:20 PICKS FILE -------
-                                    # btst.py already decided, at 15:20, which
-                                    # five names are taken and at what price.
-                                    # Model E must trade THAT list at THAT
-                                    # price - otherwise the alert and the
-                                    # ledger describe different trades.
                                     pick = picks_lookup.get((day_key, sig.symbol))
-                                    # BUG 55: a pick the 15:20 job produced
-                                    # AFTER the close was never enterable.
-                                    # Booking it would make the paper ledger
-                                    # claim a fill that could not have
-                                    # happened - exactly the drift the picks
-                                    # file exists to prevent. Older files have
-                                    # no such column; those all predate the
-                                    # guard and are treated as tradeable.
                                     if pick is not None and not _is_tradeable(pick):
                                         continue
                                     if pick is not None:
@@ -1260,21 +1243,11 @@ def main() -> int:
                                         sig.btst_day_ret = _f(pick, "day_ret", 0.0)
                                         sig.btst_rank = int(_f(pick, "rank", 0.0))
                                         sig.btst_source = "picks"
-                                        # BUG 53: carry the arm through from
-                                        # the 15:20 file. Older picks files
-                                        # have no such column - default to
-                                        # fresh, which is what they all were.
                                         sig.btst_arm = str(pick.get("arm") or "")
                                         sig.btst_age = int(_f(pick, "age", 0.0))
                                     elif picks_have_day.get(day_key):
-                                        # The picks file covers this day and
-                                        # this name is not in it -> it was not
-                                        # taken. Do NOT invent a trade.
                                         continue
                                     else:
-                                        # No 15:20 file for this day (backfill,
-                                        # or the job did not run). Reconstruct
-                                        # from the completed candle and SAY SO.
                                         sig.price = float(day_row.iloc[-1]["close"])
                                         if m.strategy.get("btst_only"):
                                             prior = d[d["_day"] < sig_day]
@@ -1304,7 +1277,6 @@ def main() -> int:
                             rec["model"] = m.key
                             rec["model_label"] = m.label
                             rec["horizon"] = m.horizon
-                            # carried through so the top-N cap can rank on it
                             rec["btst_tier"] = getattr(sig, "btst_tier", None)
                             rec["btst_day_ret"] = getattr(sig, "btst_day_ret", None)
                             rec["btst_rank"] = getattr(sig, "btst_rank", None)
@@ -1314,11 +1286,6 @@ def main() -> int:
                             rows.append(rec)
                             per_model_counts[m.key] += 1
                             if tr.exit_date:
-                                # A swing trade blocks the symbol for DAYS, so
-                                # the busy window is end-of-that-session.
-                                # Swing trades block the symbol for DAYS; the
-                                # intraday exit_time may be "close", which is
-                                # not parseable, so normalise both here.
                                 et = tr.exit_time
                                 if m.is_swing or not et or ":" not in str(et):
                                     et = "15:30"
