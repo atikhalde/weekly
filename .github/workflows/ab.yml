@@ -96,12 +96,14 @@ jobs:
           done
           echo "could not push the ledger"; exit 1
 
-      - name: Upload ledger artifact
+      - name: Upload ledger and PDF artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ab-ledger
-          path: ab_ledger.csv
+          path: |
+            ab_ledger.csv
+            btst_paper_trade_report*.pdf
           if-no-files-found: ignore
           retention-days: 90
 

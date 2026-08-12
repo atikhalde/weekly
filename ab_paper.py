@@ -1431,11 +1431,27 @@ def main() -> int:
     if ledger_path.exists():
         led = pd.read_csv(ledger_path)
         print_report(led, models)
+
+        # Generate PDF Report
+        pdf_path = None
+        try:
+            from pdf_report import build_pdf_report
+            pdf_name = f"btst_paper_trade_report_{today}.pdf"
+            pdf_path = build_pdf_report(ledger_path=ledger_path, output_pdf=pdf_name, today_str=str(today))
+            print(f"\nPDF Report generated: {pdf_path}")
+        except Exception as exc:
+            print(f"\nPDF Report generation failed: {exc}")
+
         if args.telegram:
             # WHAT was taken first, then HOW the models are doing. Two
             # messages, because they answer different questions.
             _send_telegram(todays_trades_message(led, models))
             _send_telegram(telegram_summary(led, models))
+            if pdf_path and Path(pdf_path).exists():
+                _send_telegram_doc(
+                    pdf_path,
+                    caption=f"📄 <b>BTST Master Paper Trade Report — {today}</b>\n50/50 Asymmetric Model · ₹1,00,000 / trade"
+                )
     return 0
 
 
@@ -1449,6 +1465,18 @@ def _send_telegram(msg: str) -> None:
         print("\nTelegram: sent")
     except Exception as exc:                            # noqa: BLE001
         print(f"\nTelegram: failed ({str(exc)[:80]})")
+
+
+def _send_telegram_doc(path: str | Path, caption: str = "") -> None:
+    try:
+        from telegram import build_telegram
+        from config import load_config as _lc
+        c = _lc(None)
+        tg = build_telegram(c)
+        tg.send_document(Path(path), caption=caption)
+        print("\nTelegram PDF: sent")
+    except Exception as exc:                            # noqa: BLE001
+        print(f"\nTelegram PDF failed ({str(exc)[:80]})")
 
 
 def _yahoo_fetch(sym: str):
