@@ -330,16 +330,52 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
 
         # Effective entry price: pre-circuit entry if enabled and locked, else regular close
         entry_eff = ckt["pre_entry"] if (use_pre_circuit_entry and is_locked) else close[j]
-        nxt = close[j + 1]
-        gross = (nxt / entry_eff - 1) * 100.0
+        if entry_eff <= 0:
+            continue
+
+        # 50/50 Asymmetric Model Exit Execution (Matching live paper playbook)
+        bar1 = d.iloc[j + 1]
+        o1 = float(bar1["open"])
+        h1 = float(bar1["high"])
+        l1 = float(bar1["low"])
+        c1 = close[j + 1]
+        d1_o_ret = (o1 / entry_eff - 1.0) * 100.0
+
+        # 1. Gap-down cut (<= -1.5% at open): 100% exit at 09:15 morning open
+        if d1_o_ret <= -1.5:
+            nxt = o1
+            net_pct = round(d1_o_ret - COST_ROUND_TRIP, 3)
+            exit_reason = "09:15 Gap-Down Cut (≤ -1.5%)"
+        # 2. Upper Circuit Rider (if opened locked at UC >= +4.5%): ride into D+2
+        elif d1_o_ret >= 4.5 and (h1 - c1) / max(c1, 1) < 0.005 and j + 2 < len(d):
+            bar2 = d.iloc[j + 2]
+            nxt = float(bar2["close"])
+            c2_ret = (nxt / entry_eff - 1.0) * 100.0
+            net_pct = round(c2_ret - COST_ROUND_TRIP, 3)
+            exit_reason = "Rode Upper Circuit to D+2"
+        # 3. 50/50 Asymmetric Model: 50% sold at 09:15 open, 50% runner with BE stop
+        else:
+            leg1_pct = d1_o_ret - COST_ROUND_TRIP
+            be_stop = entry_eff * 1.003
+            if l1 <= be_stop:
+                leg2_pct = 0.3 - COST_ROUND_TRIP
+                nxt = round(0.5 * o1 + 0.5 * be_stop, 2)
+                exit_reason = "09:15 Open 50% + BE Stop 50%"
+            else:
+                bar2_c = float(d.iloc[j + 2]["close"]) if j + 2 < len(d) else c1
+                leg2_pct = max((bar2_c / entry_eff - 1.0) * 100.0 - COST_ROUND_TRIP, 0.3 - COST_ROUND_TRIP)
+                nxt = round(0.5 * o1 + 0.5 * bar2_c, 2)
+                exit_reason = "09:15 Open 50% + D+2 Runner 50%"
+            net_pct = round(0.5 * leg1_pct + 0.5 * leg2_pct, 3)
+
+        gross = net_pct + COST_ROUND_TRIP
         # Sizing: strictly capped at Rs 1,00,000 max per single trade without CAGR
         cap_trade = min(DEFAULT_CAPITAL, 100000.0)
         qty = int(cap_trade // entry_eff) if entry_eff > 0 else 0
         invested = round(qty * entry_eff, 2)
-        gross_pnl = round((nxt - entry_eff) * qty, 2)
-        turnover = (entry_eff + nxt) * qty
-        costs = round(turnover * (COST_ROUND_TRIP / 100.0) / 2.0, 2)
-        net_pnl = round(gross_pnl - costs, 2)
+        net_pnl = round(qty * entry_eff * (net_pct / 100.0), 2)
+        gross_pnl = round(qty * entry_eff * (gross / 100.0), 2)
+        costs = round(gross_pnl - net_pnl, 2)
 
         # Confirmed BTST trade
         if want_btst and is_btst:
@@ -458,12 +494,31 @@ HDR = (f"{'slice':<20}{'trades':>7}{'/wk':>6}{'win%':>7}{'mean%':>9}"
        f"{'med%':>8}{'PF':>6}{'t':>6}{'P(+5%)':>8}{'Net PnL (Rs)':>13}{'Avg Rs':>9}")
 
 
+def _calc_priority(r: pd.DataFrame) -> pd.Series:
+    arm = r["arm"].astype(str)
+    rvol = r["rvol"].fillna(0).astype(float)
+    cp = r["close_pos"].fillna(1.0).astype(float)
+    pre = r["pre"].fillna(0).astype(float) if "pre" in r.columns else 0.0
+
+    is_prime1 = (arm == "ant_below") & (pre >= 6)
+    is_prime2 = arm.isin(["fresh_A", "fresh_B"]) & (rvol >= 5.0) & (cp >= 0.98)
+    is_tier_a = (arm == "fresh_A")
+    is_aged_b = (arm == "aged_B")
+    is_fresh_b = (arm == "fresh_B")
+    is_ant = arm.str.startswith("ant_")
+
+    score = (is_prime1 * 500.0 + is_prime2 * 500.0 + is_tier_a * 400.0
+             + is_aged_b * 300.0 + is_fresh_b * 200.0 + is_ant * 100.0
+             + rvol.clip(0, 30) + pre)
+    return score
+
+
 def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital_per_slot: float = DEFAULT_CAPITAL,
                                     max_trades_per_day: int = MAX_DAILY_TRADES,
                                     initial_capital: float | None = None) -> dict:
     """
     Simulate daily compounding (CAGR method) starting with 3 slots of Rs 1,00,000 (Rs 3,00,000 total portfolio).
-    Takes at most max_trades_per_day (3) trades per day.
+    Takes at most max_trades_per_day (3) trades per day (ranked by Prime #1 & #2 priority).
     Every next day adjusts position sizing according to cumulative PnL.
     """
     if initial_capital is not None:
@@ -473,9 +528,7 @@ def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital_per_slot: 
         return {"initial": total_initial, "equity": total_initial, "net_pnl": 0.0,
                 "total_return_pct": 0.0, "cagr_pct": 0.0, "max_dd_pct": 0.0, "active_days": 0}
     r = df.copy()
-    r["_k"] = ((r.arm == "fresh_A") * 300 + (r.arm == "aged_B") * 200
-               + (r.arm.str.startswith("ant_")) * 100
-               + r.rvol.fillna(0).clip(0, 50))
+    r["_k"] = _calc_priority(r)
     book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(max_trades_per_day)
     days = sorted(book.date.unique())
     equity = total_initial
@@ -586,9 +639,7 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
     # a top-3/day book (max 3 trades per day)
     print(f"\nTOP-{MAX_DAILY_TRADES} PER DAY (the traded portfolio: max {MAX_DAILY_TRADES} trades/day, Rs {capital:,.0f}/trade max)")
     r = df.copy()
-    r["_k"] = ((r.arm == "fresh_A") * 300 + (r.arm == "aged_B") * 200
-               + (r.arm.str.startswith("ant_")) * 100
-               + r.rvol.fillna(0).clip(0, 50))
+    r["_k"] = _calc_priority(r)
     book = r.sort_values(["date", "_k"], ascending=[True, False]).groupby("date").head(MAX_DAILY_TRADES)
     print(HDR)
     print(_stats(book, f"  top-{MAX_DAILY_TRADES}/day"))
@@ -602,11 +653,11 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
 
     if show_trades:
         print("\n" + "=" * 128)
-        print(f"TRADES (most recent {top}) — Rs {capital:,.0f} per trade")
+        print(f"TOP-{MAX_DAILY_TRADES} DAILY TRADED BOOK (most recent {top}) — Rs {capital:,.0f} per trade")
         print("=" * 128)
         print(f"{'date':<12}{'symbol':<12}{'tier':<10}{'qty':>5}{'entry':>9}{'exit':>9}"
               f"{'day%':>6}{'rvol':>5}{'pre':>4}{'circuit':>8}{'fillable':>12}{'net%':>7}{'Net P&L (Rs)':>14}")
-        for r_ in df.tail(top).itertuples():
+        for r_ in book.tail(top).itertuples():
             pnl_str = f"{r_.net_pnl:>+13,.0f}" if hasattr(r_, "net_pnl") else f"{r_.net_pct*1000:>+13,.0f}"
             qty_val = getattr(r_, "qty", int(capital // r_.entry))
             pre_val = getattr(r_, "pre", 0)
