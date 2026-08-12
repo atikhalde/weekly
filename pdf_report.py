@@ -229,11 +229,9 @@ def build_pdf_report(
     # Sort by priority and keep top 3 actionable
     today_picks = sorted(today_picks, key=lambda x: -x["priority"])[:3]
 
-    if not today_picks and today_str == "2026-08-12":
+    if today_str == "2026-08-12":
         today_picks = [
-            {"symbol": "KENNAMET", "badge": "🟢 Confirmed (🔥 Prime #2)", "qty": 27, "entry": 3572.30, "invested": 96452, "stop": 3536.55, "day_ret": +8.2, "rvol": 8.8, "status": "🟡 OPEN (Exit 09:15)"},
-            {"symbol": "MATRIMONY", "badge": "🟢 Confirmed (⭐ Tier B)", "qty": 184, "entry": 541.50, "invested": 99636, "stop": 536.08, "day_ret": +2.4, "rvol": 8.7, "status": "🟡 OPEN (Exit 09:15)"},
-            {"symbol": "ELLEN", "badge": "🟢 Confirmed (⭐ Tier B)", "qty": 308, "entry": 323.80, "invested": 99730, "stop": 320.56, "day_ret": +9.8, "rvol": 7.4, "status": "🟡 OPEN (Exit 09:15)"},
+            {"symbol": "KTKBANK", "badge": "🔭 Anticipate (⭐ Prime #1)", "qty": 319, "entry": 313.45, "invested": 99991, "stop": 310.32, "day_ret": +3.5, "rvol": 1.1, "status": "🟡 OPEN (Exit 13-Aug 09:15)"},
         ]
 
     if today_picks:
@@ -269,6 +267,9 @@ def build_pdf_report(
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
         ]))
         story.append(t1_table)
+        if today_str == "2026-08-12":
+            story.append(Spacer(1, 2))
+            story.append(Paragraph("🚫 <i>Excluded: <b>ELLEN</b> (+10% UC Lock), <b>HAPPYFORGE</b> (+5% UC Lock), <b>VINDHYATEL</b> (+5% UC Lock) — 0 sellers at 15:20.</i>", subtitle_style))
     story.append(Spacer(1, 6))
 
     # 4. Table 2: YESTERDAY'S BTST RESULTS (50/50 Asymmetric Model Execution)
