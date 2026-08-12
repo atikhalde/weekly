@@ -2296,10 +2296,14 @@ def main() -> int:
             excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
         else:
             q_val = int(100000 // c_val) if c_val > 0 else 0
+            arm_v = ("fresh_A" if r.get("fresh") and r["tier"] == "A"
+                     else "fresh_B" if r.get("fresh") else "aged_B")
             actionable.append({
                 "symbol": r["symbol"],
                 "badge": "🟢 Confirmed",
                 "tier": r["tier"],
+                "arm": arm_v,
+                "pre": int(r.get("pre", 0) or 0),
                 "price": c_val,
                 "qty": q_val,
                 "invest": q_val * c_val,
@@ -2319,10 +2323,13 @@ def main() -> int:
             excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
         else:
             q_val = int(100000 // c_val) if c_val > 0 else 0
+            side_v = str(r.get("side", "below"))
             actionable.append({
                 "symbol": r["symbol"],
                 "badge": "🔭 Anticipate",
                 "tier": f"PRE {r.get('pre', 0)}/8",
+                "arm": f"ant_{side_v}",
+                "pre": int(r.get("pre", 0) or 0),
                 "price": c_val,
                 "qty": q_val,
                 "invest": q_val * c_val,
@@ -2330,10 +2337,27 @@ def main() -> int:
                 "rvol": float(r.get("rvol") or 0.0),
                 "close_pos": float(r.get("close_pos") or 1.0),
                 "gap_pct": float(r.get("gap_pct") or 0.0),
-                "prime": "⭐ Prime #1" if (r.get("side") == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
+                "prime": "⭐ Prime #1" if (side_v == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
             })
 
-    # Top 3 actionable orders
+    def calc_actionable_priority(act):
+        arm = str(act.get("arm", "") or "")
+        rvol = float(act.get("rvol", 0.0) or 0.0)
+        cp = float(act.get("close_pos", 1.0) or 1.0)
+        pre = float(act.get("pre", 0.0) or 0.0)
+
+        is_prime1 = (arm == "ant_below") and (pre >= 6)
+        is_prime2 = arm in ("fresh_A", "fresh_B") and (rvol >= 5.0) and (cp >= 0.98)
+        is_tier_a = (arm == "fresh_A")
+        is_aged_b = (arm == "aged_B")
+        is_fresh_b = (arm == "fresh_B")
+        is_ant = arm.startswith("ant_")
+
+        return (is_prime1 * 500.0 + is_prime2 * 500.0 + is_tier_a * 400.0
+                + is_aged_b * 300.0 + is_ant * 200.0 + is_fresh_b * 100.0
+                + min(rvol, 30.0) + pre)
+
+    actionable.sort(key=calc_actionable_priority, reverse=True)
     top3_actionable = actionable[:3]
     taken_syms = {act["symbol"] for act in top3_actionable}
     next_anticipated = [r for r in (aq if 'aq' in locals() and aq else ant_picks) if r["symbol"] not in taken_syms][:2]
