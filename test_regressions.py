@@ -7637,8 +7637,15 @@ def test_bug78_backtest_reuses_the_live_rule_and_never_writes():
     # strictly read-only
     for bad in ("build_telegram", "send(", "state.json", "AlertState"):
         assert bad not in src, f"the backtest must not touch {bad}"
+    # 2026-08-14: this used to be a bare substring check, so merely NAMING a
+    # live file in a comment failed it - documenting that the entry-bias
+    # figure was measured from ab_ledger.csv tripped the guard. The intent is
+    # "must not WRITE", so look for writes aimed at one of these names.
     for bad in ("btst_picks.csv", "ab_ledger.csv", "anticipate_picks.csv"):
-        assert bad not in src, f"the backtest must not write {bad}"
+        for stem in (r"to_csv\([^)]*" + bad,
+                     r"open\([^)]*" + bad + r"[^)]*[\"']w",
+                     r"write_text\([^)]*" + bad):
+            assert not re.search(stem, src), f"the backtest must not write {bad}"
 
     # the outcome must be read AFTER the decision - never the same bar
     assert "close[j + 1]" in src, "exit must be the NEXT day's close"

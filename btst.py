@@ -22,9 +22,26 @@ and entering at that cutoff:
 
 Two things fall out. Precision rises towards the close because the candle stops
 changing - at 15:20 four of five flagged names still qualify at the close, at
-15:00 only seven of ten. And the entry price is BETTER earlier: these names
-close at their high, so the last minutes drift up and buying at 15:20 costs
-0.14% LESS than the close.
+15:00 only seven of ten. The entry-vs-close column was read as "you buy 0.14%
+cheaper", and that is where it gets interesting.
+
+CORRECTION, 2026-08-14 - THE SIGN IS INVERTED IN PRACTICE.
+The table above is a pre-launch simulation. Measured against all 28 real 15:20
+fills now in ab_ledger.csv, the live entry averages +0.433% ABOVE the daily
+close (median +0.097%, stdev 1.506%, worst +6.02% on MOLDTECH 2026-08-10) -
+not 0.14% below it. We pay UP for these names, we do not get them cheap.
+
+Why the simulation missed it: it measured the 15:20 print against the close on
+days the setup fired, but the live scan buys into strength on a partial candle
+that is still ramping, and rvol-gated names ramp hardest in the last ten
+minutes. The backtest, which fills at the daily close, therefore gets a
+~0.43% head start on every trade - about 40% of the 1% stop distance. That is
+a large part of why backtested results outrun the live ledger, independent of
+which stocks get picked.
+
+Do not "fix" this by moving the scan later: 15:25 and 15:30 fill closer to the
+close but leave no time to place an order. The bias is real, quantified, and
+disclosed in btst_backtest.py's report header instead of being papered over.
 
 15:20 is the balance: 82% of what it flags is still a valid setup at the bell,
 you buy slightly cheaper than the close, and ten minutes is enough to place an
@@ -586,9 +603,11 @@ TIER_A_CLOSE_POS = 0.98
 #  (+1.702 vs +1.646) but drawdown jumps -29.4% -> -40.1%, and the live scan
 #  judges close_pos on a PARTIAL 15:20 candle. A 0.99 gate is knife-edge
 #  against a bar with ten minutes left to run; 0.98 leaves room for the last
-#  wobble. The 15:20 cutoff study says these names drift UP into the bell
-#  (entry vs close -0.14%, tier precision 82.3%), so the partial reading is
-#  usually conservative - but not always, and 0.98 costs almost nothing.
+#  wobble. These names drift UP into the bell (tier precision 82.3%), so the
+#  partial reading is usually conservative - but not always, and 0.98 costs
+#  almost nothing. NB the old "-0.14% entry vs close" from that study is
+#  wrong; real fills average +0.433% ABOVE the close - see the correction at
+#  the top of this file.
 TIER_B_CLOSE_POS = 0.98
 TIER_B_RVOL = 3.0
 TIER_B_ATR = 3.0

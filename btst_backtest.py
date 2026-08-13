@@ -41,8 +41,12 @@ kept - the whole point is to see them.
 WHAT IT CANNOT TELL YOU
 -----------------------------------------------------------------------------
 * It uses the DAILY close as the entry. The live scan buys at ~15:20 on a
-  PARTIAL candle. Measured, that entry is ~0.14% CHEAPER than the close, so
-  this is mildly pessimistic - but it is not the same fill.
+  PARTIAL candle. This was documented as "~0.14% cheaper than the close, so
+  mildly pessimistic". CORRECTED 2026-08-14 from 28 real fills: the live entry
+  is +0.433% ABOVE the close (median +0.097%, worst +6.02%), so this replay is
+  OPTIMISTIC, not pessimistic - it gets ~40% of the 1% stop distance for free
+  on every trade. Yahoo caps intraday history at 60 days, so a true 15:20
+  replay is impossible; the bias is disclosed in the report header instead.
 * Yahoo daily data, not Dhan. Volumes can differ per symbol (see the SONACOMS
   rvol discrepancy), so rvol-gated Tier B counts may differ slightly from live.
 * No slippage beyond the flat cost. Real fills on a 3%+ ATR stock at the close
@@ -79,6 +83,18 @@ DATA_DIR = os.environ.get("BTST_BACKTEST_DATA", "/tmp/daily")
 COST_ROUND_TRIP = 0.22          # matches models.yaml defaults
 DEFAULT_CAPITAL = 100000.0      # Rs 1,00,000 per trade (single trade max 1L without CAGR)
 MAX_DAILY_TRADES = 3            # max 3 trades taken per day
+
+# 2026-08-14 - measured, not assumed. The docstring above used to claim the
+# 15:20 entry lands 0.14% BELOW the close. Checked against all 28 real
+# 15:20 fills in ab_ledger.csv, the sign is INVERTED: the live entry averages
+# +0.433% ABOVE the daily close (median +0.097%, stdev 1.506%, worst +6.02%
+# on MOLDTECH 2026-08-10). On a strategy with a 1% stop that is ~40% of the
+# stop distance handed to the backtest for free on every trade, which flatters
+# every number below. Yahoo caps intraday history at 60 days, so a true 15:20
+# replay over years is impossible - the daily close is the only usable proxy.
+# The bias is therefore disclosed rather than corrected.
+LIVE_ENTRY_BIAS_PCT = 0.433
+LIVE_ENTRY_BIAS_N = 28
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/120.0 Safari/537.36"}
@@ -87,6 +103,48 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
 # --------------------------------------------------------------------------- #
 #  DATA
 # --------------------------------------------------------------------------- #
+def load_mcaps(path: str = "mcap.csv") -> dict[str, float]:
+    """Symbol -> market cap in Rs crore, for the live min_mcap floor.
+
+    2026-08-14 - "backtest and paper trade are totally different". The live
+    scanner rejects everything under cfg.strategy.min_mcap (1,000 Cr), which
+    is 872 of the 2,282 names in mcap.csv - 38% of the universe. This file
+    applied no cap filter at all, so it traded names the alert would never
+    have shown you, and it did so in the flattering direction because
+    micro-caps print the biggest raw percentage moves. A report headed "the
+    LIVE rule replayed over history" cannot silently drop one of the live
+    rule's filters.
+
+    KNOWN APPROXIMATION: mcap.csv is a CURRENT snapshot (one `updated` date,
+    no history), so replaying 2024 with 2026 caps is mild lookahead - a name
+    worth 1,200 Cr today may have been 400 Cr then. It is still far better
+    than no filter, but the report header labels it rather than implying the
+    floor is point-in-time exact.
+    """
+    try:
+        m = pd.read_csv(path)
+    except (OSError, ValueError):
+        return {}
+    if "symbol" not in m.columns or "mcap_cr" not in m.columns:
+        return {}
+    caps = pd.to_numeric(m["mcap_cr"], errors="coerce")
+    return {str(sym).strip().upper(): float(cap)
+            for sym, cap in zip(m["symbol"], caps)
+            if cap == cap}
+
+
+def mcap_asof(path: str = "mcap.csv") -> str:
+    """The single `updated` date in mcap.csv, for honest header labelling."""
+    try:
+        m = pd.read_csv(path)
+        if "updated" in m.columns and len(m):
+            vals = sorted(str(v) for v in m["updated"].dropna().unique())
+            return vals[-1] if vals else "?"
+    except (OSError, ValueError):
+        pass
+    return "?"
+
+
 def fetch_history(symbols: list[str], out_dir: str, years: int = 6,
                   workers: int = 12) -> int:
     """Download daily bars once, cache to CSV. Skips what is already there."""
@@ -237,7 +295,9 @@ def get_circuit_tracking(d: pd.DataFrame, idx: int) -> dict:
 # --------------------------------------------------------------------------- #
 def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
                   exclude_circuit_locks: bool = False,
-                  use_pre_circuit_entry: bool = False) -> list[dict]:
+                  use_pre_circuit_entry: bool = False,
+                  mcap_cr: float | None = None,
+                  min_mcap: float = 0.0) -> list[dict]:
     """
     Replay historical days and identify qualifying setups with their outcomes.
 
@@ -246,6 +306,12 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
       * 'anticipated': all pre-breakout anticipation setups (Model F).
       * 'anticipated_only': anticipation setups that did NOT qualify for BTST at 15:20.
       * 'all': both confirmed BTST and anticipated setups.
+
+    min_mcap (Rs crore) applies the live scanner's floor. Rows are TAGGED
+    rather than dropped here - report() slices on `mcap_ok`, so one replay can
+    show both the parity book and what the floor costs. Symbols with no cap
+    on file are treated as failing the floor, matching the live scanner, which
+    cannot size a name it has no cap for.
     """
     sym = os.path.basename(path)[:-4]
     try:
@@ -409,6 +475,8 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
                 btst_qualified="yes",
                 gross_pct=round(gross, 3),
                 net_pct=round(gross - COST_ROUND_TRIP, 3),
+                mcap_cr=(round(mcap_cr, 2) if mcap_cr is not None else None),
+                mcap_ok=("yes" if (mcap_cr is not None and mcap_cr >= min_mcap) else "no"),
             ))
 
         # Anticipated trade
@@ -449,6 +517,8 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
                 btst_qualified="yes" if is_btst else "no",
                 gross_pct=round(gross, 3),
                 net_pct=round(gross - COST_ROUND_TRIP, 3),
+                mcap_cr=(round(mcap_cr, 2) if mcap_cr is not None else None),
+                mcap_ok=("yes" if (mcap_cr is not None and mcap_cr >= min_mcap) else "no"),
             ))
 
     return out
@@ -460,9 +530,10 @@ def replay_symbol(path: str, start: str, end: str, mode: str = "btst",
 
 def _rs(args):
     try:
-        path, start, end, mode, excl_locks, pre_ckt = args
+        path, start, end, mode, excl_locks, pre_ckt, mcap_cr, min_mcap = args
         return replay_symbol(path, start, end, mode=mode, exclude_circuit_locks=excl_locks,
-                             use_pre_circuit_entry=pre_ckt)
+                             use_pre_circuit_entry=pre_ckt,
+                             mcap_cr=mcap_cr, min_mcap=min_mcap)
     except Exception:
         return []
 
@@ -590,11 +661,23 @@ def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital_per_slot: 
 
 
 def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
-           capital: float = DEFAULT_CAPITAL) -> None:
+           capital: float = DEFAULT_CAPITAL, min_mcap: float = 0.0) -> None:
     if df.empty:
         print(f"\nNo {mode} setups in this window.")
         return
     df = df.sort_values("date").reset_index(drop=True)
+
+    # Live parity: the headline book is what the live scanner could have
+    # shown. The rejected cohort is reported separately rather than thrown
+    # away, so the floor's cost is visible instead of assumed.
+    excluded = pd.DataFrame()
+    if min_mcap > 0 and "mcap_ok" in df.columns:
+        excluded = df[df.mcap_ok != "yes"]
+        df = df[df.mcap_ok == "yes"].reset_index(drop=True)
+        if df.empty:
+            print(f"\nNo {mode} setups survive the Rs {min_mcap:,.0f} Cr mcap floor "
+                  f"in this window ({len(excluded)} below it).")
+            return
 
     mode_label = {
         "btst": "CONFIRMED BTST",
@@ -621,6 +704,31 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
     print(f"            anticipate near <={btst.ANTICIPATE_NEAR:g}% below / +{btst.ANTICIPATE_ABOVE_MAX:g}% above, "
           f"cp>={btst.ANTICIPATE_CLOSE_POS}, pre>={btst.MIN_PRE_CONFIRM}, ret_12m>={btst.MIN_RET_12M:g}%")
 
+    # ---- LIVE PARITY + KNOWN BIASES ---------------------------------------
+    # Every way this replay differs from the live book, stated up front. A
+    # backtest whose divergences are undocumented gets quoted as if it had
+    # none - which is how "the paper trade and the backtest are totally
+    # different" became a surprise instead of an expectation.
+    print()
+    if min_mcap > 0:
+        n_ex = len(excluded)
+        print(f"live parity ON  - mcap floor Rs {min_mcap:,.0f} Cr applied "
+              f"({n_ex:,} setup(s) excluded below it)")
+        print(f"            NOTE mcap.csv is a CURRENT snapshot (as of {mcap_asof()}), not "
+              f"point-in-time;")
+        print(f"                 a name large today may have been small then. Approximate.")
+    else:
+        print("live parity OFF - NO mcap floor. The live scanner rejects everything")
+        print("                 under its min_mcap, so this book is NOT what the alert")
+        print("                 would have shown you. Research only.")
+    print(f"            entry = daily CLOSE. Live buys ~15:20: measured "
+          f"{LIVE_ENTRY_BIAS_PCT:+.3f}% vs close (n={LIVE_ENTRY_BIAS_N}),")
+    print(f"                 i.e. this replay fills ~{LIVE_ENTRY_BIAS_PCT:.2f}% CHEAPER than you do "
+          f"- ~{LIVE_ENTRY_BIAS_PCT / 1.0 * 100:.0f}% of the 1% stop, in the backtest's favour.")
+    print(f"            book  = top {MAX_DAILY_TRADES}/day by the live priority rule. The A/B ledger "
+          f"logs EVERY model,")
+    print(f"                 so comparing this to raw ab_ledger.csv rows will never tie out.")
+
     print("\n" + HDR)
     print(_stats(df, "ALL"))
     print()
@@ -636,6 +744,14 @@ def report(df: pd.DataFrame, show_trades: bool, top: int, mode: str = "btst",
     if len(tiers) > 1:
         for tier in tiers:
             print(_stats(df[df.tier == tier], f"  {tier}"))
+        print()
+
+    # What the mcap floor cost (or saved). Reported so the choice to run
+    # live-parity is evidence-based rather than an article of faith.
+    if min_mcap > 0 and not excluded.empty:
+        print(f"MCAP FLOOR - what Rs {min_mcap:,.0f} Cr excluded")
+        print(_stats(df, "  traded (>= floor)"))
+        print(_stats(excluded, "  EXCLUDED (< floor)"))
         print()
 
     if "circuit_locked" in df.columns and df.circuit_locked.nunique() > 1:
@@ -721,6 +837,14 @@ def main() -> int:
                          "anticipated: all pre-breakout anticipation setups")
     ap.add_argument("--exclude-circuit-locks", action="store_true",
                     help="exclude trades where stock closed locked at upper circuit (unfillable at 15:20)")
+    ap.add_argument("--live-parity", dest="live_parity", action="store_true", default=True,
+                    help="apply the live scanner's min_mcap floor (DEFAULT). "
+                         "The backtest is only evidence about the strategy you "
+                         "actually run if it screens the same universe.")
+    ap.add_argument("--no-live-parity", dest="live_parity", action="store_false",
+                    help="research mode: no mcap floor, trades the full universe")
+    ap.add_argument("--min-mcap", type=float, default=None,
+                    help="override the mcap floor in Rs crore (default: config strategy.min_mcap)")
     ap.add_argument("--all-candidates", action="store_true",
                     help="write all qualifying candidates to CSV instead of the Top-3 traded book")
     ap.add_argument("--pre-circuit", action="store_true",
@@ -739,6 +863,25 @@ def main() -> int:
                     help="use the cache only, do not download")
     ap.add_argument("--universe", default="universe.csv")
     args = ap.parse_args()
+
+    # Resolve the live mcap floor. Reading it from config.py rather than
+    # restating 1000 here, for the same reason the thresholds come from
+    # btst.py: a second copy is a second thing to forget to update.
+    if args.min_mcap is not None:
+        min_mcap = float(args.min_mcap)
+    elif args.live_parity:
+        try:
+            from config import load_config
+            min_mcap = float(load_config().strategy.min_mcap)
+        except Exception:
+            min_mcap = 1000.0
+    else:
+        min_mcap = 0.0
+    caps = load_mcaps() if min_mcap > 0 else {}
+    if min_mcap > 0 and not caps:
+        print("WARNING: mcap.csv unreadable - the live mcap floor could NOT be "
+              "applied. This run is NOT live-parity.", flush=True)
+        min_mcap = 0.0
 
     end = args.to_date or pd.Timestamp.today().strftime("%Y-%m-%d")
     start = (args.from_date
@@ -771,7 +914,8 @@ def main() -> int:
 
     t0 = time.time()
     rows: list[dict] = []
-    jobs = [(f, start, end, args.mode, args.exclude_circuit_locks, args.pre_circuit) for f in files]
+    jobs = [(f, start, end, args.mode, args.exclude_circuit_locks, args.pre_circuit,
+             caps.get(os.path.basename(f)[:-4].upper()), min_mcap) for f in files]
     if len(files) > 8:
         with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
             for i, r in enumerate(ex.map(_rs, jobs, chunksize=8)):
@@ -786,10 +930,16 @@ def main() -> int:
     print(f"replayed {len(files):,} symbols in {time.time()-t0:.0f}s -> "
           f"{len(df):,} setups")
 
-    report(df, args.trades or bool(args.symbol), args.top, mode=args.mode, capital=args.capital)
+    report(df, args.trades or bool(args.symbol), args.top, mode=args.mode,
+           capital=args.capital, min_mcap=min_mcap)
 
     if args.csv and not df.empty:
         r = df.copy()
+        # The CSV feeds btst_backtest_trades.pdf. It must carry the SAME book
+        # the summary above describes - an unfiltered CSV under a live-parity
+        # header is exactly the mismatch this change exists to remove.
+        if min_mcap > 0 and "mcap_ok" in r.columns:
+            r = r[r.mcap_ok == "yes"]
         r["_k"] = _calc_priority(r)
         if args.all_candidates:
             out_df = r.sort_values(["date", "_k"], ascending=[True, False]).drop(columns=["_k"], errors="ignore")

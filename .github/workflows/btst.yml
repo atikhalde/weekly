@@ -8,7 +8,10 @@ name: BTST Scan (15:20 IST)
 # Today's daily candle does not exist yet at 15:20, so btst.py builds it from
 # today's 5-minute bars and pro-rates the volume test for the elapsed session.
 # Measured at this cutoff, 82% of flagged names still qualify at the close, and
-# the entry is 0.14% CHEAPER than the close (these names ramp into the bell).
+# the entry averages +0.43% ABOVE the close, not below it (corrected 2026-08-14
+# from 28 real fills; the pre-launch sim had the sign backwards - these names
+# ramp INTO the bell, so buying early pays up). 15:20 is still right: it is the
+# last cutoff that leaves time to place the order.
 #
 # BUG 55 - GITHUB CRON IS NOT RELIABLE ENOUGH FOR THIS JOB.
 # On 03-Aug the message arrived at 15:48 IST - 28 minutes late, after the
