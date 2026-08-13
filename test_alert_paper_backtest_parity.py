@@ -526,3 +526,73 @@ def test_pdf_kpis_match_the_ledger():
     closed = live[live["exit_reason"].astype(str) != "NO_FILL"]
     assert s["n"] == len(closed), (
         f"header says {s['n']} closed trades, ledger has {len(closed)}")
+
+
+# --------------------------------------------------------------------------- #
+#  10. the backtest must screen the SAME universe as the live scanner
+# --------------------------------------------------------------------------- #
+def test_backtest_applies_the_live_mcap_floor():
+    """2026-08-14: "backtest and paper trade are totally different".
+
+    btst_backtest.py applied NO market-cap filter while the live scanner
+    rejects everything under strategy.min_mcap - 872 of the 2,282 names in
+    mcap.csv, 38% of the universe. A replay headed "the LIVE rule replayed
+    over history" cannot silently drop one of the live rule's filters, and
+    the omission flatters it: micro-caps print the biggest raw moves.
+    """
+    import btst_backtest as bb
+
+    assert hasattr(bb, "load_mcaps"), "the backtest must read mcap.csv"
+    src = (ROOT / "btst_backtest.py").read_text()
+    assert "min_mcap" in src
+    # the floor must come from config, not be restated as a literal
+    assert "strategy.min_mcap" in src, "read the floor from config, do not hardcode"
+
+
+def test_backtest_mcap_floor_defaults_on():
+    """Live parity is the DEFAULT; research mode must be opt-in.
+
+    A flag that defaults off is a flag nobody sets, and the report would go
+    back to describing a universe the alert never sees.
+    """
+    src = (ROOT / "btst_backtest.py").read_text()
+    assert '"--live-parity"' in src
+    assert "action=\"store_true\", default=True" in src
+    assert '"--no-live-parity"' in src
+
+
+def test_backtest_csv_respects_the_floor():
+    """The CSV feeds the PDF. An unfiltered CSV under a live-parity header
+    is exactly the mismatch this change exists to remove."""
+    src = (ROOT / "btst_backtest.py").read_text()
+    csv_block = src.split("if args.csv and not df.empty:", 1)[1][:500]
+    assert "mcap_ok" in csv_block, "the exported CSV must carry the filtered book"
+
+
+def test_mcap_loader_handles_a_missing_or_broken_file(tmp_path):
+    import btst_backtest as bb
+    assert bb.load_mcaps(str(tmp_path / "nope.csv")) == {}
+    bad = tmp_path / "bad.csv"
+    bad.write_text("not,a,mcap,file\n1,2,3,4\n")
+    assert bb.load_mcaps(str(bad)) == {}
+    good = tmp_path / "good.csv"
+    good.write_text("symbol,mcap_cr,updated\nFOO,1500.5,2026-08-10\nBAR,,2026-08-10\n")
+    caps = bb.load_mcaps(str(good))
+    assert caps == {"FOO": 1500.5}, "NaN caps must be dropped, not kept as nan"
+
+
+def test_the_inverted_entry_bias_is_corrected_everywhere():
+    """The docs claimed the 15:20 entry is 0.14% CHEAPER than the close.
+
+    Measured over all 28 real fills it is +0.433% ABOVE the close - the sign
+    was backwards, so the backtest was described as pessimistic when it is
+    optimistic by ~40% of the 1% stop distance on every trade.
+    """
+    import btst_backtest as bb
+    assert bb.LIVE_ENTRY_BIAS_PCT > 0, "the live entry is ABOVE the close"
+    assert bb.LIVE_ENTRY_BIAS_N >= 28
+
+    for name in ("btst.py", "btst_backtest.py", ".github/workflows/btst.yml"):
+        text = (ROOT / name).read_text()
+        assert "0.14% CHEAPER" not in text, f"{name} still claims the wrong sign"
+        assert "0.14% LESS than the close" not in text, f"{name} still claims the wrong sign"

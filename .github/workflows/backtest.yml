@@ -18,6 +18,14 @@ name: BTST Backtest (on demand)
 #
 # The trade list is uploaded as an artifact (CSV) and the summary is printed
 # in the job log, so "show me the trades behind +3.04%" has an answer.
+#
+# CHOOSING A MODE - read this before comparing against the paper ledger.
+# 2026-08-14 a run was dispatched with mode=anticipated_only and the output
+# shared none of the paper trade's stocks. That mode is DEFINED as "anticipated
+# setups that did NOT qualify for BTST at 15:20" - the COMPLEMENT of what the
+# live alert buys - so near-zero overlap is the correct result, not a bug.
+# Use mode=all to compare against live. Run reconcile_backtest.py afterwards
+# to attribute any remaining difference to a named cause.
 
 on:
   workflow_dispatch:
@@ -44,6 +52,10 @@ on:
         description: "End date YYYY-MM-DD (blank = today)"
         type: string
         default: ""
+      live_parity:
+        description: "Apply the live mcap floor (recommended - matches what the alert screens)"
+        type: boolean
+        default: true
       trades:
         description: "Print the individual trade list in the log"
         type: boolean
@@ -89,6 +101,7 @@ jobs:
             --mode "${{ inputs.mode || 'btst' }}" \
             ${{ inputs.pre_circuit && '--pre-circuit' || '' }} \
             ${{ inputs.exclude_circuit_locks && '--exclude-circuit-locks' || '' }} \
+            ${{ inputs.live_parity == false && '--no-live-parity' || '' }} \
             ${{ inputs.symbol && format('--symbol {0}', inputs.symbol) || '' }} \
             ${{ inputs.from_date && format('--from {0}', inputs.from_date) || '' }} \
             ${{ inputs.to_date && format('--to {0}', inputs.to_date) || '' }} \
