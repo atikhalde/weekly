@@ -5501,7 +5501,12 @@ def test_bug55_late_picks_are_marked_untradeable_and_model_e_skips_them():
     """The paper ledger must not book a fill that could never have happened."""
     body = (ROOT / "btst.py").read_text()
     chunk = body.split("this IS the trade list", 1)[1].split("pfile =", 1)[0]
-    assert '"tradeable": 0 if too_late else 1' in chunk, (
+    # 2026-08-14: the flag is now driven by `enterable` rather than
+    # `not too_late`. too_late exempted --after-close, so a post-close
+    # review stamped tradeable=1 on picks nobody could buy (AARTISURF /
+    # INDSWFTLAB, 2026-08-11 20:59). enterable requires the scan to have
+    # run INSIDE the 15:00-15:30 entry window, in every mode.
+    assert '"tradeable": 1 if enterable else 0' in chunk, (
         "the picks file must record whether the pick was enterable")
 
     ab = (ROOT / "ab_paper.py").read_text()
@@ -5819,7 +5824,9 @@ def test_bug63_anticipate_list_also_honours_the_entry_window():
 
     # the anticipation picks file must carry the flag
     apick = ant.split("aout = pd.DataFrame", 1)[1][:900]
-    assert '"tradeable": 0 if too_late else 1' in apick, (
+    # 2026-08-14: driven by `enterable` now - see BUG 55's test for why
+    # `not too_late` was wrong (it exempted --after-close).
+    assert '"tradeable": 1 if enterable else 0' in apick, (
         "anticipate_picks.csv must record whether the pick was enterable")
 
     # and Model F must honour it

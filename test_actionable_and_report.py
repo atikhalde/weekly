@@ -93,10 +93,11 @@ def test_build_actionable_lists_next_anticipated_excludes_already_taken():
 
     # All 3 anticipate rows are eligible for top3_actionable (no confirmed
     # picks competing), so whichever land in top3 must NOT reappear in
-    # next_anticipated, and next_anticipated must be capped at 2.
+    # next_anticipated, and next_anticipated must be capped at 3
+    # (2026-08-14: the watchlist carries the nearest THREE, was two).
     taken = {a["symbol"] for a in top3}
     assert not (taken & {r["symbol"] for r in next_ant})
-    assert len(next_ant) <= 2
+    assert len(next_ant) <= 3
 
 
 def test_build_actionable_lists_empty_when_nothing_qualifies():
