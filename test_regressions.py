@@ -2536,6 +2536,50 @@ def test_ab_ledger_upgrades_stale_no_fill_to_a_real_resolution(tmp_path):
     assert final.iloc[0]["exit_reason"] == "SL", "an already-resolved trade must not be overwritten again"
 
 
+def test_pick_is_circuit_locked_matches_the_live_alert_exclusion():
+    """2026-08-14 bug fix - "excluded circuit stock still got a fake fill":
+    reproduces the exact real-world case found in ab_ledger.csv on
+    2026-08-13. AARTISURF (day_ret +12.6%, entry 572.0) and BLSE (day_ret
+    +2.0%, entry 318.4) were BOTH explicitly excluded from the real
+    2026-08-11 15:16 IST Telegram alert ("Locked at Upper Circuit... 0
+    sellers"), reconstructed via btst.build_actionable_lists() against the
+    real committed btst_picks.csv/anticipate_picks.csv rows for that date -
+    yet both appeared in ab_ledger.csv as fully resolved SL trades with a
+    real P&L, as if they had actually been bought. LUMAXTECH, the real
+    2026-08-11 confirmed pick, must NOT be flagged as locked."""
+    from ab_paper import _pick_is_circuit_locked
+
+    assert _pick_is_circuit_locked({"entry": 572.0, "day_ret": 12.6}) is True, "AARTISURF"
+    assert _pick_is_circuit_locked({"entry": 318.4, "day_ret": 2.0}) is True, "BLSE"
+    assert _pick_is_circuit_locked({"entry": 2085.8, "day_ret": 15.22}) is False, "LUMAXTECH (real confirmed pick)"
+    # Degenerate inputs must fail open (never crash the whole simulation run).
+    assert _pick_is_circuit_locked({}) is False
+    assert _pick_is_circuit_locked({"entry": 0, "day_ret": 50}) is False
+
+
+def test_simulate_btst_circuit_locked_returns_no_fill_not_a_fake_trade():
+    """A circuit-locked pick must simulate to a NO_FILL trade (no P&L),
+    exactly like the pre-existing "no daily candle" / "price above capital"
+    NO_FILL cases - never a fabricated fill at the closing price."""
+    import types
+    import pandas as pd
+    from ab_paper import simulate_btst
+
+    sig = types.SimpleNamespace(
+        symbol="AARTISURF", price=572.0, trigger="cross",
+        bar_time=pd.Timestamp("2026-08-11 15:20:00"),
+        entry_level=563.0, level_52=0.0, week_start="2026-08-10",
+        bar_low=0.0, evaluation=None,
+    )
+    daily_after = pd.DataFrame({"open": [575.0], "high": [580.0], "low": [570.0],
+                                "close": [566.28], "_day": [pd.Timestamp("2026-08-12")]})
+    tr = simulate_btst(sig, daily_after, 100000.0, {"rule": "btst", "stop_pct": 1.0, "take_pct": 2.0},
+                       hold_days=5, circuit_locked=True)
+    assert tr.exit_reason == "NO_FILL"
+    assert "circuit" in tr.exit_note.lower()
+    assert tr.pnl == 0.0 and tr.qty == 0, "a circuit-locked pick must never show a simulated P&L"
+
+
 def test_ab_target_r_uses_initial_risk():
     """+3R must mean 3x the ORIGINAL stop distance, not a moving one."""
     from datetime import datetime, timedelta

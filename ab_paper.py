@@ -461,6 +461,36 @@ def _is_tradeable(row) -> bool:
     return bool(int(f))
 
 
+def _pick_is_circuit_locked(row: dict) -> bool:
+    """Was this BTST/Anticipate candidate locked at its upper circuit (0
+    sellers, un-buyable) at the time it was recorded in btst_picks.csv /
+    anticipate_picks.csv?
+
+    Reuses btst.py's own get_circuit_info() - the exact same check the live
+    alert applies to decide "Excluded: X (Locked at Upper Circuit)" - rather
+    than restating the rule (and risking it drifting from the real one).
+    The picks CSVs don't persist the day's raw high, so "high" falls back
+    to the close, matching the identical fallback btst.py itself uses when
+    building the Telegram message (`float(r.get("high") or c_val)`).
+
+    2026-08-14 fix: this check did not previously exist anywhere in
+    ab_paper.py's direct-picks simulation, so a circuit-locked pick could
+    still receive a fully simulated fill and P&L, contradicting the alert
+    that explicitly reported it as excluded/unfillable.
+    """
+    import btst as _btst
+    try:
+        c_val = float(row.get("entry") or 0.0)
+        day_ret_val = float(row.get("day_ret") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if c_val <= 0:
+        return False
+    pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+    ckt = _btst.get_circuit_info(pc_val, c_val, c_val)
+    return bool(ckt["is_locked"])
+
+
 def load_btst_picks(path: Path | str | None = None) -> tuple[dict, dict]:
     """
     The top-5 list btst.py wrote at 15:20.
@@ -493,7 +523,8 @@ def load_btst_picks(path: Path | str | None = None) -> tuple[dict, dict]:
 
 def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
                   exit_rule: dict, hold_days: int = 10,
-                  cost_round_trip: float = COST_ROUND_TRIP) -> PaperTrade:
+                  cost_round_trip: float = COST_ROUND_TRIP,
+                  circuit_locked: bool = False) -> PaperTrade:
     """
     BTST simulation: buy the breakout/anticipation close at 15:20.
 
@@ -503,6 +534,20 @@ def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
         cut if opened gap-down <= -1.5%.
       * 'btst': Standard 1% stop / 2% target on close.
       * 'swing': Multi-day hold with stop and target.
+
+    circuit_locked: 2026-08-14 fix - "excluded circuit stock still got a
+    fake fill". The live alert's own build_actionable_lists() excludes any
+    pick that is locked at its upper circuit (0 sellers - literally
+    un-buyable) from "today's actionable buy list". The direct-picks
+    simulation below never applied that same check, so a stock the real
+    alert explicitly reported as "Excluded: X - Locked at Upper Circuit"
+    could still receive a full simulated fill with a real P&L in
+    ab_ledger.csv. Confirmed with real data: AARTISURF (+10% UC) and BLSE
+    (+2% UC) were both excluded from the real 2026-08-11 15:16 IST alert,
+    yet both show up in ab_ledger.csv as resolved SL trades as if bought.
+    When True, this returns a NO_FILL trade (no P&L) instead of simulating
+    an impossible fill - the same "signal existed but was not takeable"
+    semantics already used for "no daily candle" / "price above capital".
     """
     entry = float(sig.price)
     sig_d, sig_t = _stamp(sig.bar_time)
@@ -530,6 +575,10 @@ def simulate_btst(sig, daily_after: pd.DataFrame, capital: float,
         rsi=rsi_val,
         macd_hist=macd_val,
     )
+    if circuit_locked:
+        t.exit_reason = "NO_FILL"
+        t.exit_note = "locked at upper circuit at signal time - 0 sellers, not fillable"
+        return t
     if daily_after.empty or risk <= 0:
         t.exit_reason = "NO_FILL"
         t.exit_note = "no daily candle after the signal"
@@ -1363,7 +1412,8 @@ def main() -> int:
                 btst_age=int(_f(pick, "age", 0.0)),
             )
             for m in [mm for mm in models if mm.key in ("E_btst", "E_btst_wide")]:
-                tr = simulate_btst(sig, dafter, capital, m.exit, m.hold_days, cost)
+                tr = simulate_btst(sig, dafter, capital, m.exit, m.hold_days, cost,
+                                   circuit_locked=_pick_is_circuit_locked(pick))
                 rec = dict(tr.__dict__)
                 rec["model"] = m.key
                 rec["model_label"] = m.label
@@ -1403,7 +1453,8 @@ def main() -> int:
                 if m.key == "F_anticipate_only" and picks_lookup.get((day_k, sym)) is not None:
                     continue
                 sig.btst_tier = "F_only" if (m.key == "F_anticipate_only") else "F"
-                tr = simulate_btst(sig, dafter, capital, m.exit, m.hold_days, cost)
+                tr = simulate_btst(sig, dafter, capital, m.exit, m.hold_days, cost,
+                                   circuit_locked=_pick_is_circuit_locked(ap_))
                 rec = dict(tr.__dict__)
                 rec["model"] = m.key
                 rec["model_label"] = m.label
