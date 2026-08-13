@@ -100,11 +100,19 @@ def main() -> int:
     if "mode" in bt.columns:
         modes = bt["mode"].value_counts().to_dict()
         print(f"modes             {modes}")
-        if set(modes) == {"anticipated_only"}:
+        # CAREFUL: `mode` here is a PER-ROW descriptor, not the run's --mode.
+        # Under --mode all, an anticipate setup that did not also qualify as
+        # confirmed BTST is legitimately labelled "anticipated_only". The
+        # run-level mistake worth flagging is the absence of any confirmed
+        # BTST row across a window long enough that one was likely - which is
+        # what --mode anticipated_only produces, since it drops them all.
+        if "btst" not in modes and len(bt) >= 10:
             print()
-            print("  !! every row is anticipated_only. That mode is defined as")
-            print("     'anticipated setups that did NOT qualify for BTST', i.e. the")
-            print("     COMPLEMENT of what the live alert buys. Re-run --mode all.")
+            print("  ?  no confirmed-BTST rows in this book. If the run used")
+            print("     --mode anticipated_only that is BY DEFINITION the complement")
+            print("     of what the live alert buys - re-run with --mode all.")
+            print("     (Under --mode all this can also be genuine: it just means no")
+            print("     breakout cleared Tier A/B in the window.)")
 
     if not alert:
         print()
