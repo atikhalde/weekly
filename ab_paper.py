@@ -494,12 +494,93 @@ def _pick_is_circuit_locked(row: dict) -> bool:
         return False
     pc_val = _btst._resolve_prev_close({"prev_close": row.get("prev_close"),
                                         "close": c_val, "day_ret": row.get("day_ret")})
+    # An unknown high must not masquerade as "closed at the high" - that is
+    # what made get_circuit_info() fire falsely on HAPPYFORGE/MOREPENLAB.
+    # But legacy rows predate BOTH `high` and `close_pos`, and for those the
+    # old close-as-high assumption is the only signal there is (it is what
+    # catches AARTISURF's real lock). So assume it only when there is no
+    # close_pos to judge by; when close_pos exists it decides.
     try:
-        high_val = float(row.get("high") or c_val)
+        high_val = float(row.get("high") or 0.0)
     except (TypeError, ValueError):
+        high_val = 0.0
+    if high_val <= 0.0 and row.get("close_pos") is None:
         high_val = c_val
-    ckt = _btst.get_circuit_info(pc_val, c_val, high_val)
+    # close_pos (2026-08-14): a locked stock has no sellers and closes AT
+    # its high, so pass it through to suppress the false positives that
+    # otherwise fire whenever `high` is unknown - see get_circuit_info().
+    ckt = _btst.get_circuit_info(pc_val, c_val, high_val,
+                                 close_pos=row.get("close_pos"))
     return bool(ckt["is_locked"])
+
+
+def load_alert_selection(root: Path | str | None = None) -> dict[str, set[str]]:
+    """{date -> {symbols the alert ACTUALLY told you to buy}} from the
+    btst_alert_state.json snapshots btst.py writes.
+
+    2026-08-14 fix - "paper trade and backtest show different stocks than
+    the alert picked". btst_picks.csv / anticipate_picks.csv ACCUMULATE a
+    row per run per day: the 15:20 cron, the second cron slot, any
+    repository_dispatch trigger, and every manual after-close review all
+    append to the same file. load_btst_picks() then unions all of them into
+    one flat {(date, symbol): row} map, so the paper ledger traded the
+    UNION of every scan of the day instead of the one list the alert sent.
+
+    Confirmed with real data for 2026-08-13:
+
+        alert actually sent (20:39 snapshot) : KMEW, MUNJALAU
+                             excluded (UC)   : JUBLCPL
+        btst_picks.csv rows that day         : MUNJALAU (15:20),
+                                               JUBLCPL  (20:39)
+        anticipate_picks.csv rows that day   : PRECWIRE   (14:38),
+                                               MOREPENLAB (15:20),
+                                               MUNJALAU   (20:39),
+                                               KMEW       (20:39)
+        ab_ledger.csv actually traded        : JUBLCPL, KMEW, MOREPENLAB,
+                                               MUNJALAU, PRECWIRE
+
+    Five names booked against a two-name alert - PRECWIRE and MOREPENLAB
+    came from earlier intraday scans that the final alert dropped, and
+    JUBLCPL was the one the alert explicitly EXCLUDED as circuit-locked.
+    That is the reported "3 showing different trades".
+
+    The snapshot is the literal object the Telegram message was rendered
+    from, so gating on it makes the ledger trade exactly the alert. Days
+    with no snapshot return no entry at all and the caller falls back to
+    the CSVs unchanged, preserving every historical/backfill run.
+    """
+    import json as _json
+
+    root = Path(root) if root else ROOT
+    out: dict[str, set[str]] = {}
+    # The live file is one day's snapshot; btst_alert_state_*.json is the
+    # archived form, so a multi-day replay can gate each day on its own alert.
+    paths = [root / "btst_alert_state.json"]
+    paths += sorted(root.glob("btst_alert_state_*.json"))
+    for p in paths:
+        if not p.exists():
+            continue
+        try:
+            state = _json.loads(p.read_text())
+        except (OSError, ValueError):
+            continue
+        day = str(state.get("date", "")).strip()
+        if not day:
+            continue
+        # A snapshot from a run that could not actually enter (post-close
+        # review, or a scan outside the 15:00-15:30 window) describes a list
+        # nobody could have bought. It must never define the tradeable set -
+        # otherwise the 2026-08-13 20:39 review would have become "the
+        # alert". Absent an enterable snapshot the day is simply ungated.
+        if not bool(state.get("enterable", True)):
+            continue
+        syms = {str(a.get("symbol", "")).strip().upper()
+                for a in (state.get("top3_actionable") or [])
+                if str(a.get("symbol", "")).strip()}
+        # A day whose alert was rendered but produced NOTHING actionable is
+        # still authoritative: it means "buy nothing today", not "no data".
+        out[day] = syms
+    return out
 
 
 def load_btst_picks(path: Path | str | None = None) -> tuple[dict, dict]:
@@ -767,37 +848,72 @@ def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int, int]:
     new = new[LEDGER_COLS]
     key = ["model", "symbol", "signal_date", "signal_time"]
 
+    # 2026-08-14 fix - "the ledger books the same pick twice in one day".
+    # signal_time was part of the identity, but ONE pick can legitimately
+    # produce rows at two different times on the same day: the direct-picks
+    # simulation always stamps 15:20, while the 5m replay path stamps the
+    # actual cross bar (e.g. 12:50). Both describe the SAME BTST trade -
+    # one stock, one entry, bought once at that day's close - so keying on
+    # signal_time made them two independent trades and double-counted the
+    # P&L. Confirmed with real data: KENNAMET 2026-08-12 booked E_btst
+    # twice (12:50 and 15:20), same 3,524.80 entry, same TGT exit, +3,958.68
+    # counted TWICE (7,917.35 instead of 3,958.68); JUBLCPL 2026-08-13 and
+    # five other names hit the same duplication.
+    #
+    # A BTST/anticipate trade is identified by (model, symbol, signal_date)
+    # - the time it was spotted is not part of its identity. Non-BTST
+    # models keep signal_time in the key: an intraday model genuinely can
+    # take the same name twice in a day on separate crosses.
+    #
+    # "Is this a BTST row" is read off btst_source (set to picks /
+    # anticipate / reconstructed by every path that calls simulate_btst,
+    # and blank for every other model) rather than a hardcoded list of
+    # model keys, so a new BTST-style model added to models.yaml inherits
+    # the correct de-duplication automatically.
+    def _dedup_key(frame: pd.DataFrame) -> pd.Series:
+        """Per-row identity: BTST rows ignore signal_time, others keep it."""
+        src = frame["btst_source"].astype(str).str.strip().str.lower()
+        is_btst = ~src.isin(["", "nan", "none"])
+        base = (frame["model"].astype(str) + "|" + frame["symbol"].astype(str)
+                + "|" + frame["signal_date"].astype(str))
+        return base.where(is_btst, base + "|" + frame["signal_time"].astype(str))
+
     if path.exists():
         old = pd.read_csv(path)
         for c in LEDGER_COLS:
             if c not in old.columns:
                 old[c] = ""
         old = old[LEDGER_COLS]
-        old_keys = set(map(tuple, old[key].astype(str).values))
+        old_keys = set(_dedup_key(old)) if not old.empty else set()
 
         merged = pd.concat([old, new], ignore_index=True)
+        merged["_key"] = _dedup_key(merged)
         # Stable sort: resolved rows (exit_reason != NO_FILL) sort ahead of
         # NO_FILL rows for the same key; ties keep insertion order (old
         # before new), so an already-resolved trade never gets churned by
         # a later re-simulation of the same signal.
         merged["_resolved"] = (merged["exit_reason"].astype(str) != "NO_FILL").astype(int)
         merged = merged.sort_values("_resolved", ascending=False, kind="mergesort")
-        merged = merged.drop_duplicates(subset=key, keep="first").drop(columns=["_resolved"])
-        merged = merged[LEDGER_COLS]
+        merged = merged.drop_duplicates(subset=["_key"], keep="first")
 
-        new_keys_only = set(map(tuple, new[key].astype(str).values)) - old_keys
+        new_keys = set(_dedup_key(new))
+        new_keys_only = new_keys - old_keys
         added = len(new_keys_only)
-        merged_keys = set(map(tuple, merged[key].astype(str).values))
+        merged_keys = set(merged["_key"])
         # Rows that already existed but flipped from NO_FILL -> resolved.
-        old_by_key = {tuple(k): r for k, r in zip(old[key].astype(str).values, old["exit_reason"].astype(str))}
-        merged_by_key = {tuple(k): r for k, r in zip(merged[key].astype(str).values, merged["exit_reason"].astype(str))}
+        old_by_key = dict(zip(_dedup_key(old), old["exit_reason"].astype(str))) if not old.empty else {}
+        merged_by_key = dict(zip(merged["_key"], merged["exit_reason"].astype(str)))
         upgraded = sum(1 for k in old_keys & merged_keys
                        if old_by_key.get(k) == "NO_FILL" and merged_by_key.get(k) != "NO_FILL")
-        dupes = len(new) - added - upgraded
+        dupes = len(new_keys) - added - upgraded
+
+        merged = merged.drop(columns=["_resolved", "_key"])[LEDGER_COLS]
 
         merged.to_csv(path, index=False)
         return added, max(dupes, 0), upgraded
-    new = new.drop_duplicates(subset=key, keep="first")
+    new = (new.assign(_key=_dedup_key(new))
+              .drop_duplicates(subset=["_key"], keep="first")
+              .drop(columns=["_key"]))
     new.to_csv(path, index=False)
     return len(new), 0, 0
 
@@ -1111,6 +1227,11 @@ def main() -> int:
     ap.add_argument("--config", default=None)
     ap.add_argument("--report-only", action="store_true",
                     help="print the standings from the existing ledger")
+    ap.add_argument("--ignore-alert-state", action="store_true",
+                    help="trade every row in the picks CSVs instead of only "
+                         "the names that day's alert actually sent. Research "
+                         "escape hatch - it re-enables the multi-run union "
+                         "that made the ledger disagree with the alert.")
     args = ap.parse_args()
 
     defaults, models = load_models(args.models)
@@ -1177,6 +1298,41 @@ def main() -> int:
     # ---- the 15:20 picks file: Model E's trade list ------------------------
     picks_lookup, picks_have_day = load_btst_picks()
     ant_lookup, ant_have_day = load_btst_picks(ROOT / "anticipate_picks.csv")
+
+    # ---- gate both lists on what the alert ACTUALLY sent --------------------
+    # See load_alert_selection(): the picks CSVs accumulate a row per RUN per
+    # day, so trading them directly books names from superseded intraday
+    # scans and names the alert excluded as circuit-locked. Where a snapshot
+    # exists it is authoritative; days without one are left untouched so
+    # historical backfills and --days replays behave exactly as before.
+    alert_sel = {} if args.ignore_alert_state else load_alert_selection()
+    if alert_sel:
+        def _gate(lookup: dict, label: str) -> dict:
+            kept, dropped = {}, []
+            for (day_k, sym_k), row in lookup.items():
+                allowed = alert_sel.get(str(day_k))
+                if allowed is None or str(sym_k).upper() in allowed:
+                    kept[(day_k, sym_k)] = row
+                else:
+                    dropped.append(f"{day_k} {sym_k}")
+            if dropped:
+                print(f"  {label}: dropped {len(dropped)} row(s) not in that "
+                      f"day's alert -> {', '.join(sorted(dropped)[:8])}"
+                      f"{' ...' if len(dropped) > 8 else ''}")
+            return kept
+        gated_days = sorted(alert_sel)
+        print(f"  alert snapshot(s) found for {len(gated_days)} session(s) - "
+              f"paper trades are gated to the names the alert actually sent")
+        picks_lookup = _gate(picks_lookup, "btst picks")
+        ant_lookup = _gate(ant_lookup, "anticipate picks")
+        picks_have_day = {d: True for (d, _s) in picks_lookup}
+        ant_have_day = {d: True for (d, _s) in ant_lookup}
+        # A gated day with nothing left still HAS an alert - it said "buy
+        # nothing". Keep the day flagged so the reconstruction fallback in
+        # the replay path cannot resurrect a trade the alert never sent.
+        for d in gated_days:
+            picks_have_day.setdefault(d, True)
+            ant_have_day.setdefault(d, True)
     if ant_lookup:
         print(f"  anticipate picks: {len(ant_lookup)} entry(ies) across "
               f"{len(ant_have_day)} session(s) - Model F trades THAT list")
@@ -1529,6 +1685,31 @@ def main() -> int:
     added, dupes, upgraded = append_ledger(ledger_path, rows)
     upgrade_note = f", {upgraded} resolved (were stuck at NO_FILL)" if upgraded else ""
     print(f"\nLedger {ledger_path.name}: +{added} new, {dupes} already recorded{upgrade_note}")
+
+    # 2026-08-14: gating only stops NEW off-alert rows. Rows written BEFORE
+    # the gate existed are still in the ledger and would keep polluting every
+    # report, so evict them too. Only days with an enterable snapshot are
+    # touched, and only BTST/anticipate rows - nothing else is second-guessed.
+    if alert_sel:
+        led = pd.read_csv(ledger_path) if ledger_path.exists() else pd.DataFrame()
+        if not led.empty:
+            src = led.get("btst_source", pd.Series("", index=led.index))
+            is_btst = src.astype(str).str.strip().str.lower().isin(
+                ["picks", "anticipate", "reconstructed"])
+            day = led["signal_date"].astype(str)
+            sym = led["symbol"].astype(str).str.upper()
+            gated_day = day.isin(alert_sel)
+            allowed = pd.Series(
+                [s in alert_sel.get(d, {s}) for d, s in zip(day, sym)],
+                index=led.index)
+            stale = is_btst & gated_day & ~allowed
+            if stale.any():
+                for _, r in led[stale].iterrows():
+                    print(f"  evicted {r['signal_date']} {r['symbol']} "
+                          f"({r['model']}) - not in that day's alert")
+                led[~stale].to_csv(ledger_path, index=False)
+                print(f"  removed {int(stale.sum())} pre-gate row(s) the "
+                      f"alert never sent")
 
     if ledger_path.exists():
         led = pd.read_csv(ledger_path)

@@ -126,7 +126,11 @@ jobs:
           # don't match the alert": pdf_report.py reads this file instead of
           # re-deriving "today's picks" from the raw, multi-run-per-day CSVs,
           # which could (and did) pick up a different run's results.
-          git add btst_picks.csv anticipate_picks.csv btst_alert_state.json 2>/dev/null || git add btst_picks.csv
+          # btst_alert_state_<date>.json is the per-day archive of the same
+          # object (2026-08-14): the live file only holds the latest session,
+          # so a multi-day paper/backtest replay needs the dated copies to ask
+          # "what did the alert send on THAT day" instead of re-deriving it.
+          git add btst_picks.csv anticipate_picks.csv btst_alert_state.json btst_alert_state_*.json 2>/dev/null || git add btst_picks.csv
           if git diff --cached --quiet; then
             echo "picks unchanged"
             exit 0
@@ -153,6 +157,7 @@ jobs:
             btst_picks.csv
             anticipate_picks.csv
             btst_alert_state.json
+            btst_alert_state_*.json
           if-no-files-found: ignore
           retention-days: 30
 

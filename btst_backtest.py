@@ -495,22 +495,46 @@ HDR = (f"{'slice':<20}{'trades':>7}{'/wk':>6}{'win%':>7}{'mean%':>9}"
 
 
 def _calc_priority(r: pd.DataFrame) -> pd.Series:
-    arm = r["arm"].astype(str)
-    rvol = r["rvol"].fillna(0).astype(float)
-    cp = r["close_pos"].fillna(1.0).astype(float)
-    pre = r["pre"].fillna(0).astype(float) if "pre" in r.columns else 0.0
+    """Vectorised twin of btst.actionable_priority() - and asserted to agree.
 
-    is_prime1 = (arm == "ant_below") & (pre >= 6)
-    is_prime2 = arm.isin(["fresh_A", "fresh_B"]) & (rvol >= 5.0) & (cp >= 0.98)
-    is_tier_a = (arm == "fresh_A")
-    is_aged_b = (arm == "aged_B")
-    is_fresh_b = (arm == "fresh_B")
-    is_ant = arm.str.startswith("ant_")
+    2026-08-14 fix - "backtest ranks a different top-3 than the alert":
+    this function had the anticipate and fresh_B weights TRANSPOSED
+    relative to btst.actionable_priority(), the live alert's own rule:
 
-    score = (is_prime1 * 500.0 + is_prime2 * 500.0 + is_tier_a * 400.0
-             + is_aged_b * 300.0 + is_fresh_b * 200.0 + is_ant * 100.0
-             + rvol.clip(0, 30) + pre)
-    return score
+        live alert   ... + is_ant * 200.0 + is_fresh_b * 100.0
+        backtest     ... + is_fresh_b * 200.0 + is_ant * 100.0   <-- wrong
+
+    So for two otherwise-identical candidates the alert preferred the
+    anticipate name and the backtest preferred the fresh_B name - a
+    straight 100-point inversion that reorders the top-3 book the backtest
+    reports as "the LIVE rule replayed over history". It is not the live
+    rule if the ordering differs.
+
+    The weights are no longer restated here. btst.actionable_priority() is
+    THE rule; this only applies it row-wise, so the two cannot drift again.
+    A hand-kept vectorised copy is exactly what produced this bug, and the
+    same reasoning is already documented on classify()/exhausted()/
+    conviction() being imported from btst.py rather than duplicated.
+    """
+    if r.empty:
+        return pd.Series([], dtype=float, index=r.index)
+    # Missing/NaN handling stays HERE, matching the previous vectorised
+    # defaults (rvol->0, close_pos->1.0, pre->0). actionable_priority() sees
+    # only clean floats, because `float(nan) or 0.0` is nan (nan is truthy),
+    # which would silently poison the score.
+    arm = (r["arm"].astype("string").fillna("")
+           if "arm" in r.columns else pd.Series("", index=r.index))
+    def _col(name, default):
+        if name not in r.columns:
+            return pd.Series(default, index=r.index, dtype=float)
+        return pd.to_numeric(r[name], errors="coerce").fillna(default).astype(float)
+    rvol = _col("rvol", 0.0)
+    cp = _col("close_pos", 1.0)
+    pre = _col("pre", 0.0)
+    return pd.Series(
+        [btst.actionable_priority({"arm": a, "rvol": v, "close_pos": c, "pre": p})
+         for a, v, c, p in zip(arm, rvol, cp, pre)],
+        index=r.index, dtype=float)
 
 
 def calculate_compounding_portfolio(df: pd.DataFrame, initial_capital_per_slot: float = DEFAULT_CAPITAL,
@@ -700,7 +724,7 @@ def main() -> int:
     ap.add_argument("--all-candidates", action="store_true",
                     help="write all qualifying candidates to CSV instead of the Top-3 traded book")
     ap.add_argument("--pre-circuit", action="store_true",
-                    help="simulate pre-circuit entry (entered ~0.8% before circuit level was touched)")
+                    help="simulate pre-circuit entry (entered ~0.8%% before circuit level was touched)")
     ap.add_argument("--years", type=float, default=2.0,
                     help="how far back to replay (default 2)")
     ap.add_argument("--from", dest="from_date", default="",

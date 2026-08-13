@@ -42,5 +42,6 @@
       "JUBLCPL",
       "Locked at Upper Circuit +20%"
     ]
-  ]
+  ],
+  "enterable": false
 }

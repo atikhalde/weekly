@@ -953,10 +953,28 @@ def fetch_ohlc(client, snaps: list) -> dict:
     return out
 
 
-def get_circuit_info(prev_close: float, current_price: float, high: float = 0.0) -> dict:
+def get_circuit_info(prev_close: float, current_price: float, high: float = 0.0,
+                     close_pos: float | None = None) -> dict:
     """
     Computes upper circuit price, band (5%, 10%, 20%), distance to circuit,
     whether locked, and pre-circuit entry zone.
+
+    close_pos (2026-08-14) is where the close sat in the day's range, 0..1.
+    A stock LOCKED at its upper circuit has no sellers, so it closes AT the
+    high: close_pos ~= 1.0. Passing it suppresses a false lock on a name
+    that merely finished near a band boundary.
+
+    Why that matters: callers pass `high or close`, so when the high is
+    unknown the second lock test degenerates to `hi == current_price`,
+    whose "did it close at its high" clause is then trivially true - every
+    name within 0.2% of a band limit gets reported locked. Confirmed with
+    real data: HAPPYFORGE (2026-08-12, close_pos 0.90) and MOREPENLAB
+    (2026-08-13, close_pos 0.957) were both flagged "Locked at Upper
+    Circuit" and dropped from the buy list, though neither closed at its
+    high - the same false-positive class already documented for BLSE,
+    MARINE, KENNAMET, SHRIPISTON, SJS, SMLMAH and UNIPARTS in
+    _resolve_prev_close(). A lock must be evidenced, never inferred from
+    absent data.
     """
     if prev_close <= 0 or current_price <= 0:
         return {"band": 10.0, "uc_limit": 0.0, "dist_to_uc": 0.0, "is_locked": False, "pre_entry": 0.0}
@@ -973,7 +991,27 @@ def get_circuit_info(prev_close: float, current_price: float, high: float = 0.0)
     uc_limit = round(prev_close * (1.0 + band / 100.0), 2)
     dist_to_uc = round((uc_limit - current_price) / current_price * 100.0, 2)
     hi = max(high, current_price)
-    is_locked = (abs(current_price - uc_limit) / uc_limit <= 0.003) or (hi >= uc_limit * 0.998 and (hi - current_price) / current_price < 0.001)
+    # (a) the close IS the circuit price, or (b) the day's high reached the
+    # circuit and the close never came off it. (b) needs a REAL high: with
+    # `high` defaulted to the close it proves nothing, so it only counts
+    # when a genuine high was supplied.
+    at_uc_price = abs(current_price - uc_limit) / uc_limit <= 0.003
+    have_high = high > 0.0
+    closed_at_high = have_high and (hi - current_price) / current_price < 0.001
+    pinned_at_high = closed_at_high and hi >= uc_limit * 0.998
+    is_locked = at_uc_price or pinned_at_high
+    # A locked stock has no sellers and therefore closes AT its high. When a
+    # REAL high proves the close was the high, that is direct evidence and
+    # stands. Otherwise fall back to close_pos: if the close sat materially
+    # below the day's high the stock was trading freely, so a band-boundary
+    # coincidence must not be reported as a lock. This only ever REMOVES a
+    # lock inferred from incomplete data; it never invents one.
+    if is_locked and not closed_at_high and close_pos is not None:
+        try:
+            if float(close_pos) < 0.995:
+                is_locked = False
+        except (TypeError, ValueError):
+            pass
     pre_entry = round(uc_limit * 0.992, 2)
 
     return {
@@ -1652,7 +1690,10 @@ def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tupl
         c_val = float(r.get("close") or 0.0)
         day_ret_val = float(r.get("day_ret") or 0.0)
         pc_val = _resolve_prev_close(r)
-        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
+        # high 0.0 when unknown - see get_circuit_info(): defaulting it to
+        # the close fabricates "closed at its high" and invents locks.
+        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or 0.0),
+                               close_pos=r.get("close_pos"))
         if ckt["is_locked"]:
             excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
         else:
@@ -1679,7 +1720,10 @@ def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tupl
         c_val = float(r.get("close") or 0.0)
         day_ret_val = float(r.get("day_ret") or 0.0)
         pc_val = _resolve_prev_close(r)
-        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
+        # high 0.0 when unknown - see get_circuit_info(): defaulting it to
+        # the close fabricates "closed at its high" and invents locks.
+        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or 0.0),
+                               close_pos=r.get("close_pos"))
         if ckt["is_locked"]:
             excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
         else:
@@ -1704,13 +1748,18 @@ def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tupl
     actionable.sort(key=actionable_priority, reverse=True)
     top3_actionable = actionable[:3]
     taken_syms = {act["symbol"] for act in top3_actionable}
-    next_anticipated = [r for r in ant_pool if r["symbol"] not in taken_syms][:2]
+    # 2026-08-14: the watchlist carries the nearest THREE anticipated names
+    # (was two). "Nearest" is ant_pool's own ordering - classify_approach's
+    # ranked pool, above-level first then smallest |gap_pct| - so this is
+    # literally the three closest to their level that were not already
+    # bought as an actionable pick.
+    next_anticipated = [r for r in ant_pool if r["symbol"] not in taken_syms][:3]
     return top3_actionable, next_anticipated, excluded_locked
 
 
 def write_alert_state(cfg, now, today_str: str, scan_time: str, too_late: bool,
                        too_early: bool, top3_actionable: list, next_anticipated: list,
-                       excluded_locked: list) -> None:
+                       excluded_locked: list, enterable: bool = True) -> None:
     """Persist the EXACT data the Telegram alert was rendered from.
 
     2026-08-13: this is the fix for 'paper trade report / backtest don't
@@ -1732,12 +1781,43 @@ def write_alert_state(cfg, now, today_str: str, scan_time: str, too_late: bool,
         "top3_actionable": top3_actionable,
         "next_anticipated": next_anticipated,
         "excluded_locked": [list(x) for x in excluded_locked],
+        # Did this scan run while the buy-at-close entry was actually
+        # available? Only an enterable run describes a list you could have
+        # bought; a post-close review is a research artefact.
+        "enterable": bool(enterable),
     }
     path = cfg.paths["root"] / ALERT_STATE_FILE
     with open(path, "w") as f:
         _json.dump(state, f, indent=2, default=str)
-    log.info("wrote %s (%d actionable, %d anticipated)",
-             path.name, len(top3_actionable), len(next_anticipated))
+
+    # 2026-08-14: also keep a PER-DAY copy. The live file only ever holds the
+    # latest session, so a multi-day paper/backtest replay had no way to ask
+    # "what did the alert send on THAT day" and fell back to the raw,
+    # multi-run-per-day picks CSVs - the same re-derivation this snapshot
+    # exists to prevent. ab_paper.load_alert_selection() reads these.
+    #
+    # The archive is WRITE-ONCE per day for the entry window: a later
+    # after-close review must not overwrite the list you could actually
+    # trade. Without this the only 2026-08-13 snapshot left on disk was the
+    # 20:39 post-close review, so "gate the ledger on the alert" would have
+    # gated it on a run that happened five hours after the close.
+    archive = cfg.paths["root"] / f"btst_alert_state_{today_str}.json"
+    keep_existing = False
+    if archive.exists():
+        try:
+            prior = _json.loads(archive.read_text())
+            keep_existing = bool(prior.get("enterable", True))
+        except (OSError, ValueError):
+            keep_existing = False
+    if keep_existing and not enterable:
+        log.info("kept the existing enterable %s - this %s run is a review, "
+                 "not the tradeable alert", archive.name, scan_time)
+    else:
+        with open(archive, "w") as f:
+            _json.dump(state, f, indent=2, default=str)
+    log.info("wrote %s (+ %s) (%d actionable, %d anticipated, enterable=%s)",
+             path.name, archive.name, len(top3_actionable),
+             len(next_anticipated), enterable)
 
 
 def main() -> int:
@@ -1794,6 +1874,25 @@ def main() -> int:
     entry_close = dtime(15, 30)
     too_late = (not args.after_close) and now.time() > entry_close
     too_early = (not args.after_close) and now.time() < entry_open
+
+    # 2026-08-14 fix - "--after-close picks were booked as real trades".
+    # too_late drives BOTH the "MISSED" banner AND the tradeable flag
+    # written into the picks CSVs. Exempting --after-close from too_late is
+    # right for the banner (being late is that mode's whole purpose) but it
+    # also stamped tradeable=1 on picks produced hours AFTER the close, so
+    # the paper ledger filled them at a price nobody could have paid.
+    # Confirmed with real data: the 2026-08-11 20:59 review wrote AARTISURF
+    # and INDSWFTLAB with tradeable=1, and AARTISURF - a stock that closed
+    # LOCKED at its +10% upper circuit that day - was carried into
+    # ab_ledger.csv as a real Model E position.
+    #
+    # NOTE the asymmetry, which is deliberate: an EARLY scan (say 13:46) is
+    # still enterable, because the entry is "buy into today's close" and
+    # that close has not happened yet - you can act on it. A scan after the
+    # close is not, in ANY mode. So the test is "did this run finish before
+    # the entry window shut", not "did it run inside the window".
+    ran_before_close = now.time() <= entry_close
+    enterable = ran_before_close and not args.after_close
     if too_late:
         log.error("RAN AT %s IST - AFTER THE %s CLOSE. The buy-at-close entry "
                   "is no longer available; picks are recorded as MISSED.",
@@ -2285,7 +2384,7 @@ def main() -> int:
             # after 15:30 cannot buy at today's close, and Model E must not
             # book a fill it could never have got. "missed" rows stay in the
             # file - deleting them would erase the evidence of the outage.
-            "tradeable": 0 if too_late else 1,
+            "tradeable": 1 if enterable else 0,
             "rank": r["rank"], "symbol": r["symbol"], "tier": r["tier"],
             # BUG 53: age/arm are recorded so the paper ledger can score the
             # fresh and aged arms apart forever, instead of blending them.
@@ -2479,7 +2578,7 @@ def main() -> int:
                 # BUG 63: Model F must not book a fill that was never
                 # available either. Same flag, same meaning as the confirmed
                 # picks file.
-                "tradeable": 0 if too_late else 1,
+                "tradeable": 1 if enterable else 0,
                 "rank": r["rank"], "symbol": r["symbol"],
                 "entry": round(float(r["close"]), 2),
                 "pre": int(r.get("pre", 0)),
@@ -2552,7 +2651,7 @@ def main() -> int:
                   "<i>No setups qualified today matching quality filters.</i>",
                   "━━━━━━━━━━━━━━━━━━━━\n"]
 
-    # 2. Next 2 Closest Anticipated Watchlist for Tomorrow
+    # 2. Next 3 Closest Anticipated Watchlist for Tomorrow
     if next_anticipated and not too_late:
         lines += ["🔭 <b>CLOSEST ANTICIPATED WATCHLIST (For Tomorrow)</b>",
                   "━━━━━━━━━━━━━━━━━━━━"]
@@ -2577,7 +2676,8 @@ def main() -> int:
     msg = "\n".join(lines)
 
     write_alert_state(cfg, now, f"{now:%Y-%m-%d}", f"{now:%H:%M}", too_late, too_early,
-                       top3_actionable, next_anticipated, excluded_locked)
+                       top3_actionable, next_anticipated, excluded_locked,
+                       enterable=enterable)
 
     if args.dry_run:
         print(msg)
