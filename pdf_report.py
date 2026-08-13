@@ -390,6 +390,14 @@ def build_pdf_report(
     else:
         top3_actionable, next_anticipated, excluded_locked = derive_today_lists_from_csv(today_str)
         data_source_note = "reconstructed from picks CSV (no alert snapshot for this date)"
+        # Keep the entry-state lookups below total. The CSV fallback carries a
+        # per-row `tradeable` flag; treat the day as entered only if some row
+        # says so, rather than defaulting to "yes" and overstating the book.
+        alert_state = {
+            "enterable": any(int(a.get("tradeable", 0) or 0) for a in top3_actionable),
+            "too_late": False,
+            "scan_time": "?",
+        }
 
     yesterday_rows = compute_yesterday_results(ledger, today_str)
     open_rows = compute_open_positions(ledger, today_str)
@@ -495,7 +503,18 @@ def build_pdf_report(
     story.append(Spacer(1, 6))
 
     # 3. Table 1: STOCKS ENTERED TODAY
-    story.append(Paragraph(f" 1. STOCKS ENTERED TODAY — {today_str}", section_head))
+    # BUG 79: this heading and the OPEN status were unconditional, so a
+    # post-close review run (enterable=False / too_late=True, tradeable=0 in
+    # the picks CSVs, NO_FILL with qty 0 in the ledger) was rendered as live
+    # money at work. On 2026-08-13 the report claimed positions in KMEW and
+    # MUNJALAU worth 197,466 that were never bought. A report that overstates
+    # the book is worse than no report, so the entry state now decides both
+    # the heading and the per-row status.
+    entered = bool(alert_state.get("enterable", True)) and not alert_state.get("too_late", False)
+    if entered:
+        story.append(Paragraph(f" 1. STOCKS ENTERED TODAY — {today_str}", section_head))
+    else:
+        story.append(Paragraph(f" 1. TODAY'S SETUPS — {today_str} (NOT ENTERED)", section_head))
     today_picks = []
     for act in top3_actionable:
         qty = int(act.get("qty", 0) or 0)
@@ -504,10 +523,16 @@ def build_pdf_report(
         prime = act.get("prime", "")
         label = f"{badge} ({prime})" if prime else badge
         today_picks.append({
-            "symbol": act["symbol"], "badge": label, "qty": qty, "entry": price,
-            "invested": qty * price, "stop": price * 0.99,
+            "symbol": act["symbol"], "badge": label,
+            # Not entered -> no shares, no capital committed. Showing the
+            # would-be size in a "MISSED" row still reads as a position.
+            "qty": qty if entered else 0,
+            "entry": price,
+            "invested": qty * price if entered else 0.0,
+            "stop": price * 0.99,
             "day_ret": float(act.get("day_ret", 0) or 0), "rvol": float(act.get("rvol", 0) or 0),
-            "status": " OPEN (Exit 09:15)",
+            "status": " OPEN (Exit 09:15)" if entered
+                      else f"MISSED - scan ran {alert_state.get('scan_time', '?')}, after the 15:30 close",
         })
 
     if today_picks:

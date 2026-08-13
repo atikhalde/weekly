@@ -3368,21 +3368,24 @@ def test_fanout_covers_documents_and_batches():
     assert len(b.calls) == 2, "documents and batches must mirror too"
 
 
-def test_second_destination_needs_both_token_and_chat_id(monkeypatch):
-    """A half-configured pair must be ignored, never guessed."""
+def test_a_destination_needs_both_token_and_chat_id(monkeypatch):
+    """A half-configured pair must be ignored, never guessed.
+
+    The second bot was removed on 2026-08-14, so this now guards the primary:
+    a token with no chat id must yield no destination at all rather than a
+    client that posts nowhere and reports success.
+    """
     from config import Secrets
 
-    both = Secrets(telegram_bot_token="t1", telegram_chat_id="c1",
-                   telegram_bot_token_2="t2", telegram_chat_id_2="c2")
-    assert len(both.telegram_destinations) == 2
+    full = Secrets(telegram_bot_token="t1", telegram_chat_id="c1")
+    assert len(full.telegram_destinations) == 1
 
-    half = Secrets(telegram_bot_token="t1", telegram_chat_id="c1",
-                   telegram_bot_token_2="t2")           # chat id missing
-    assert len(half.telegram_destinations) == 1, \
-        "an incomplete second destination must be skipped"
+    half = Secrets(telegram_bot_token="t1")              # chat id missing
+    assert half.telegram_destinations == [], \
+        "an incomplete destination must be skipped"
 
-    none = Secrets(telegram_bot_token="t1", telegram_chat_id="c1")
-    assert len(none.telegram_destinations) == 1
+    other_half = Secrets(telegram_chat_id="c1")          # token missing
+    assert other_half.telegram_destinations == []
 
 
 def test_every_sender_uses_build_telegram():
@@ -3398,17 +3401,32 @@ def test_every_sender_uses_build_telegram():
             f"{name} still builds a single-destination client"
 
 
-def test_workflows_pass_the_second_bot_secrets():
-    """Env vars are useless if the workflow never forwards them."""
+def test_workflows_do_not_reference_the_removed_second_bot():
+    """The second Telegram bot was removed on 2026-08-14.
+
+    TELEGRAM_CHAT_ID_2 answered "400 chat not found" on every send for weeks
+    - three times per document upload - and nobody read that chat. This test
+    used to assert the opposite (that every workflow forwarded the 2nd pair);
+    it is inverted rather than deleted so the intent stays on the record.
+    """
     import yaml as _yaml
 
     for wf in WORKFLOWS.glob("*.yml"):
         text = wf.read_text()
-        if "TELEGRAM_BOT_TOKEN:" not in text:
-            continue                     # tests.yml sends nothing
-        assert "TELEGRAM_BOT_TOKEN_2" in text, f"{wf.name} misses the 2nd token"
-        assert "TELEGRAM_CHAT_ID_2" in text, f"{wf.name} misses the 2nd chat id"
+        assert "TELEGRAM_BOT_TOKEN_2" not in text, f"{wf.name} still wires the 2nd token"
+        assert "TELEGRAM_CHAT_ID_2" not in text, f"{wf.name} still wires the 2nd chat id"
         _yaml.safe_load(text)            # still valid YAML
+
+
+def test_only_the_primary_destination_is_configured():
+    """cfg.telegram_destinations must yield exactly one entry."""
+    from config import Secrets
+    s = Secrets(telegram_bot_token="t", telegram_chat_id="c")
+    dests = s.telegram_destinations
+    assert len(dests) == 1, f"expected only the primary, got {dests}"
+    assert dests[0][2] == "primary"
+    assert not hasattr(s, "telegram_bot_token_2")
+    assert not hasattr(s, "telegram_chat_id_2")
 
 
 # --------------------------------------------------------------------------- #

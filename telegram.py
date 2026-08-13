@@ -59,7 +59,8 @@ class Telegram:
                     # burns ~3s per message and buries the real cause in
                     # duplicate log lines. Found in the 07-Aug run log:
                     #   telegram 400: "Bad Request: chat not found"  x3
-                    # on every single send, for the secondary destination.
+                    # on every single send, for the secondary destination
+                    # (removed 2026-08-14).
                     if r.status_code in (400, 401, 403):
                         ok = False
                         break
@@ -173,9 +174,7 @@ class TelegramFanout:
                 cid = str(getattr(client, "chat_id", "") or "unset")
                 masked = (cid[:4] + "..." + cid[-3:]) if len(cid) > 8 else cid
                 log.error("telegram %s destination FAILED (chat_id=%s). The "
-                          "primary was fine. Fix TELEGRAM_CHAT_ID_2 / "
-                          "TELEGRAM_BOT_TOKEN_2, or unset them to silence "
-                          "this.", label, masked)
+                          "primary was fine.", label, masked)
         return primary_ok
 
     def send(self, text: str, disable_preview: bool = True) -> bool:

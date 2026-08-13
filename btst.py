@@ -1757,6 +1757,24 @@ def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tupl
     return top3_actionable, next_anticipated, excluded_locked
 
 
+def _keep_enterable(path, today_str: str, enterable: bool) -> bool:
+    """True if `path` already holds an enterable snapshot for TODAY that a
+    non-enterable run must not clobber.
+
+    The date check matters: yesterday's leftover file describes a different
+    session and must always be replaced, otherwise the first post-close run
+    of a new day would preserve stale names forever.
+    """
+    import json as _json
+    if enterable or not path.exists():
+        return False
+    try:
+        prior = _json.loads(path.read_text())
+    except (OSError, ValueError):
+        return False
+    return bool(prior.get("enterable", True)) and prior.get("date") == today_str
+
+
 def write_alert_state(cfg, now, today_str: str, scan_time: str, too_late: bool,
                        too_early: bool, top3_actionable: list, next_anticipated: list,
                        excluded_locked: list, enterable: bool = True) -> None:
@@ -1786,9 +1804,19 @@ def write_alert_state(cfg, now, today_str: str, scan_time: str, too_late: bool,
         # bought; a post-close review is a research artefact.
         "enterable": bool(enterable),
     }
+    # BUG 79: the per-day archive below was already write-once for the entry
+    # window, but the LIVE file was not - so five post-close re-runs on
+    # 2026-08-13 overwrote the 15:20 alert with a 22:56 review, and
+    # pdf_report.py (which reads this file) reported the review's names as
+    # today's entries. Same rule for both files: once an enterable run has
+    # described the day, a later non-enterable review must not replace it.
     path = cfg.paths["root"] / ALERT_STATE_FILE
-    with open(path, "w") as f:
-        _json.dump(state, f, indent=2, default=str)
+    if _keep_enterable(path, today_str, enterable):
+        log.info("kept the existing enterable %s - this %s run is a review, "
+                 "not the tradeable alert", path.name, scan_time)
+    else:
+        with open(path, "w") as f:
+            _json.dump(state, f, indent=2, default=str)
 
     # 2026-08-14: also keep a PER-DAY copy. The live file only ever holds the
     # latest session, so a multi-day paper/backtest replay had no way to ask
@@ -1802,14 +1830,7 @@ def write_alert_state(cfg, now, today_str: str, scan_time: str, too_late: bool,
     # 20:39 post-close review, so "gate the ledger on the alert" would have
     # gated it on a run that happened five hours after the close.
     archive = cfg.paths["root"] / f"btst_alert_state_{today_str}.json"
-    keep_existing = False
-    if archive.exists():
-        try:
-            prior = _json.loads(archive.read_text())
-            keep_existing = bool(prior.get("enterable", True))
-        except (OSError, ValueError):
-            keep_existing = False
-    if keep_existing and not enterable:
+    if _keep_enterable(archive, today_str, enterable):
         log.info("kept the existing enterable %s - this %s run is a review, "
                  "not the tradeable alert", archive.name, scan_time)
     else:
