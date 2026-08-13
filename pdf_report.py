@@ -3,18 +3,57 @@
 BTST & Anticipation Master Paper Trade PDF Report Generator.
 
 Generates an institutional-grade PDF summary containing:
-  1. Executive Portfolio KPIs (Compounded Equity, CAGR, MaxDD, Win Rate, Net P&L)
-  2. Stocks Entered Today (15:20 IST BTST & Anticipation Orders)
-  3. Yesterday's BTST Results (Realized P&L under 50/50 Asymmetric Model)
-  4. Active Open Positions & Multi-Day Runners (with Trailing Breakeven Stops)
-  5. Top 2 Closest Anticipated Watchlist for Tomorrow
-  6. 5-Year Comprehensive Slices & Year-by-Year Performance Breakdown
+  1. Stocks Entered Today (exactly what the Telegram alert picked)
+  2. Yesterday's BTST Results (Realized P&L, from the real ab_ledger.csv)
+  3. Active Open Positions & Multi-Day Runners (marked to a live quote)
+  4. Closest Anticipated Watchlist for Tomorrow (same as the alert)
+  5. Live-ledger performance summary (real trades only - see note below)
 
 Can be called standalone or invoked automatically by post-market workflows (ab.yml).
+
+--------------------------------------------------------------------------
+2026-08-13 REWRITE - "report doesn't match the alert" bug fix
+--------------------------------------------------------------------------
+Every section below used to be a hardcoded Python literal (fake KPI banner,
+a fixed "yesterday's results" list, a fixed "open positions" list, a fixed
+"anticipated watchlist", and a fabricated "5-year, 1,564 trade" backtest
+table) with a `ledger_path` parameter that was accepted but never once
+referenced in the function body. None of it reflected what the live
+scanner actually did, which is why the PDF disagreed with the Telegram
+alert on a specific real-world date (2026-08-13: alert said "no setups
+qualified, watch KMEW"; PDF said "MUNJALAU/JUBLCPL entered, watch
+HAPPYFORGE/VINDHYATEL" - none of which came from any computation).
+
+This rewrite computes every section from real, on-disk data:
+  - "Stocks Entered Today" / "Anticipated Watchlist" -> btst_alert_state.json,
+    the literal object btst.py's Telegram message was rendered from (see
+    btst.py's write_alert_state()). This is the ONLY way to guarantee the
+    PDF can never show a different pick than the alert, because multiple
+    btst.py runs per day (two cron slots + a repository_dispatch trigger +
+    occasional manual after-close reviews) each append to the same
+    btst_picks.csv/anticipate_picks.csv, so "read today's rows" is not one
+    consistent answer - re-deriving from those files was the root cause.
+    Falls back to re-deriving from the latest same-day scan_time batch in
+    the CSVs (via btst.build_actionable_lists, the same importable rule
+    the alert itself uses) only for older dates that predate this fix.
+  - "Yesterday's Results" / "Active Open Positions" -> ab_ledger.csv, the
+    real, already-tested paper-trading ledger ab_paper.py builds.
+  - KPI summary -> ab_paper.summarise(), the SAME function ab_paper.py's
+    own Telegram standings message already uses - not a second, competing
+    stats engine that could drift from it.
+
+No 5-year / year-by-year backtest table: the live ledger is only ~2-3
+weeks old (first real trade 2026-07-27), so a "5-year, 1,564 trade" claim
+is not just wrong in its numbers but impossible in kind. Per an explicit
+product decision (2026-08-13), this section instead shows real live-ledger
+stats with an honest sample-size caveat, and does NOT pull in
+btst_backtest.py's numbers, since that workflow is deliberately read-only
+and never commits its output anywhere this script could read it.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from datetime import datetime, timedelta, date
@@ -42,13 +81,234 @@ COLOR_BG_ALT = colors.HexColor("#f1f5f9")   # Alt row light gray
 COLOR_BORDER = colors.HexColor("#cbd5e1")   # Border gray
 COST_ROUND_TRIP = 0.22
 
+# The real, live BTST/Anticipation models in ab_ledger.csv - these are the
+# ones that represent an actual traded pick. E_btst_wide / F_anticipate_only
+# / C_swing / D_early are internal comparison arms measuring alternative
+# stops/exits on the SAME signal and must not be counted as separate trades
+# here (see AB_TEST_GUIDE.md).
+LIVE_MODELS = ("E_btst", "F_anticipate")
+
 
 def _fmt(v: float | None) -> str:
-    if v is None or np.isnan(v):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
         return "-"
     return f"{v:,.2f}"
 
 
+def _is_blank(v) -> bool:
+    return v is None or (isinstance(v, float) and np.isnan(v)) or str(v).strip() in ("", "nan", "None")
+
+
+# --------------------------------------------------------------------------- #
+#  Real data loaders (replace the old hardcoded literals)
+# --------------------------------------------------------------------------- #
+def load_alert_state(today_str: str, root: Path = ROOT) -> dict | None:
+    """The exact top3_actionable/next_anticipated the Telegram alert used.
+
+    Returns None if btst.py hasn't run since this fix shipped, or hasn't
+    run today at all - callers must fall back rather than fabricate data.
+    """
+    path = root / "btst_alert_state.json"
+    if not path.exists():
+        return None
+    try:
+        state = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    if state.get("date") != today_str:
+        return None
+    return state
+
+
+def derive_today_lists_from_csv(today_str: str, root: Path = ROOT) -> tuple[list, list, list]:
+    """Legacy fallback for dates before btst_alert_state.json existed.
+
+    Reuses btst.py's own build_actionable_lists()/actionable_priority() -
+    the same rule the alert is computed from - rather than restating a
+    second copy of the ranking here. Restricted to the LATEST scan_time
+    seen for today in each file, since btst.py can run more than once a
+    day and earlier runs' rows for other symbols would otherwise leak in
+    as if they were part of the same decision.
+    """
+    sys.path.insert(0, str(root))
+    import btst as _btst
+
+    bp_path = root / "btst_picks.csv"
+    ap_path = root / "anticipate_picks.csv"
+    bp_df = pd.read_csv(bp_path) if bp_path.exists() else pd.DataFrame()
+    ap_df = pd.read_csv(ap_path) if ap_path.exists() else pd.DataFrame()
+
+    def _latest_batch(df):
+        if df.empty or "date" not in df.columns:
+            return []
+        sub = df[df["date"].astype(str) == today_str]
+        if sub.empty or "scan_time" not in sub.columns:
+            return sub.to_dict("records")
+        latest_time = sub["scan_time"].astype(str).max()
+        return sub[sub["scan_time"].astype(str) == latest_time].to_dict("records")
+
+    picks = []
+    for r in _latest_batch(bp_df):
+        picks.append({
+            "symbol": r.get("symbol"), "close": r.get("entry"), "day_ret": r.get("day_ret"),
+            "rvol": r.get("rvol"), "tier": r.get("tier"), "fresh": str(r.get("arm", "")).startswith("fresh"),
+            "close_pos": r.get("close_pos"), "high": r.get("entry"), "pre": r.get("pre", 0),
+        })
+    ant_picks = []
+    for r in _latest_batch(ap_df):
+        ant_picks.append({
+            "symbol": r.get("symbol"), "close": r.get("entry"), "level": r.get("level"),
+            "side": r.get("side"), "pre": r.get("pre", 0), "day_ret": r.get("day_ret"),
+            "rvol": r.get("rvol"), "close_pos": r.get("close_pos"), "gap_pct": r.get("gap_pct"),
+            "mcap_cr": r.get("mcap_cr"), "ret_12m": r.get("ret_12m"), "dist_200dma": r.get("dist_200dma"),
+        })
+    return _btst.build_actionable_lists(picks, ant_picks, ant_picks)
+
+
+def load_ledger(ledger_path: str | Path) -> pd.DataFrame:
+    ledger_path = Path(ledger_path)
+    if not ledger_path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(ledger_path)
+    df["signal_date"] = df["signal_date"].astype(str)
+    return df
+
+
+def dedupe_live_trades(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per (symbol, signal_date) for the live BTST/Anticipate models.
+
+    ab_ledger.csv's own de-dup key is (model, symbol, signal_date,
+    signal_time) - if btst.py ran more than once on the same day and both
+    runs still flagged the same symbol (e.g. an early aged-pool pass and
+    the official 15:20 close scan), that symbol gets TWO ledger rows with
+    different signal_time, which would double count it in any KPI roll-up.
+    Prefers the canonical 15:20 close-scan row when more than one exists.
+    """
+    sub = df[df["model"].isin(LIVE_MODELS)].copy()
+    if sub.empty:
+        return sub
+    sub["_pref"] = (sub["signal_time"].astype(str) == "15:20").astype(int)
+    sub = sub.sort_values(["symbol", "signal_date", "_pref"], ascending=[True, True, False])
+    sub = sub.drop_duplicates(subset=["symbol", "signal_date"], keep="first")
+    return sub.drop(columns=["_pref"])
+
+
+def fetch_live_quotes(symbols: list[str], root: Path = ROOT) -> dict[str, float]:
+    """Best-effort live LTP for open positions' mark-to-market.
+
+    Uses DhanClient.ltp(), whose primary source is yfinance (no broker
+    credentials needed) with Dhan as a fallback - see dhan.py. Returns {}
+    on any failure; callers must show 'quote unavailable' rather than a
+    stale/fake price, never fabricate a number.
+    """
+    if not symbols:
+        return {}
+    try:
+        from dhan import DhanClient
+        universe_path = root / "universe.csv"
+        if not universe_path.exists():
+            return {}
+        uni = pd.read_csv(universe_path, dtype=str)
+        uni = uni[uni["symbol"].str.upper().isin([s.upper() for s in symbols])]
+        if uni.empty:
+            return {}
+        by_seg: dict[str, list[int]] = {}
+        ident: dict[tuple, str] = {}
+        for r in uni.itertuples():
+            seg = r.exchange_segment
+            sid = int(r.security_id)
+            by_seg.setdefault(seg, []).append(sid)
+            ident[(seg, str(sid))] = r.symbol
+        client = DhanClient(
+            os.environ.get("DHAN_CLIENT_ID", ""),
+            os.environ.get("DHAN_ACCESS_TOKEN", ""),
+        )
+        raw = client.ltp(by_seg)
+        out = {}
+        for seg, m in raw.items():
+            for sid, px in m.items():
+                sym = ident.get((seg, str(sid)))
+                if sym and px:
+                    out[sym] = float(px)
+        return out
+    except Exception as exc:
+        print(f"[pdf_report] live quote fetch failed ({exc}) - "
+              f"open positions will show 'quote unavailable' instead of a fake price")
+        return {}
+
+
+def compute_yesterday_results(ledger: pd.DataFrame, today_str: str) -> list[dict]:
+    """Real, resolved (closed) trades whose signal was BEFORE today.
+
+    'Yesterday' means the most recent prior session with a resolved BTST/
+    Anticipate trade in the ledger, not literally calendar-yesterday (the
+    previous session could be a Friday, or skip a holiday).
+    """
+    live = dedupe_live_trades(ledger)
+    if live.empty:
+        return []
+    prior = live[(live["signal_date"] < today_str) & (live["exit_reason"].astype(str) != "NO_FILL")
+                 & (~live["exit_date"].apply(_is_blank))]
+    if prior.empty:
+        return []
+    last_session = prior["signal_date"].max()
+    rows = prior[prior["signal_date"] == last_session]
+    out = []
+    for r in rows.sort_values("symbol").itertuples():
+        out.append({
+            "symbol": r.symbol,
+            "entry_date": r.signal_date,
+            "entry": float(r.entry or 0),
+            "exit": float(r.exit or 0),
+            "pnl_pct": float(r.pnl_pct or 0),
+            "pnl_rs": float(r.pnl or 0),
+            "reason": str(r.exit_reason or "") + (f" · {r.exit_note}" if not _is_blank(getattr(r, "exit_note", None)) else ""),
+        })
+    return out
+
+
+def compute_open_positions(ledger: pd.DataFrame, today_str: str, root: Path = ROOT) -> list[dict]:
+    """Real still-open multi-day BTST/Anticipate positions (not today's
+    fresh entries - those belong in 'Stocks Entered Today')."""
+    live = dedupe_live_trades(ledger)
+    if live.empty:
+        return []
+    open_rows = live[(live["signal_date"] < today_str) & (live["exit_date"].apply(_is_blank))
+                      & (live["exit_reason"].astype(str) != "NO_FILL")]
+    if open_rows.empty:
+        return []
+    quotes = fetch_live_quotes(list(open_rows["symbol"].unique()), root=root)
+    out = []
+    for r in open_rows.sort_values("symbol").itertuples():
+        entry = float(r.entry or 0)
+        stop = float(r.stop or 0)
+        cur = quotes.get(r.symbol)
+        u_pct = ((cur - entry) / entry * 100.0) if (cur and entry) else None
+        out.append({
+            "symbol": r.symbol, "entry_date": r.signal_date, "entry": entry,
+            "current": cur, "stop": stop, "unrealized_pct": u_pct,
+        })
+    return out
+
+
+def compute_kpi_summary(ledger: pd.DataFrame) -> dict:
+    """Real KPI roll-up over the live ledger, reusing ab_paper.summarise()
+    (the same math already trusted by ab_paper.py's own Telegram standings
+    message) rather than a second, independently-drifting stats engine."""
+    sys.path.insert(0, str(ROOT))
+    from ab_paper import summarise
+
+    live = dedupe_live_trades(ledger)
+    if live.empty:
+        return {"n": 0}
+    stats = summarise(live)
+    stats["since"] = live["signal_date"].min() if not live.empty else None
+    return stats
+
+
+# --------------------------------------------------------------------------- #
+#  PDF builder
+# --------------------------------------------------------------------------- #
 def build_pdf_report(
     ledger_path: str | Path = "ab_ledger.csv",
     output_pdf: str | Path = "btst_paper_trade_report.pdf",
@@ -59,103 +319,63 @@ def build_pdf_report(
     if today_str is None:
         today_str = now.strftime("%Y-%m-%d")
 
-    bp_path = ROOT / "btst_picks.csv"
-    ap_path = ROOT / "anticipate_picks.csv"
+    ledger = load_ledger(ledger_path)
+    alert_state = load_alert_state(today_str)
+    if alert_state is not None:
+        top3_actionable = alert_state.get("top3_actionable", [])
+        next_anticipated = alert_state.get("next_anticipated", [])
+        excluded_locked = alert_state.get("excluded_locked", [])
+        data_source_note = f"alert snapshot · {alert_state.get('scan_time', '?')} IST"
+    else:
+        top3_actionable, next_anticipated, excluded_locked = derive_today_lists_from_csv(today_str)
+        data_source_note = "reconstructed from picks CSV (no alert snapshot for this date)"
 
-    bp_df = pd.read_csv(bp_path) if bp_path.exists() else pd.DataFrame()
-    ap_df = pd.read_csv(ap_path) if ap_path.exists() else pd.DataFrame()
+    yesterday_rows = compute_yesterday_results(ledger, today_str)
+    open_rows = compute_open_positions(ledger, today_str)
+    kpis = compute_kpi_summary(ledger)
 
     # Document setup
     doc = SimpleDocTemplate(
         str(output_pdf),
         pagesize=letter,
-        leftMargin=24,
-        rightMargin=24,
-        topMargin=24,
-        bottomMargin=24,
+        topMargin=28, bottomMargin=28, leftMargin=28, rightMargin=28,
     )
     styles = getSampleStyleSheet()
-
-    # Custom styles
     title_style = ParagraphStyle(
-        "DocTitle",
-        parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
-        fontSize=16,
-        leading=19,
-        textColor=COLOR_PRIMARY,
-        spaceAfter=2,
+        "TitleStyle", parent=styles["Heading1"], fontName="Helvetica-Bold",
+        fontSize=15, leading=18, textColor=COLOR_NAVY, spaceAfter=2,
     )
     subtitle_style = ParagraphStyle(
-        "DocSubTitle",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=8.5,
-        leading=11.5,
-        textColor=colors.HexColor("#475569"),
-        spaceAfter=6,
+        "SubtitleStyle", parent=styles["Normal"], fontName="Helvetica",
+        fontSize=8, leading=10, textColor=colors.HexColor("#475569"),
     )
     section_head = ParagraphStyle(
-        "SectionHead",
-        parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
-        fontSize=10.5,
-        leading=13,
-        textColor=COLOR_NAVY,
-        spaceBefore=6,
-        spaceAfter=3,
+        "SectionHead", parent=styles["Heading2"], fontName="Helvetica-Bold",
+        fontSize=10.5, leading=13, textColor=COLOR_NAVY, spaceBefore=6, spaceAfter=3,
     )
     cell_head = ParagraphStyle(
-        "CellHead",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=7.5,
-        leading=9.5,
-        textColor=colors.white,
-        alignment=1, # Center
+        "CellHead", parent=styles["Normal"], fontName="Helvetica-Bold",
+        fontSize=7.5, leading=9.5, textColor=colors.white, alignment=1,
     )
     cell_txt = ParagraphStyle(
-        "CellText",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=7,
-        leading=8.5,
-        textColor=COLOR_NAVY,
+        "CellText", parent=styles["Normal"], fontName="Helvetica",
+        fontSize=7, leading=8.5, textColor=COLOR_NAVY,
     )
     cell_txt_center = ParagraphStyle(
-        "CellTextCenter",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=7,
-        leading=8.5,
-        textColor=COLOR_NAVY,
-        alignment=1,
+        "CellTextCenter", parent=styles["Normal"], fontName="Helvetica",
+        fontSize=7, leading=8.5, textColor=COLOR_NAVY, alignment=1,
     )
     cell_txt_bold = ParagraphStyle(
-        "CellTextBold",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=7,
-        leading=8.5,
-        textColor=COLOR_NAVY,
+        "CellTextBold", parent=styles["Normal"], fontName="Helvetica-Bold",
+        fontSize=7, leading=8.5, textColor=COLOR_NAVY,
     )
     cell_green = ParagraphStyle(
-        "CellGreen",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=7,
-        leading=8.5,
-        textColor=COLOR_GREEN,
-        alignment=2, # Right
+        "CellGreen", parent=styles["Normal"], fontName="Helvetica-Bold",
+        fontSize=7, leading=8.5, textColor=COLOR_GREEN, alignment=2,
     )
     cell_red = ParagraphStyle(
-        "CellRed",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=7,
-        leading=8.5,
-        textColor=COLOR_RED,
-        alignment=2, # Right
+        "CellRed", parent=styles["Normal"], fontName="Helvetica-Bold",
+        fontSize=7, leading=8.5, textColor=COLOR_RED, alignment=2,
     )
 
     story = []
@@ -164,23 +384,29 @@ def build_pdf_report(
     story.append(Paragraph("🌙 BTST & ANTICIPATION MASTER TRADING REPORT", title_style))
     story.append(Paragraph(
         f"<b>Session Date:</b> {today_str} · <b>Generated:</b> {now:%d-%b-%Y %H:%M} IST · "
-        f"<b>Execution Model:</b> 50/50 Asymmetric Model (09:15 Open 50% Exit + Breakeven Runner) · "
-        f"<b>Sizing:</b> Max 3 Trades/Day (₹1,00,000 / trade)",
+        f"<b>Today's entries source:</b> {data_source_note} · "
+        f"<b>Sizing:</b> ₹1,00,000 / trade",
         subtitle_style
     ))
     story.append(HRFlowable(width="100%", thickness=1.5, color=COLOR_PRIMARY, spaceBefore=0, spaceAfter=6))
 
-    # 2. Portfolio KPIs Banner
-    kpi_data = [
-        [
-            Paragraph("<b>Initial Portfolio</b><br/>₹3,00,000 (3 Slots)", cell_txt_center),
-            Paragraph("<b>Compounded Equity</b><br/>₹8,14,290 (+171.4%)", cell_txt_center),
-            Paragraph("<b>5-Yr CAGR / MaxDD</b><br/>+34.6% CAGR · -10.6% DD", cell_txt_center),
-            Paragraph("<b>Win Rate / PF</b><br/>70.3% Win · 4.41 PF", cell_txt_center),
-            Paragraph("<b>Fixed 1L Net P&L</b><br/>+₹9,26,820 (1,564 tr)", cell_txt_center),
-        ]
-    ]
-    kpi_table = Table(kpi_data, colWidths=[112, 114, 114, 112, 112])
+    # 2. Portfolio KPIs Banner - real numbers from ab_ledger.csv, or an
+    # honest "not enough data yet" note. No fabricated CAGR/5-year claims.
+    n_trades = int(kpis.get("n", 0) or 0)
+    if n_trades > 0:
+        since = kpis.get("since", "?")
+        kpi_data = [[
+            Paragraph(f"<b>Trades (closed)</b><br/>{n_trades} since {since}", cell_txt_center),
+            Paragraph(f"<b>Win Rate</b><br/>{kpis.get('win', 0):.1f}%", cell_txt_center),
+            Paragraph(f"<b>Profit Factor</b><br/>{kpis.get('pf', 0):.2f}", cell_txt_center),
+            Paragraph(f"<b>Avg / Median %</b><br/>{kpis.get('avg_pct', 0):+.2f}% / {kpis.get('med_pct', 0):+.2f}%", cell_txt_center),
+            Paragraph(f"<b>Net P&amp;L (fixed sizing)</b><br/>₹{kpis.get('net', 0):+,.0f}", cell_txt_center),
+        ]]
+    else:
+        kpi_data = [[Paragraph(
+            "<b>No closed BTST/Anticipate trades in ab_ledger.csv yet</b> - KPIs will appear here once trades resolve.",
+            cell_txt_center)]]
+    kpi_table = Table(kpi_data, colWidths=[112, 114, 114, 112, 112] if n_trades > 0 else [564])
     kpi_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), COLOR_BG_ALT),
         ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
@@ -189,61 +415,37 @@ def build_pdf_report(
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
     story.append(kpi_table)
+    if n_trades > 0:
+        story.append(Paragraph(
+            f"<i>Live-ledger stats only ({n_trades} real closed trade(s) since {kpis.get('since','?')}) - "
+            f"not a multi-year backtest. Run the 'BTST Backtest (on demand)' workflow separately for "
+            f"long-horizon history; its output is not auto-committed, so it cannot be shown here live.</i>",
+            subtitle_style
+        ))
     story.append(Spacer(1, 6))
 
-    # 3. Table 1: STOCKS ENTERED TODAY (15:20 IST Orders)
-    story.append(Paragraph(f"🛒 1. STOCKS ENTERED TODAY — {today_str} (15:20 IST Orders)", section_head))
-    
-    # Priority extraction for today
+    # 3. Table 1: STOCKS ENTERED TODAY
+    story.append(Paragraph(f"🛒 1. STOCKS ENTERED TODAY — {today_str}", section_head))
     today_picks = []
-    if not bp_df.empty and "date" in bp_df.columns:
-        sub_b = bp_df[bp_df.date.astype(str) == today_str]
-        for r in sub_b.itertuples():
-            c_val = float(getattr(r, "entry", 0) or 0)
-            qty = int(100000 // c_val) if c_val > 0 else 0
-            tier = str(getattr(r, "tier", "B"))
-            rvol_v = float(getattr(r, "rvol", 0) or 0)
-            prime = "🔥 Prime #2" if (tier == "A" or rvol_v >= 5.0) else f"Tier {tier}"
-            today_picks.append({
-                "symbol": r.symbol, "badge": f"🟢 Confirmed ({prime})",
-                "qty": qty, "entry": c_val, "invested": qty * c_val,
-                "stop": c_val * 0.99, "day_ret": float(getattr(r, "day_ret", 0) or 0),
-                "rvol": rvol_v, "status": "🟡 OPEN (Exit 09:15)", "priority": 500 if "Prime" in prime else 300
-            })
-    if not ap_df.empty and "date" in ap_df.columns:
-        sub_a = ap_df[ap_df.date.astype(str) == today_str]
-        for r in sub_a.itertuples():
-            c_val = float(getattr(r, "entry", 0) or 0)
-            qty = int(100000 // c_val) if c_val > 0 else 0
-            side = str(getattr(r, "side", "below"))
-            gap = abs(float(getattr(r, "gap_pct", 0) or 0))
-            pre_v = int(getattr(r, "pre", 6) or 6)
-            prime = "⭐ Prime #1" if (side == "below" and gap <= 3.0) else f"PRE {pre_v}/8"
-            today_picks.append({
-                "symbol": r.symbol, "badge": f"🔭 Anticipate ({prime})",
-                "qty": qty, "entry": c_val, "invested": qty * c_val,
-                "stop": c_val * 0.99, "day_ret": float(getattr(r, "day_ret", 0) or 0),
-                "rvol": float(getattr(r, "rvol", 0) or 0), "status": "🟡 OPEN (Exit 09:15)", "priority": 400 if "Prime" in prime else 200
-            })
-
-    # Sort by priority and keep top 3 actionable
-    today_picks = sorted(today_picks, key=lambda x: -x["priority"])[:3]
-
-    if today_str == "2026-08-12":
-        today_picks = [
-            {"symbol": "KTKBANK", "badge": "🔭 Anticipate (⭐ Prime #1)", "qty": 319, "entry": 313.45, "invested": 99991, "stop": 310.32, "day_ret": +3.5, "rvol": 1.1, "status": "🟡 OPEN (Exit 13-Aug 09:15)"},
-        ]
+    for act in top3_actionable:
+        qty = int(act.get("qty", 0) or 0)
+        price = float(act.get("price", 0) or 0)
+        badge = act.get("badge", "")
+        prime = act.get("prime", "")
+        label = f"{badge} ({prime})" if prime else badge
+        today_picks.append({
+            "symbol": act["symbol"], "badge": label, "qty": qty, "entry": price,
+            "invested": qty * price, "stop": price * 0.99,
+            "day_ret": float(act.get("day_ret", 0) or 0), "rvol": float(act.get("rvol", 0) or 0),
+            "status": "🟡 OPEN (Exit 09:15)",
+        })
 
     if today_picks:
         t1_rows = [[
-            Paragraph("<b>#</b>", cell_head),
-            Paragraph("<b>Symbol</b>", cell_head),
-            Paragraph("<b>Setup Category</b>", cell_head),
-            Paragraph("<b>Qty</b>", cell_head),
-            Paragraph("<b>Entry (₹)</b>", cell_head),
-            Paragraph("<b>Invested (₹)</b>", cell_head),
-            Paragraph("<b>Stop Loss (₹)</b>", cell_head),
-            Paragraph("<b>Day % / RVOL</b>", cell_head),
+            Paragraph("<b>#</b>", cell_head), Paragraph("<b>Symbol</b>", cell_head),
+            Paragraph("<b>Setup Category</b>", cell_head), Paragraph("<b>Qty</b>", cell_head),
+            Paragraph("<b>Entry (₹)</b>", cell_head), Paragraph("<b>Invested (₹)</b>", cell_head),
+            Paragraph("<b>Stop Loss (₹)</b>", cell_head), Paragraph("<b>Day % / RVOL</b>", cell_head),
             Paragraph("<b>Execution Status</b>", cell_head),
         ]]
         for idx, item in enumerate(today_picks, 1):
@@ -267,239 +469,114 @@ def build_pdf_report(
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
         ]))
         story.append(t1_table)
-        if today_str == "2026-08-12":
-            story.append(Spacer(1, 2))
-            story.append(Paragraph("🚫 <i>Excluded: <b>ELLEN</b> (+10% UC Lock), <b>HAPPYFORGE</b> (+5% UC Lock), <b>VINDHYATEL</b> (+5% UC Lock) — 0 sellers at 15:20.</i>", subtitle_style))
-    story.append(Spacer(1, 6))
-
-    # 4. Table 2: YESTERDAY'S BTST RESULTS (50/50 Asymmetric Model Execution)
-    story.append(Paragraph("📊 2. YESTERDAY'S BTST RESULTS (Realized & Closed Today)", section_head))
-    
-    # Realized yesterday picks for 11-Aug / 10-Aug
-    if today_str == "2026-08-12":
-        closed_rows = [
-            {"symbol": "INDSWFTLAB", "entry_date": "2026-08-11", "entry": 284.68, "exit": 301.45, "pnl_pct": +5.67, "pnl_rs": +5670, "reason": "09:15 Open 50% (+6.2%) + Close 50% (+5.2%)"},
-            {"symbol": "ROLEXRINGS", "entry_date": "2026-08-11", "entry": 177.29, "exit": 174.71, "pnl_pct": -1.45, "pnl_rs": -1450, "reason": "09:15 Open 50% (-0.1%) + Stop 50% (-2.8%)"},
-            {"symbol": "MBAPL", "entry_date": "2026-08-11", "entry": 165.49, "exit": 165.85, "pnl_pct": +0.18, "pnl_rs": +180, "reason": "09:15 Open 50% (+0.3%) + BE Stop (+0.08%)"},
-        ]
     else:
-        closed_rows = [
-            {"symbol": "LUMAXTECH", "entry_date": "2026-08-10", "entry": 1738.20, "exit": 1935.65, "pnl_pct": +11.14, "pnl_rs": +11140, "reason": "09:15 Open 50% (+3.3%) + Close 50% (+19.0%)"},
-            {"symbol": "AARTIPHARM", "entry_date": "2026-08-10", "entry": 823.00, "exit": 866.30, "pnl_pct": +5.04, "pnl_rs": +5040, "reason": "09:15 Open 50% (+3.1%) + Close 50% (+7.0%)"},
-            {"symbol": "SHAILY", "entry_date": "2026-08-10", "entry": 3367.40, "exit": 3457.90, "pnl_pct": +2.47, "pnl_rs": +2470, "reason": "09:15 Open 50% (-0.3%) + High Trailing (+5.2%)"},
-        ]
-
-    t2_rows = [[
-        Paragraph("<b>Symbol</b>", cell_head),
-        Paragraph("<b>Entry Date</b>", cell_head),
-        Paragraph("<b>Entry (₹)</b>", cell_head),
-        Paragraph("<b>Exit (₹)</b>", cell_head),
-        Paragraph("<b>Net Move %</b>", cell_head),
-        Paragraph("<b>Realized P&L (₹)</b>", cell_head),
-        Paragraph("<b>50/50 Execution Breakdown</b>", cell_head),
-    ]]
-    for item in closed_rows:
-        p_style = cell_green if item["pnl_pct"] > 0 else cell_red
-        t2_rows.append([
-            Paragraph(f"<b>{item['symbol']}</b>", cell_txt_bold),
-            Paragraph(str(item["entry_date"]), cell_txt_center),
-            Paragraph(f"₹{_fmt(item['entry'])}", cell_txt_center),
-            Paragraph(f"₹{_fmt(item['exit'])}", cell_txt_center),
-            Paragraph(f"{item['pnl_pct']:+.2f}%", p_style),
-            Paragraph(f"{item['pnl_rs']:+,.0f} Rs", p_style),
-            Paragraph(str(item["reason"]), cell_txt),
-        ])
-    t2_table = Table(t2_rows, colWidths=[75, 65, 65, 65, 64, 80, 150])
-    t2_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), COLOR_NAVY),
-        ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-    ]))
-    story.append(t2_table)
+        story.append(Paragraph("<i>No setups qualified today matching quality filters.</i>", cell_txt))
+    if excluded_locked:
+        lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
+        story.append(Spacer(1, 2))
+        story.append(Paragraph(f"🚫 <i>Excluded: {lock_names} — 0 sellers.</i>", subtitle_style))
     story.append(Spacer(1, 6))
 
-    # 5. Table 3: ACTIVE OPEN POSITIONS & MULTI-DAY RUNNERS (Trailing BE Stop)
+    # 4. Table 2: YESTERDAY'S BTST RESULTS - real, from ab_ledger.csv
+    story.append(Paragraph("📊 2. YESTERDAY'S BTST RESULTS (Realized & Closed)", section_head))
+    if yesterday_rows:
+        t2_rows = [[
+            Paragraph("<b>Symbol</b>", cell_head), Paragraph("<b>Entry Date</b>", cell_head),
+            Paragraph("<b>Entry (₹)</b>", cell_head), Paragraph("<b>Exit (₹)</b>", cell_head),
+            Paragraph("<b>Net Move %</b>", cell_head), Paragraph("<b>Realized P&amp;L (₹)</b>", cell_head),
+            Paragraph("<b>Exit Reason</b>", cell_head),
+        ]]
+        for item in yesterday_rows:
+            p_style = cell_green if item["pnl_pct"] > 0 else cell_red
+            t2_rows.append([
+                Paragraph(f"<b>{item['symbol']}</b>", cell_txt_bold),
+                Paragraph(str(item["entry_date"]), cell_txt_center),
+                Paragraph(f"₹{_fmt(item['entry'])}", cell_txt_center),
+                Paragraph(f"₹{_fmt(item['exit'])}", cell_txt_center),
+                Paragraph(f"{item['pnl_pct']:+.2f}%", p_style),
+                Paragraph(f"{item['pnl_rs']:+,.0f}", p_style),
+                Paragraph(str(item["reason"]), cell_txt),
+            ])
+        t2_table = Table(t2_rows, colWidths=[75, 65, 65, 65, 64, 80, 150])
+        t2_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), COLOR_NAVY),
+            ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+            ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ]))
+        story.append(t2_table)
+    else:
+        story.append(Paragraph("<i>No resolved BTST/Anticipate trades from the prior session yet.</i>", cell_txt))
+    story.append(Spacer(1, 6))
+
+    # 5. Table 3: ACTIVE OPEN POSITIONS & MULTI-DAY RUNNERS - real, marked
+    # to a live quote when available.
     story.append(Paragraph("🟡 3. ACTIVE OPEN POSITIONS & MULTI-DAY RUNNERS", section_head))
-    open_runners = [
-        ["COMSYN", "2026-08-07", 224.83, 269.25, 225.50, +19.76, "🟡 Active (50% Runner D+3 · BE locked)"],
-        ["SBCL", "2026-08-07", 913.57, 1026.65, 916.31, +12.38, "🟡 Active (50% Runner D+3 · BE locked)"],
-    ]
-    t3_rows = [[
-        Paragraph("<b>Symbol</b>", cell_head),
-        Paragraph("<b>Entry Date</b>", cell_head),
-        Paragraph("<b>Entry Price (₹)</b>", cell_head),
-        Paragraph("<b>Current Price (₹)</b>", cell_head),
-        Paragraph("<b>Trailing Stop (₹)</b>", cell_head),
-        Paragraph("<b>Unrealized %</b>", cell_head),
-        Paragraph("<b>Position Status</b>", cell_head),
-    ]]
-    for sym, ed, ep, cp, sl, u_pct, st in open_runners:
-        t3_rows.append([
-            Paragraph(f"<b>{sym}</b>", cell_txt_bold),
-            Paragraph(ed, cell_txt_center),
-            Paragraph(f"₹{_fmt(ep)}", cell_txt_center),
-            Paragraph(f"₹{_fmt(cp)}", cell_txt_center),
-            Paragraph(f"₹{_fmt(sl)}", cell_txt_center),
-            Paragraph(f"{u_pct:+.2f}%", cell_green),
-            Paragraph(st, cell_txt),
-        ])
-    t3_table = Table(t3_rows, colWidths=[75, 65, 75, 75, 75, 65, 134])
-    t3_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), COLOR_PRIMARY),
-        ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-    ]))
-    story.append(t3_table)
+    if open_rows:
+        t3_rows = [[
+            Paragraph("<b>Symbol</b>", cell_head), Paragraph("<b>Entry Date</b>", cell_head),
+            Paragraph("<b>Entry Price (₹)</b>", cell_head), Paragraph("<b>Current Price (₹)</b>", cell_head),
+            Paragraph("<b>Stop (₹)</b>", cell_head), Paragraph("<b>Unrealized %</b>", cell_head),
+            Paragraph("<b>Position Status</b>", cell_head),
+        ]]
+        for item in open_rows:
+            cur_txt = f"₹{_fmt(item['current'])}" if item["current"] is not None else "quote unavailable"
+            u_txt = f"{item['unrealized_pct']:+.2f}%" if item["unrealized_pct"] is not None else "-"
+            u_style = (cell_green if (item["unrealized_pct"] or 0) > 0 else cell_red) if item["unrealized_pct"] is not None else cell_txt_center
+            t3_rows.append([
+                Paragraph(f"<b>{item['symbol']}</b>", cell_txt_bold),
+                Paragraph(str(item["entry_date"]), cell_txt_center),
+                Paragraph(f"₹{_fmt(item['entry'])}", cell_txt_center),
+                Paragraph(cur_txt, cell_txt_center),
+                Paragraph(f"₹{_fmt(item['stop'])}", cell_txt_center),
+                Paragraph(u_txt, u_style),
+                Paragraph("🟡 Active (multi-day runner)", cell_txt),
+            ])
+        t3_table = Table(t3_rows, colWidths=[75, 65, 75, 75, 75, 65, 134])
+        t3_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), COLOR_PRIMARY),
+            ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+            ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ]))
+        story.append(t3_table)
+    else:
+        story.append(Paragraph("<i>No multi-day runners currently open.</i>", cell_txt))
     story.append(Spacer(1, 6))
 
-    # 6. Table 4: TOP 2 CLOSEST ANTICIPATED WATCHLIST FOR TOMORROW
+    # 6. Table 4: CLOSEST ANTICIPATED WATCHLIST - same data as the alert
     story.append(Paragraph("🔭 4. CLOSEST ANTICIPATED WATCHLIST (Top 2 Setups for Tomorrow)", section_head))
-    watch_candidates = [
-        {"symbol": "HAPPYFORGE", "entry": 2022.70, "level": 1934.10, "gap_pct": -4.28, "side": "above", "pre": 7, "day_ret": +4.8, "rvol": 1.9},
-        {"symbol": "VINDHYATEL", "entry": 2582.70, "level": 2484.90, "gap_pct": -3.94, "side": "above", "pre": 6, "day_ret": +6.5, "rvol": 2.0},
-    ]
-
-    t4_rows = [[
-        Paragraph("<b>Symbol</b>", cell_head),
-        Paragraph("<b>LTP (₹)</b>", cell_head),
-        Paragraph("<b>26W Level (₹)</b>", cell_head),
-        Paragraph("<b>Proximity Gap</b>", cell_head),
-        Paragraph("<b>PRE Score</b>", cell_head),
-        Paragraph("<b>Day % / RVOL</b>", cell_head),
-        Paragraph("<b>Watchlist Target Action</b>", cell_head),
-    ]]
-    for item in watch_candidates:
-        t4_rows.append([
-            Paragraph(f"<b>{item['symbol']}</b>", cell_txt_bold),
-            Paragraph(f"₹{_fmt(item['entry'])}", cell_txt_center),
-            Paragraph(f"₹{_fmt(item['level'])}", cell_txt_center),
-            Paragraph(f"<b>{abs(item['gap_pct']):.2f}% {item['side']}</b>", cell_txt_center),
-            Paragraph(f"{item['pre']}/8", cell_txt_center),
-            Paragraph(f"{item['day_ret']:+.1f}% · {item['rvol']:.1f}x", cell_txt_center),
-            Paragraph("Watch for tomorrow's breakout cross", cell_txt),
-        ])
-    t4_table = Table(t4_rows, colWidths=[75, 65, 75, 80, 55, 75, 139])
-    t4_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), COLOR_NAVY),
-        ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-    ]))
-    story.append(t4_table)
-
-    # Page 2: 5-Year Comprehensive Backtest Tables
-    story.append(PageBreak())
-    story.append(Paragraph("📈 5. 5-YEAR COMPREHENSIVE PERFORMANCE & SLICES BREAKDOWN (2021–2026)", section_head))
-    story.append(Paragraph(
-        "Replay of 1,564 point-in-time trades across 745 symbols. Evaluated under the <b>50/50 Asymmetric Model</b> "
-        "with 0.22% round-trip friction and strict ₹1,00,000 single trade sizing cap.",
-        subtitle_style
-    ))
-
-    t5_rows = [[
-        Paragraph("<b>Performance Slice</b>", cell_head),
-        Paragraph("<b>Trades</b>", cell_head),
-        Paragraph("<b>/Wk</b>", cell_head),
-        Paragraph("<b>Win %</b>", cell_head),
-        Paragraph("<b>Mean %</b>", cell_head),
-        Paragraph("<b>Med %</b>", cell_head),
-        Paragraph("<b>PF</b>", cell_head),
-        Paragraph("<b>t-stat</b>", cell_head),
-        Paragraph("<b>P(≥+5%)</b>", cell_head),
-        Paragraph("<b>Net P&L (₹)</b>", cell_head),
-        Paragraph("<b>Avg ₹/tr</b>", cell_head),
-    ]]
-    slices_data = [
-        ["ALL (Combined Setups)", "1,564", "6.0", "70.3%", "+0.59%", "+0.21%", "4.41", "14.8", "4.0%", "+₹9,26,820", "+₹593"],
-        ["  fresh_A (Tier A)", "33", "0.1", "69.7%", "+1.84%", "+0.85%", "5.12", "4.8", "24.2%", "+₹60,720", "+₹1,840"],
-        ["  aged_B (Tier B)", "7", "0.0", "71.4%", "+1.12%", "+0.60%", "4.80", "2.1", "14.3%", "+₹7,840", "+₹1,120"],
-        ["  fresh_B (Tier B)", "27", "0.1", "63.0%", "+0.48%", "+0.15%", "2.85", "1.4", "11.1%", "+₹12,960", "+₹480"],
-        ["  ant_below (Prime #1)", "537", "2.1", "72.8%", "+0.74%", "+0.28%", "4.96", "11.2", "5.8%", "+₹3,97,380", "+₹740"],
-        ["  ant_above (Model F)", "960", "3.7", "68.5%", "+0.42%", "+0.16%", "3.88", "8.4", "2.6%", "+₹4,03,200", "+₹420"],
-        ["[CIRCUIT DYNAMICS]", "", "", "", "", "", "", "", "", "", ""],
-        ["  ⚡ OPEN_WIN (Fillable)", "1,514", "5.8", "71.2%", "+0.62%", "+0.24%", "4.68", "15.1", "4.2%", "+₹9,38,680", "+₹620"],
-        ["  🔒 HARD_LOCK (0 sellers)", "50", "0.2", "—", "—", "—", "—", "—", "—", "Excluded (Unfillable)", "—"],
-        ["[PRE SCORE (Model F)]", "", "", "", "", "", "", "", "", "", ""],
-        ["  PRE Score 8/8", "244", "1.0", "74.2%", "+0.81%", "+0.32%", "5.20", "6.4", "6.6%", "+₹1,97,640", "+₹810"],
-        ["  PRE Score 7/8", "696", "2.7", "71.1%", "+0.58%", "+0.22%", "4.35", "9.8", "4.2%", "+₹4,03,680", "+₹580"],
-        ["  PRE Score 6/8", "613", "2.4", "67.9%", "+0.45%", "+0.16%", "3.90", "7.9", "2.8%", "+₹2,75,850", "+₹450"],
-    ]
-    for row in slices_data:
-        is_sub = row[0].startswith("  ")
-        is_hdr = row[0].startswith("[")
-        t5_rows.append([
-            Paragraph(f"<b>{row[0]}</b>" if not is_sub else row[0], cell_txt),
-            Paragraph(row[1], cell_txt_center),
-            Paragraph(row[2], cell_txt_center),
-            Paragraph(row[3], cell_txt_center),
-            Paragraph(row[4], cell_txt_center),
-            Paragraph(row[5], cell_txt_center),
-            Paragraph(row[6], cell_txt_center),
-            Paragraph(row[7], cell_txt_center),
-            Paragraph(row[8], cell_txt_center),
-            Paragraph(f"<b>{row[9]}</b>", cell_green if "+" in row[9] else cell_txt),
-            Paragraph(row[10], cell_txt_center),
-        ])
-    t5_table = Table(t5_rows, colWidths=[130, 36, 26, 38, 38, 38, 30, 32, 42, 75, 49])
-    t5_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), COLOR_PRIMARY),
-        ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-    ]))
-    story.append(t5_table)
-    story.append(Spacer(1, 6))
-
-    # 7. Table 6: Year-by-Year Performance Consistency
-    story.append(Paragraph("📅 6. YEAR-BY-YEAR PERFORMANCE CONSISTENCY (2021 – 2026)", section_head))
-    yearly_data = [
-        ["2021", "136", "6.8", "66.9%", "+0.48%", "+0.18%", "3.82", "4.4%", "+₹65,280", "₹3,58,400"],
-        ["2022", "226", "4.4", "64.2%", "+0.39%", "+0.14%", "3.25", "3.5%", "+₹88,140", "₹4,32,100"],
-        ["2023", "359", "7.0", "71.9%", "+0.62%", "+0.25%", "4.70", "3.9%", "+₹2,22,580", "₹5,96,800"],
-        ["2024", "614", "11.8", "72.3%", "+0.66%", "+0.24%", "4.88", "4.6%", "+₹4,05,240", "₹7,68,500"],
-        ["2025", "114", "2.3", "68.4%", "+0.47%", "+0.19%", "3.90", "3.5%", "+₹53,580", "₹7,92,400"],
-        ["2026 (YTD)", "115", "3.8", "76.5%", "+0.80%", "+0.35%", "5.64", "5.2%", "+₹92,000", "₹8,14,290"],
-    ]
-    t6_rows = [[
-        Paragraph("<b>Year</b>", cell_head),
-        Paragraph("<b>Trades</b>", cell_head),
-        Paragraph("<b>/Wk</b>", cell_head),
-        Paragraph("<b>Win %</b>", cell_head),
-        Paragraph("<b>Mean %</b>", cell_head),
-        Paragraph("<b>Med %</b>", cell_head),
-        Paragraph("<b>PF</b>", cell_head),
-        Paragraph("<b>P(≥+5%)</b>", cell_head),
-        Paragraph("<b>Net P&L (Fixed 1L)</b>", cell_head),
-        Paragraph("<b>Compounded Equity</b>", cell_head),
-    ]]
-    for row in yearly_data:
-        t6_rows.append([
-            Paragraph(f"<b>{row[0]}</b>", cell_txt_bold),
-            Paragraph(row[1], cell_txt_center),
-            Paragraph(row[2], cell_txt_center),
-            Paragraph(row[3], cell_txt_center),
-            Paragraph(row[4], cell_txt_center),
-            Paragraph(row[5], cell_txt_center),
-            Paragraph(row[6], cell_txt_center),
-            Paragraph(row[7], cell_txt_center),
-            Paragraph(f"<b>{row[8]}</b>", cell_green),
-            Paragraph(f"<b>{row[9]}</b>", cell_txt_center),
-        ])
-    t6_table = Table(t6_rows, colWidths=[65, 45, 35, 45, 45, 45, 40, 50, 95, 109])
-    t6_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), COLOR_NAVY),
-        ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
-        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
-    ]))
-    story.append(t6_table)
+    if next_anticipated:
+        t4_rows = [[
+            Paragraph("<b>Symbol</b>", cell_head), Paragraph("<b>LTP (₹)</b>", cell_head),
+            Paragraph("<b>26W Level (₹)</b>", cell_head), Paragraph("<b>Proximity Gap</b>", cell_head),
+            Paragraph("<b>PRE Score</b>", cell_head), Paragraph("<b>Day % / RVOL</b>", cell_head),
+            Paragraph("<b>Watchlist Target Action</b>", cell_head),
+        ]]
+        for r in next_anticipated:
+            side = "above" if r.get("side") == "above" else "below"
+            t4_rows.append([
+                Paragraph(f"<b>{r['symbol']}</b>", cell_txt_bold),
+                Paragraph(f"₹{_fmt(float(r.get('close', 0) or 0))}", cell_txt_center),
+                Paragraph(f"₹{_fmt(float(r.get('level', 0) or 0))}", cell_txt_center),
+                Paragraph(f"<b>{abs(float(r.get('gap_pct', 0) or 0)):.2f}% {side}</b>", cell_txt_center),
+                Paragraph(f"{int(r.get('pre', 0) or 0)}/8", cell_txt_center),
+                Paragraph(f"{float(r.get('day_ret', 0) or 0):+.1f}% · {float(r.get('rvol', 0) or 0):.1f}x", cell_txt_center),
+                Paragraph("Watch for tomorrow's breakout cross", cell_txt),
+            ])
+        t4_table = Table(t4_rows, colWidths=[75, 65, 75, 80, 55, 75, 139])
+        t4_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), COLOR_NAVY),
+            ('BOX', (0, 0), (-1, -1), 1, COLOR_BORDER),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, COLOR_BORDER),
+            ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+        ]))
+        story.append(t4_table)
+    else:
+        story.append(Paragraph("<i>No anticipated setups within range today.</i>", cell_txt))
 
     # Build PDF document
     doc.build(story)

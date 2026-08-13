@@ -113,13 +113,20 @@ jobs:
       - name: Commit the picks file
         if: success()
         run: |
-          if [[ ! -f btst_picks.csv && ! -f anticipate_picks.csv ]]; then
+          if [[ ! -f btst_picks.csv && ! -f anticipate_picks.csv && ! -f btst_alert_state.json ]]; then
             echo "no picks today - nothing to commit"
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add btst_picks.csv anticipate_picks.csv 2>/dev/null || git add btst_picks.csv
+          # btst_alert_state.json is the exact top3_actionable/next_anticipated
+          # decision this run's Telegram message was built from (written by
+          # btst.py's write_alert_state()) - committing it alongside the picks
+          # CSVs is the 2026-08-13 fix for "paper trade report / backtest
+          # don't match the alert": pdf_report.py reads this file instead of
+          # re-deriving "today's picks" from the raw, multi-run-per-day CSVs,
+          # which could (and did) pick up a different run's results.
+          git add btst_picks.csv anticipate_picks.csv btst_alert_state.json 2>/dev/null || git add btst_picks.csv
           if git diff --cached --quiet; then
             echo "picks unchanged"
             exit 0
@@ -145,6 +152,7 @@ jobs:
             btst_*.csv
             btst_picks.csv
             anticipate_picks.csv
+            btst_alert_state.json
           if-no-files-found: ignore
           retention-days: 30
 

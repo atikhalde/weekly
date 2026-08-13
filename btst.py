@@ -324,6 +324,12 @@ ANTICIPATE_TOP_N = 5
 MIN_RET_12M = 50.0     # percent, trailing twelve months
 MIN_DIST_200DMA = 25.0  # percent above the 200-day moving average
 ANTICIPATE_FILE = "anticipate_picks.csv"
+# 2026-08-13: the exact top3_actionable/next_anticipated decision the
+# Telegram alert was rendered from, written by write_alert_state() so
+# pdf_report.py can reproduce the alert exactly instead of re-deriving it
+# from the raw, multi-run-per-day picks CSVs (see write_alert_state's
+# docstring for why that re-derivation was the root cause of the mismatch).
+ALERT_STATE_FILE = "btst_alert_state.json"
 
 # --------------------------------------------------------------------------- #
 #  THE COMBINED EDGE (measured 31-Jul-2026, 18,231 tradeable signals)
@@ -1520,6 +1526,147 @@ def score_prior_picks(cfg, client, now, caps) -> list[str]:
 SNAPS_CACHE: list = []
 
 
+def actionable_priority(act: dict) -> float:
+    """Ranking score for the combined Confirmed+Anticipate actionable list.
+
+    Extracted from main() (2026-08-13) so pdf_report.py can import this
+    exact function instead of restating the rule - the same reasoning
+    documented for classify()/exhausted()/conviction() being shared with
+    btst_backtest.py. A second, hand-copied implementation would drift the
+    moment either side changed, which is exactly the "report doesn't match
+    the alert" class of bug this fixes.
+    """
+    arm = str(act.get("arm", "") or "")
+    rvol = float(act.get("rvol", 0.0) or 0.0)
+    cp = float(act.get("close_pos", 1.0) or 1.0)
+    pre = float(act.get("pre", 0.0) or 0.0)
+
+    is_prime1 = (arm == "ant_below") and (pre >= 6)
+    is_prime2 = arm in ("fresh_A", "fresh_B") and (rvol >= 5.0) and (cp >= 0.98)
+    is_tier_a = (arm == "fresh_A")
+    is_aged_b = (arm == "aged_B")
+    is_fresh_b = (arm == "fresh_B")
+    is_ant = arm.startswith("ant_")
+
+    return (is_prime1 * 500.0 + is_prime2 * 500.0 + is_tier_a * 400.0
+            + is_aged_b * 300.0 + is_ant * 200.0 + is_fresh_b * 100.0
+            + min(rvol, 30.0) + pre)
+
+
+def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tuple:
+    """Build the exact (top3_actionable, next_anticipated, excluded_locked)
+    triple the Telegram alert is rendered from.
+
+    Extracted from main() (2026-08-13, BUG: 'paper trade report and backtest
+    don't match the alert') so this is the single, importable source of
+    truth for "what did the alert actually pick" - pdf_report.py calls this
+    same function (via the btst_alert_state.json snapshot main() writes
+    right after this) instead of re-deriving its own selection from the
+    raw, multi-run-per-day btst_picks.csv/anticipate_picks.csv files, which
+    was the root cause: those CSVs accumulate rows from every run of the
+    day (two cron slots + the repository_dispatch trigger + any manual
+    after-close review), so "today's rows" is not one consistent snapshot.
+
+    ant_pool is the full ranked anticipate candidate pool ('aq' in main())
+    used only for next_anticipated's fallback ordering when nothing from
+    ant_picks was already claimed by top3_actionable.
+    """
+    actionable = []
+    excluded_locked = []
+
+    # 1. Confirmed picks
+    for r in picks:
+        c_val = float(r.get("close") or 0.0)
+        day_ret_val = float(r.get("day_ret") or 0.0)
+        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
+        if ckt["is_locked"]:
+            excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
+        else:
+            q_val = int(100000 // c_val) if c_val > 0 else 0
+            arm_v = ("fresh_A" if r.get("fresh") and r["tier"] == "A"
+                     else "fresh_B" if r.get("fresh") else "aged_B")
+            actionable.append({
+                "symbol": r["symbol"],
+                "badge": "🟢 Confirmed",
+                "tier": r["tier"],
+                "arm": arm_v,
+                "pre": int(r.get("pre", 0) or 0),
+                "price": c_val,
+                "qty": q_val,
+                "invest": q_val * c_val,
+                "day_ret": day_ret_val,
+                "rvol": float(r.get("rvol") or 0.0),
+                "close_pos": float(r.get("close_pos") or 1.0),
+                "prime": "🔥 Prime #2" if (r["tier"] == "A" or float(r.get("rvol") or 0) >= 5.0) else ""
+            })
+
+    # 2. Anticipate picks
+    for r in ant_picks:
+        c_val = float(r.get("close") or 0.0)
+        day_ret_val = float(r.get("day_ret") or 0.0)
+        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
+        if ckt["is_locked"]:
+            excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
+        else:
+            q_val = int(100000 // c_val) if c_val > 0 else 0
+            side_v = str(r.get("side", "below"))
+            actionable.append({
+                "symbol": r["symbol"],
+                "badge": "🔭 Anticipate",
+                "tier": f"PRE {r.get('pre', 0)}/8",
+                "arm": f"ant_{side_v}",
+                "pre": int(r.get("pre", 0) or 0),
+                "price": c_val,
+                "qty": q_val,
+                "invest": q_val * c_val,
+                "day_ret": day_ret_val,
+                "rvol": float(r.get("rvol") or 0.0),
+                "close_pos": float(r.get("close_pos") or 1.0),
+                "gap_pct": float(r.get("gap_pct") or 0.0),
+                "prime": "⭐ Prime #1" if (side_v == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
+            })
+
+    actionable.sort(key=actionable_priority, reverse=True)
+    top3_actionable = actionable[:3]
+    taken_syms = {act["symbol"] for act in top3_actionable}
+    next_anticipated = [r for r in ant_pool if r["symbol"] not in taken_syms][:2]
+    return top3_actionable, next_anticipated, excluded_locked
+
+
+def write_alert_state(cfg, now, today_str: str, scan_time: str, too_late: bool,
+                       too_early: bool, top3_actionable: list, next_anticipated: list,
+                       excluded_locked: list) -> None:
+    """Persist the EXACT data the Telegram alert was rendered from.
+
+    2026-08-13: this is the fix for 'paper trade report / backtest don't
+    match the alert'. Without this file, any downstream report has to
+    re-derive 'what did today's alert say' from the raw, multi-run-per-day
+    picks CSVs and can easily reconstruct a DIFFERENT answer than the one
+    actually sent (e.g. picking up a later post-close re-run's different
+    picks, or a different top-3 ranking). This file is the literal object
+    the message was built from, serialized as-is - pdf_report.py reads it
+    instead of re-computing, so the two can never drift apart again.
+    """
+    import json as _json
+    state = {
+        "date": today_str,
+        "scan_time": scan_time,
+        "generated_at_ist": now.strftime("%Y-%m-%dT%H:%M:%S"),
+        "too_late": bool(too_late),
+        "too_early": bool(too_early),
+        "top3_actionable": top3_actionable,
+        "next_anticipated": next_anticipated,
+        "excluded_locked": [list(x) for x in excluded_locked],
+    }
+    path = cfg.paths["root"] / ALERT_STATE_FILE
+    with open(path, "w") as f:
+        _json.dump(state, f, indent=2, default=str)
+    log.info("wrote %s (%d actionable, %d anticipated)",
+             path.name, len(top3_actionable), len(next_anticipated))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -2283,84 +2430,8 @@ def main() -> int:
                      afile.name, len(ant_picks), len(aout))
 
     # ---- ACTIONABLE PORTFOLIO BUY LIST (Top 3 Fillable Setups) -------------
-    actionable = []
-    excluded_locked = []
-
-    # 1. Confirmed picks
-    for r in picks:
-        c_val = float(r.get("close") or 0.0)
-        day_ret_val = float(r.get("day_ret") or 0.0)
-        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
-        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
-        if ckt["is_locked"]:
-            excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
-        else:
-            q_val = int(100000 // c_val) if c_val > 0 else 0
-            arm_v = ("fresh_A" if r.get("fresh") and r["tier"] == "A"
-                     else "fresh_B" if r.get("fresh") else "aged_B")
-            actionable.append({
-                "symbol": r["symbol"],
-                "badge": "🟢 Confirmed",
-                "tier": r["tier"],
-                "arm": arm_v,
-                "pre": int(r.get("pre", 0) or 0),
-                "price": c_val,
-                "qty": q_val,
-                "invest": q_val * c_val,
-                "day_ret": day_ret_val,
-                "rvol": float(r.get("rvol") or 0.0),
-                "close_pos": float(r.get("close_pos") or 1.0),
-                "prime": "🔥 Prime #2" if (r["tier"] == "A" or float(r.get("rvol") or 0) >= 5.0) else ""
-            })
-
-    # 2. Anticipate picks
-    for r in ant_picks:
-        c_val = float(r.get("close") or 0.0)
-        day_ret_val = float(r.get("day_ret") or 0.0)
-        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
-        ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
-        if ckt["is_locked"]:
-            excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
-        else:
-            q_val = int(100000 // c_val) if c_val > 0 else 0
-            side_v = str(r.get("side", "below"))
-            actionable.append({
-                "symbol": r["symbol"],
-                "badge": "🔭 Anticipate",
-                "tier": f"PRE {r.get('pre', 0)}/8",
-                "arm": f"ant_{side_v}",
-                "pre": int(r.get("pre", 0) or 0),
-                "price": c_val,
-                "qty": q_val,
-                "invest": q_val * c_val,
-                "day_ret": day_ret_val,
-                "rvol": float(r.get("rvol") or 0.0),
-                "close_pos": float(r.get("close_pos") or 1.0),
-                "gap_pct": float(r.get("gap_pct") or 0.0),
-                "prime": "⭐ Prime #1" if (side_v == "below" and abs(float(r.get("gap_pct") or 0)) <= 3.0) else ""
-            })
-
-    def calc_actionable_priority(act):
-        arm = str(act.get("arm", "") or "")
-        rvol = float(act.get("rvol", 0.0) or 0.0)
-        cp = float(act.get("close_pos", 1.0) or 1.0)
-        pre = float(act.get("pre", 0.0) or 0.0)
-
-        is_prime1 = (arm == "ant_below") and (pre >= 6)
-        is_prime2 = arm in ("fresh_A", "fresh_B") and (rvol >= 5.0) and (cp >= 0.98)
-        is_tier_a = (arm == "fresh_A")
-        is_aged_b = (arm == "aged_B")
-        is_fresh_b = (arm == "fresh_B")
-        is_ant = arm.startswith("ant_")
-
-        return (is_prime1 * 500.0 + is_prime2 * 500.0 + is_tier_a * 400.0
-                + is_aged_b * 300.0 + is_ant * 200.0 + is_fresh_b * 100.0
-                + min(rvol, 30.0) + pre)
-
-    actionable.sort(key=calc_actionable_priority, reverse=True)
-    top3_actionable = actionable[:3]
-    taken_syms = {act["symbol"] for act in top3_actionable}
-    next_anticipated = [r for r in (aq if 'aq' in locals() and aq else ant_picks) if r["symbol"] not in taken_syms][:2]
+    top3_actionable, next_anticipated, excluded_locked = build_actionable_lists(
+        picks, ant_picks, (aq if 'aq' in locals() and aq else ant_picks))
 
     # ---- BUILD THE TELEGRAM MESSAGE ----------------------------------------
     lines = [f"🌙 <b>BTST & ANTICIPATION EXECUTION ORDERS — {now:%d-%b-%Y} ({now:%H:%M} IST)</b>",
@@ -2420,6 +2491,9 @@ def main() -> int:
     # Tier A measured +3.04%/trade (t 6.4, n=302, 57% win); Tier B +2.15% (t 11.5, n=852, 65% win). 🔭 below-level beat 🚀 above. RECALL: disciplined execution catches ~3% of market runners. Tier B holds with age; Tier A does not. candidate(s) returned no candle. This list is INCOMPLETE. _rvol_detail(r)
     # aged setups were NOT scanned if quote_failed = True
     msg = "\n".join(lines)
+
+    write_alert_state(cfg, now, f"{now:%Y-%m-%d}", f"{now:%H:%M}", too_late, too_early,
+                       top3_actionable, next_anticipated, excluded_locked)
 
     if args.dry_run:
         print(msg)
