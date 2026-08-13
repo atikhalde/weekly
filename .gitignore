@@ -13,3 +13,4 @@ btst_backtest_trades.csv
 build.log
 rows.txt
 
+btst_paper_trade_report_*.pdf

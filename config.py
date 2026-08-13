@@ -211,8 +211,6 @@ class Secrets:
     telegram_chat_id: str = ""
     # Optional SECOND destination - a different bot and/or a different chat.
     # Everything the primary receives is mirrored here. Leave blank to disable.
-    telegram_bot_token_2: str = ""
-    telegram_chat_id_2: str = ""
 
     @property
     def telegram_ready(self) -> bool:
@@ -225,12 +223,16 @@ class Secrets:
 
         A destination needs BOTH a token and a chat id; a half-configured pair
         is skipped rather than silently posting to the wrong place.
+
+        2026-08-14: the second bot was removed. TELEGRAM_CHAT_ID_2 had been
+        answering "400 chat not found" on every single send for weeks, three
+        times per document upload, and nobody was reading that chat. The
+        fan-out machinery below is kept because it costs nothing and makes
+        adding a real second destination a config change again.
         """
         out: list[tuple[str, str, str]] = []
         if self.telegram_bot_token and self.telegram_chat_id:
             out.append((self.telegram_bot_token, self.telegram_chat_id, "primary"))
-        if self.telegram_bot_token_2 and self.telegram_chat_id_2:
-            out.append((self.telegram_bot_token_2, self.telegram_chat_id_2, "secondary"))
         return out
 
 
@@ -276,10 +278,6 @@ def load_config(path: str | Path | None = None) -> Config:
         dhan_access_token=os.environ.get("DHAN_ACCESS_TOKEN", "").strip(),
         telegram_bot_token=os.environ.get("TELEGRAM_BOT_TOKEN", "").strip(),
         telegram_chat_id=os.environ.get("TELEGRAM_CHAT_ID", "").strip(),
-        # Second bot. Both must be set for it to be used. If only the chat id
-        # differs, repeat the same token in TELEGRAM_BOT_TOKEN_2.
-        telegram_bot_token_2=os.environ.get("TELEGRAM_BOT_TOKEN_2", "").strip(),
-        telegram_chat_id_2=os.environ.get("TELEGRAM_CHAT_ID_2", "").strip(),
     )
 
     # Flat layout: generated files sit beside the config file, not in a data/

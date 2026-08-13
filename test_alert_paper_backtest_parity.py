@@ -281,11 +281,46 @@ def test_enterable_snapshot_is_used(tmp_path):
     assert ab_paper.load_alert_selection(tmp_path) == {"2026-08-13": {"KMEW"}}
 
 
-def test_a_review_must_not_overwrite_the_entry_window_archive():
-    src = (ROOT / "btst.py").read_text()
-    seg = src.split("keep_existing = False", 1)[1][:600]
-    assert "if keep_existing and not enterable:" in seg, (
-        "an after-close review must keep the enterable archive intact")
+def test_a_review_must_not_overwrite_the_entry_window_snapshot(tmp_path):
+    """BUG 79: the guard now covers the LIVE file too, not just the archive.
+
+    Was a string match on the old inline implementation; rewritten to test
+    the extracted helper's behaviour so it survives refactors.
+    """
+    import json
+    from btst import _keep_enterable
+
+    live = tmp_path / "btst_alert_state.json"
+    live.write_text(json.dumps({"date": "2026-08-13", "enterable": True}))
+
+    # a post-close review must NOT clobber today's enterable alert
+    assert _keep_enterable(live, "2026-08-13", enterable=False) is True
+    # a genuine 15:20 run may always write
+    assert _keep_enterable(live, "2026-08-13", enterable=True) is False
+    # yesterday's leftover describes another session - always replaceable,
+    # otherwise the first post-close run of a new day freezes stale names
+    assert _keep_enterable(live, "2026-08-14", enterable=False) is False
+
+    # a prior non-enterable review is not worth protecting
+    live.write_text(json.dumps({"date": "2026-08-13", "enterable": False}))
+    assert _keep_enterable(live, "2026-08-13", enterable=False) is False
+
+    # missing / corrupt files must never block a write
+    assert _keep_enterable(tmp_path / "nope.json", "2026-08-13", False) is False
+    live.write_text("{ not json")
+    assert _keep_enterable(live, "2026-08-13", enterable=False) is False
+
+
+def test_the_pdf_must_not_report_unentered_setups_as_positions():
+    """BUG 79: on 2026-08-13 five post-close re-runs overwrote the snapshot,
+    and the PDF rendered the review's names as OPEN positions worth 197,466
+    that were never bought (every ledger row that day was NO_FILL, qty 0)."""
+    src = (ROOT / "pdf_report.py").read_text()
+    assert '"status": " OPEN (Exit 09:15)" if entered' in src, (
+        "the OPEN status must be conditional on the day being enterable")
+    assert "NOT ENTERED" in src, "a non-enterable day needs an honest heading"
+    assert '"invested": qty * price if entered else 0.0' in src, (
+        "an unentered setup has no capital committed")
 
 
 # --------------------------------------------------------------------------- #

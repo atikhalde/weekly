@@ -85,8 +85,6 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_BOT_TOKEN_2: ${{ secrets.TELEGRAM_BOT_TOKEN_2 }}
-          TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
@@ -105,13 +103,11 @@ jobs:
           MSG+=$'<b>no alerts, no shortlist and no BTST scan</b> until this is fixed.\n\n'
           MSG+=$'<b>Fix now:</b> Actions → Weekly Snapshot → Run workflow (tick <b>fresh</b>).\n'
           MSG+="${RUN_URL}"
-          for TOKEN_CHAT in "${TELEGRAM_BOT_TOKEN}:::${TELEGRAM_CHAT_ID}" "${TELEGRAM_BOT_TOKEN_2}:::${TELEGRAM_CHAT_ID_2}"; do
-            TOK="${TOKEN_CHAT%%:::*}"; CHAT="${TOKEN_CHAT##*:::}"
-            [[ -z "${TOK}" || -z "${CHAT}" ]] && continue
-            curl -s -X POST "https://api.telegram.org/bot${TOK}/sendMessage" \
-              --data-urlencode "chat_id=${CHAT}" \
+          if [[ -n "${TELEGRAM_BOT_TOKEN}" && -n "${TELEGRAM_CHAT_ID}" ]]; then
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
               --data-urlencode "parse_mode=HTML" \
               --data-urlencode "text=${MSG}" > /dev/null
-          done
+          fi
           # red tick as well, so the Actions tab shows it
           exit 1
