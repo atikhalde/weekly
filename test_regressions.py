@@ -2487,10 +2487,53 @@ def test_ab_ledger_deduplicates(tmp_path):
     p = tmp_path / "led.csv"
     row = {"model": "A_gated", "symbol": "X", "signal_date": "2026-07-27",
            "signal_time": "10:00", "pnl": 100.0}
-    added, dupes = append_ledger(p, [row])
-    assert added == 1 and dupes == 0
-    added, dupes = append_ledger(p, [row])
-    assert added == 0 and dupes == 1, "the same trade was recorded twice"
+    added, dupes, upgraded = append_ledger(p, [row])
+    assert added == 1 and dupes == 0 and upgraded == 0
+    added, dupes, upgraded = append_ledger(p, [row])
+    assert added == 0 and dupes == 1 and upgraded == 0, "the same trade was recorded twice"
+
+
+def test_ab_ledger_upgrades_stale_no_fill_to_a_real_resolution(tmp_path):
+    """2026-08-14 bug fix: a signal written as NO_FILL (no 'tomorrow' candle
+    existed yet) must be replaced once a later run recomputes the SAME
+    signal with a real resolved exit - not frozen forever. Confirmed with
+    real data: KENNAMET's 2026-08-10 BTST signal was still reported
+    "no daily candle after the signal" as of 2026-08-13, despite KENNAMET
+    trading normally every one of those days."""
+    from ab_paper import append_ledger
+
+    p = tmp_path / "led.csv"
+    key_row = {"model": "E_btst", "symbol": "KENNAMET", "signal_date": "2026-08-10",
+               "signal_time": "15:20", "entry": 3524.8, "exit": 0.0,
+               "exit_reason": "NO_FILL", "exit_note": "no daily candle after the signal",
+               "pnl": 0.0, "pnl_pct": 0.0}
+    added, dupes, upgraded = append_ledger(p, [key_row])
+    assert added == 1 and upgraded == 0
+
+    # A later run recomputes the identical (model, symbol, signal_date,
+    # signal_time) key, now with a real resolving candle available.
+    resolved_row = dict(key_row)
+    resolved_row.update({"exit": 3489.55, "exit_reason": "SL",
+                          "exit_note": "", "pnl": -1210.0, "pnl_pct": -1.0})
+    added, dupes, upgraded = append_ledger(p, [resolved_row])
+    assert added == 0 and upgraded == 1, "the resolved re-computation must replace the stale NO_FILL row"
+
+    import pandas as pd
+    final = pd.read_csv(p)
+    assert len(final) == 1, "the key must still be a single row, not duplicated"
+    assert final.iloc[0]["exit_reason"] == "SL"
+    assert final.iloc[0]["pnl"] == pytest.approx(-1210.0)
+
+    # A THIRD run recomputing the same, now-resolved key must not churn it
+    # back to some other value - the first real resolution wins, exactly
+    # like the pre-existing "first write wins" guarantee for normal trades.
+    another_resolved_row = dict(key_row)
+    another_resolved_row.update({"exit": 9999.0, "exit_reason": "TGT",
+                                  "exit_note": "", "pnl": 555.0, "pnl_pct": 5.0})
+    added, dupes, upgraded = append_ledger(p, [another_resolved_row])
+    assert added == 0 and upgraded == 0 and dupes == 1
+    final = pd.read_csv(p)
+    assert final.iloc[0]["exit_reason"] == "SL", "an already-resolved trade must not be overwritten again"
 
 
 def test_ab_target_r_uses_initial_risk():

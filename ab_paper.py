@@ -675,11 +675,32 @@ LEDGER_COLS = ["model", "model_label", "horizon", "symbol", "week", "signal_date
                "btst_arm", "btst_age"]
 
 
-def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int]:
-    """Append, de-duplicating on (model, symbol, signal_date, signal_time)."""
+def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int, int]:
+    """Append, de-duplicating on (model, symbol, signal_date, signal_time).
+
+    2026-08-14 fix - "stale NO_FILL trades never resolve": a signal always
+    writes NO_FILL the day it fires, because the "tomorrow" candle needed
+    to evaluate its BTST/swing exit does not exist yet. The original
+    keep="first" dedup then froze that NO_FILL row FOREVER, even after the
+    resolving candle became available on every subsequent day's run -
+    confirmed with real data: KENNAMET's 2026-08-10 BTST signal was still
+    reported "no daily candle after the signal" as of 2026-08-13 (three
+    trading sessions later), despite KENNAMET trading completely normally
+    every one of those days (verified via yfinance OHLC). Every downstream
+    report (paper-trade PDF, standings, "yesterday's results") inherited
+    this bug, since a trade that should have closed 3 days ago still shows
+    up as an open, unresolved NO_FILL signal today.
+
+    Fix: when a freshly recomputed row shares a key with an existing row,
+    prefer whichever of the two is RESOLVED (exit_reason != "NO_FILL") over
+    a NO_FILL placeholder, instead of blindly keeping whichever was written
+    first. Ties (both NO_FILL, or both already resolved) keep the earlier
+    one, preserving the previous, already-relied-upon reproducibility for
+    trades that were never stuck in the first place.
+    """
     new = pd.DataFrame(rows)
     if new.empty:
-        return 0, 0
+        return 0, 0, 0
     for c in LEDGER_COLS:
         if c not in new.columns:
             new[c] = ""
@@ -692,15 +713,33 @@ def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int]:
             if c not in old.columns:
                 old[c] = ""
         old = old[LEDGER_COLS]
-        before = len(new)
+        old_keys = set(map(tuple, old[key].astype(str).values))
+
         merged = pd.concat([old, new], ignore_index=True)
-        merged = merged.drop_duplicates(subset=key, keep="first")
-        added = len(merged) - len(old)
+        # Stable sort: resolved rows (exit_reason != NO_FILL) sort ahead of
+        # NO_FILL rows for the same key; ties keep insertion order (old
+        # before new), so an already-resolved trade never gets churned by
+        # a later re-simulation of the same signal.
+        merged["_resolved"] = (merged["exit_reason"].astype(str) != "NO_FILL").astype(int)
+        merged = merged.sort_values("_resolved", ascending=False, kind="mergesort")
+        merged = merged.drop_duplicates(subset=key, keep="first").drop(columns=["_resolved"])
+        merged = merged[LEDGER_COLS]
+
+        new_keys_only = set(map(tuple, new[key].astype(str).values)) - old_keys
+        added = len(new_keys_only)
+        merged_keys = set(map(tuple, merged[key].astype(str).values))
+        # Rows that already existed but flipped from NO_FILL -> resolved.
+        old_by_key = {tuple(k): r for k, r in zip(old[key].astype(str).values, old["exit_reason"].astype(str))}
+        merged_by_key = {tuple(k): r for k, r in zip(merged[key].astype(str).values, merged["exit_reason"].astype(str))}
+        upgraded = sum(1 for k in old_keys & merged_keys
+                       if old_by_key.get(k) == "NO_FILL" and merged_by_key.get(k) != "NO_FILL")
+        dupes = len(new) - added - upgraded
+
         merged.to_csv(path, index=False)
-        return added, before - added
+        return added, max(dupes, 0), upgraded
     new = new.drop_duplicates(subset=key, keep="first")
     new.to_csv(path, index=False)
-    return len(new), 0
+    return len(new), 0, 0
 
 
 # --------------------------------------------------------------------------- #
@@ -1425,8 +1464,9 @@ def main() -> int:
     for k, v in per_model_counts.items():
         print(f"  {k}: {v} trade(s) this run")
 
-    added, dupes = append_ledger(ledger_path, rows)
-    print(f"\nLedger {ledger_path.name}: +{added} new, {dupes} already recorded")
+    added, dupes, upgraded = append_ledger(ledger_path, rows)
+    upgrade_note = f", {upgraded} resolved (were stuck at NO_FILL)" if upgraded else ""
+    print(f"\nLedger {ledger_path.name}: +{added} new, {dupes} already recorded{upgrade_note}")
 
     if ledger_path.exists():
         led = pd.read_csv(ledger_path)
