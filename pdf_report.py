@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from datetime import datetime, timedelta, date
 from pathlib import Path
@@ -291,6 +292,66 @@ def compute_open_positions(ledger: pd.DataFrame, today_str: str, root: Path = RO
     return out
 
 
+_EMOJI_RE = re.compile(
+    "[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF"
+    "\U00002B00-\U00002BFF\U0000FE0F\U0001F900-\U0001F9FF]+")
+
+
+def _plain(text: str) -> str:
+    """Drop emoji the PDF font cannot draw.
+
+    2026-08-14: DejaVuSans covers the rupee sign but NOT pictographs, so a
+    leftover emoji renders as a NUL box in the PDF. They are pure
+    decoration here - the Telegram alert still shows them - so strip them
+    rather than ship a report full of tofu.
+    """
+    out = _EMOJI_RE.sub("", str(text))
+    # collapse the gaps an removed emoji leaves behind: "( Prime #1)" -> "(Prime #1)"
+    out = re.sub(r"\(\s+", "(", out)
+    out = re.sub(r"\s+\)", ")", out)
+    return re.sub(r"\s{2,}", " ", out).strip()
+
+
+def _register_fonts() -> tuple[str, str, str]:
+    """(regular, bold, rupee_symbol) - a font that can actually draw ₹.
+
+    Returns Helvetica plus an ASCII "Rs " fallback when no Unicode TTF is
+    installed, so the report degrades to readable rather than to a row of
+    stray "n" characters.
+    """
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    candidates = [
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+    ]
+    try:  # matplotlib bundles DejaVu, so this works even on bare images
+        import matplotlib
+        mpl = Path(matplotlib.__file__).parent / "mpl-data" / "fonts" / "ttf"
+        candidates.append((str(mpl / "DejaVuSans.ttf"),
+                           str(mpl / "DejaVuSans-Bold.ttf")))
+    except Exception:
+        pass
+
+    for reg, bold in candidates:
+        if Path(reg).exists() and Path(bold).exists():
+            try:
+                pdfmetrics.registerFont(TTFont("ReportSans", reg))
+                pdfmetrics.registerFont(TTFont("ReportSans-Bold", bold))
+                from reportlab.pdfbase.pdfmetrics import registerFontFamily
+                registerFontFamily("ReportSans", normal="ReportSans",
+                                   bold="ReportSans-Bold",
+                                   italic="ReportSans",
+                                   boldItalic="ReportSans-Bold")
+                return "ReportSans", "ReportSans-Bold", "\u20b9"
+            except Exception:
+                continue
+    return "Helvetica", "Helvetica-Bold", "Rs "
+
+
 def compute_kpi_summary(ledger: pd.DataFrame) -> dict:
     """Real KPI roll-up over the live ledger, reusing ab_paper.summarise()
     (the same math already trusted by ab_paper.py's own Telegram standings
@@ -340,52 +401,61 @@ def build_pdf_report(
         pagesize=letter,
         topMargin=28, bottomMargin=28, leftMargin=28, rightMargin=28,
     )
+    # ---- fonts: Helvetica cannot render the rupee sign -----------------
+    # 2026-08-14 fix - "every price shows a stray n". Helvetica is a base-14
+    # Type1 font whose encoding predates the rupee sign (U+20B9), so every
+    # "₹" in the report was dropped to a placeholder glyph that reads as a
+    # lone "n" next to each number - the whole report looked corrupt even
+    # though every VALUE in it was correct. DejaVuSans ships with matplotlib
+    # and most Linux images and does have the glyph; fall back to the ASCII
+    # "Rs " prefix if no such font exists, which is ugly but never wrong.
+    BASE, BOLD, RUPEE = _register_fonts()
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
-        "TitleStyle", parent=styles["Heading1"], fontName="Helvetica-Bold",
+        "TitleStyle", parent=styles["Heading1"], fontName=BOLD,
         fontSize=15, leading=18, textColor=COLOR_NAVY, spaceAfter=2,
     )
     subtitle_style = ParagraphStyle(
-        "SubtitleStyle", parent=styles["Normal"], fontName="Helvetica",
+        "SubtitleStyle", parent=styles["Normal"], fontName=BASE,
         fontSize=8, leading=10, textColor=colors.HexColor("#475569"),
     )
     section_head = ParagraphStyle(
-        "SectionHead", parent=styles["Heading2"], fontName="Helvetica-Bold",
+        "SectionHead", parent=styles["Heading2"], fontName=BOLD,
         fontSize=10.5, leading=13, textColor=COLOR_NAVY, spaceBefore=6, spaceAfter=3,
     )
     cell_head = ParagraphStyle(
-        "CellHead", parent=styles["Normal"], fontName="Helvetica-Bold",
+        "CellHead", parent=styles["Normal"], fontName=BOLD,
         fontSize=7.5, leading=9.5, textColor=colors.white, alignment=1,
     )
     cell_txt = ParagraphStyle(
-        "CellText", parent=styles["Normal"], fontName="Helvetica",
+        "CellText", parent=styles["Normal"], fontName=BASE,
         fontSize=7, leading=8.5, textColor=COLOR_NAVY,
     )
     cell_txt_center = ParagraphStyle(
-        "CellTextCenter", parent=styles["Normal"], fontName="Helvetica",
+        "CellTextCenter", parent=styles["Normal"], fontName=BASE,
         fontSize=7, leading=8.5, textColor=COLOR_NAVY, alignment=1,
     )
     cell_txt_bold = ParagraphStyle(
-        "CellTextBold", parent=styles["Normal"], fontName="Helvetica-Bold",
+        "CellTextBold", parent=styles["Normal"], fontName=BOLD,
         fontSize=7, leading=8.5, textColor=COLOR_NAVY,
     )
     cell_green = ParagraphStyle(
-        "CellGreen", parent=styles["Normal"], fontName="Helvetica-Bold",
+        "CellGreen", parent=styles["Normal"], fontName=BOLD,
         fontSize=7, leading=8.5, textColor=COLOR_GREEN, alignment=2,
     )
     cell_red = ParagraphStyle(
-        "CellRed", parent=styles["Normal"], fontName="Helvetica-Bold",
+        "CellRed", parent=styles["Normal"], fontName=BOLD,
         fontSize=7, leading=8.5, textColor=COLOR_RED, alignment=2,
     )
 
     story = []
 
     # 1. Header Banner
-    story.append(Paragraph("🌙 BTST & ANTICIPATION MASTER TRADING REPORT", title_style))
+    story.append(Paragraph(" BTST & ANTICIPATION MASTER TRADING REPORT", title_style))
     story.append(Paragraph(
         f"<b>Session Date:</b> {today_str} · <b>Generated:</b> {now:%d-%b-%Y %H:%M} IST · "
         f"<b>Today's entries source:</b> {data_source_note} · "
-        f"<b>Sizing:</b> ₹1,00,000 / trade",
+        f"<b>Sizing:</b> {RUPEE}1,00,000 / trade",
         subtitle_style
     ))
     story.append(HRFlowable(width="100%", thickness=1.5, color=COLOR_PRIMARY, spaceBefore=0, spaceAfter=6))
@@ -400,7 +470,7 @@ def build_pdf_report(
             Paragraph(f"<b>Win Rate</b><br/>{kpis.get('win', 0):.1f}%", cell_txt_center),
             Paragraph(f"<b>Profit Factor</b><br/>{kpis.get('pf', 0):.2f}", cell_txt_center),
             Paragraph(f"<b>Avg / Median %</b><br/>{kpis.get('avg_pct', 0):+.2f}% / {kpis.get('med_pct', 0):+.2f}%", cell_txt_center),
-            Paragraph(f"<b>Net P&amp;L (fixed sizing)</b><br/>₹{kpis.get('net', 0):+,.0f}", cell_txt_center),
+            Paragraph(f"<b>Net P&amp;L (fixed sizing)</b><br/>{RUPEE}{kpis.get('net', 0):+,.0f}", cell_txt_center),
         ]]
     else:
         kpi_data = [[Paragraph(
@@ -425,7 +495,7 @@ def build_pdf_report(
     story.append(Spacer(1, 6))
 
     # 3. Table 1: STOCKS ENTERED TODAY
-    story.append(Paragraph(f"🛒 1. STOCKS ENTERED TODAY — {today_str}", section_head))
+    story.append(Paragraph(f" 1. STOCKS ENTERED TODAY — {today_str}", section_head))
     today_picks = []
     for act in top3_actionable:
         qty = int(act.get("qty", 0) or 0)
@@ -437,26 +507,26 @@ def build_pdf_report(
             "symbol": act["symbol"], "badge": label, "qty": qty, "entry": price,
             "invested": qty * price, "stop": price * 0.99,
             "day_ret": float(act.get("day_ret", 0) or 0), "rvol": float(act.get("rvol", 0) or 0),
-            "status": "🟡 OPEN (Exit 09:15)",
+            "status": " OPEN (Exit 09:15)",
         })
 
     if today_picks:
         t1_rows = [[
             Paragraph("<b>#</b>", cell_head), Paragraph("<b>Symbol</b>", cell_head),
             Paragraph("<b>Setup Category</b>", cell_head), Paragraph("<b>Qty</b>", cell_head),
-            Paragraph("<b>Entry (₹)</b>", cell_head), Paragraph("<b>Invested (₹)</b>", cell_head),
-            Paragraph("<b>Stop Loss (₹)</b>", cell_head), Paragraph("<b>Day % / RVOL</b>", cell_head),
+            Paragraph(f"<b>Entry ({RUPEE})</b>", cell_head), Paragraph(f"<b>Invested ({RUPEE})</b>", cell_head),
+            Paragraph(f"<b>Stop Loss ({RUPEE})</b>", cell_head), Paragraph("<b>Day % / RVOL</b>", cell_head),
             Paragraph("<b>Execution Status</b>", cell_head),
         ]]
         for idx, item in enumerate(today_picks, 1):
             t1_rows.append([
                 Paragraph(str(idx), cell_txt_center),
                 Paragraph(f"<b>{item['symbol']}</b>", cell_txt_bold),
-                Paragraph(item['badge'], cell_txt),
+                Paragraph(_plain(item['badge']), cell_txt),
                 Paragraph(f"{item['qty']:,}", cell_txt_center),
-                Paragraph(f"₹{_fmt(item['entry'])}", cell_txt_center),
-                Paragraph(f"₹{item['invested']:,.0f}", cell_txt_center),
-                Paragraph(f"₹{_fmt(item['stop'])}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(item['entry'])}", cell_txt_center),
+                Paragraph(f"{RUPEE}{item['invested']:,.0f}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(item['stop'])}", cell_txt_center),
                 Paragraph(f"{item['day_ret']:+.1f}% · {item['rvol']:.1f}x", cell_txt_center),
                 Paragraph(f"<b>{item['status']}</b>", cell_txt_center),
             ])
@@ -474,16 +544,16 @@ def build_pdf_report(
     if excluded_locked:
         lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
         story.append(Spacer(1, 2))
-        story.append(Paragraph(f"🚫 <i>Excluded: {lock_names} — 0 sellers.</i>", subtitle_style))
+        story.append(Paragraph(f" <i>Excluded: {lock_names} — 0 sellers.</i>", subtitle_style))
     story.append(Spacer(1, 6))
 
     # 4. Table 2: YESTERDAY'S BTST RESULTS - real, from ab_ledger.csv
-    story.append(Paragraph("📊 2. YESTERDAY'S BTST RESULTS (Realized & Closed)", section_head))
+    story.append(Paragraph(" 2. YESTERDAY'S BTST RESULTS (Realized & Closed)", section_head))
     if yesterday_rows:
         t2_rows = [[
             Paragraph("<b>Symbol</b>", cell_head), Paragraph("<b>Entry Date</b>", cell_head),
-            Paragraph("<b>Entry (₹)</b>", cell_head), Paragraph("<b>Exit (₹)</b>", cell_head),
-            Paragraph("<b>Net Move %</b>", cell_head), Paragraph("<b>Realized P&amp;L (₹)</b>", cell_head),
+            Paragraph(f"<b>Entry ({RUPEE})</b>", cell_head), Paragraph(f"<b>Exit ({RUPEE})</b>", cell_head),
+            Paragraph("<b>Net Move %</b>", cell_head), Paragraph(f"<b>Realized P&amp;L ({RUPEE})</b>", cell_head),
             Paragraph("<b>Exit Reason</b>", cell_head),
         ]]
         for item in yesterday_rows:
@@ -491,8 +561,8 @@ def build_pdf_report(
             t2_rows.append([
                 Paragraph(f"<b>{item['symbol']}</b>", cell_txt_bold),
                 Paragraph(str(item["entry_date"]), cell_txt_center),
-                Paragraph(f"₹{_fmt(item['entry'])}", cell_txt_center),
-                Paragraph(f"₹{_fmt(item['exit'])}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(item['entry'])}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(item['exit'])}", cell_txt_center),
                 Paragraph(f"{item['pnl_pct']:+.2f}%", p_style),
                 Paragraph(f"{item['pnl_rs']:+,.0f}", p_style),
                 Paragraph(str(item["reason"]), cell_txt),
@@ -512,26 +582,26 @@ def build_pdf_report(
 
     # 5. Table 3: ACTIVE OPEN POSITIONS & MULTI-DAY RUNNERS - real, marked
     # to a live quote when available.
-    story.append(Paragraph("🟡 3. ACTIVE OPEN POSITIONS & MULTI-DAY RUNNERS", section_head))
+    story.append(Paragraph(" 3. ACTIVE OPEN POSITIONS & MULTI-DAY RUNNERS", section_head))
     if open_rows:
         t3_rows = [[
             Paragraph("<b>Symbol</b>", cell_head), Paragraph("<b>Entry Date</b>", cell_head),
-            Paragraph("<b>Entry Price (₹)</b>", cell_head), Paragraph("<b>Current Price (₹)</b>", cell_head),
-            Paragraph("<b>Stop (₹)</b>", cell_head), Paragraph("<b>Unrealized %</b>", cell_head),
+            Paragraph(f"<b>Entry Price ({RUPEE})</b>", cell_head), Paragraph(f"<b>Current Price ({RUPEE})</b>", cell_head),
+            Paragraph(f"<b>Stop ({RUPEE})</b>", cell_head), Paragraph("<b>Unrealized %</b>", cell_head),
             Paragraph("<b>Position Status</b>", cell_head),
         ]]
         for item in open_rows:
-            cur_txt = f"₹{_fmt(item['current'])}" if item["current"] is not None else "quote unavailable"
+            cur_txt = f"{RUPEE}{_fmt(item['current'])}" if item["current"] is not None else "quote unavailable"
             u_txt = f"{item['unrealized_pct']:+.2f}%" if item["unrealized_pct"] is not None else "-"
             u_style = (cell_green if (item["unrealized_pct"] or 0) > 0 else cell_red) if item["unrealized_pct"] is not None else cell_txt_center
             t3_rows.append([
                 Paragraph(f"<b>{item['symbol']}</b>", cell_txt_bold),
                 Paragraph(str(item["entry_date"]), cell_txt_center),
-                Paragraph(f"₹{_fmt(item['entry'])}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(item['entry'])}", cell_txt_center),
                 Paragraph(cur_txt, cell_txt_center),
-                Paragraph(f"₹{_fmt(item['stop'])}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(item['stop'])}", cell_txt_center),
                 Paragraph(u_txt, u_style),
-                Paragraph("🟡 Active (multi-day runner)", cell_txt),
+                Paragraph(" Active (multi-day runner)", cell_txt),
             ])
         t3_table = Table(t3_rows, colWidths=[75, 65, 75, 75, 75, 65, 134])
         t3_table.setStyle(TableStyle([
@@ -547,11 +617,16 @@ def build_pdf_report(
     story.append(Spacer(1, 6))
 
     # 6. Table 4: CLOSEST ANTICIPATED WATCHLIST - same data as the alert
-    story.append(Paragraph("🔭 4. CLOSEST ANTICIPATED WATCHLIST (Top 2 Setups for Tomorrow)", section_head))
+    # 2026-08-14: the count is derived, not hardcoded. btst.py now sends the
+    # nearest THREE anticipated names (was two) and the heading silently
+    # kept claiming "Top 2" - a report that mis-describes its own contents.
+    _n_ant = len(next_anticipated)
+    _ant_hdr = f"(Top {_n_ant} Setup{'s' if _n_ant != 1 else ''} for Tomorrow)" if _n_ant else "(For Tomorrow)"
+    story.append(Paragraph(f" 4. CLOSEST ANTICIPATED WATCHLIST {_ant_hdr}", section_head))
     if next_anticipated:
         t4_rows = [[
-            Paragraph("<b>Symbol</b>", cell_head), Paragraph("<b>LTP (₹)</b>", cell_head),
-            Paragraph("<b>26W Level (₹)</b>", cell_head), Paragraph("<b>Proximity Gap</b>", cell_head),
+            Paragraph("<b>Symbol</b>", cell_head), Paragraph(f"<b>LTP ({RUPEE})</b>", cell_head),
+            Paragraph(f"<b>26W Level ({RUPEE})</b>", cell_head), Paragraph("<b>Proximity Gap</b>", cell_head),
             Paragraph("<b>PRE Score</b>", cell_head), Paragraph("<b>Day % / RVOL</b>", cell_head),
             Paragraph("<b>Watchlist Target Action</b>", cell_head),
         ]]
@@ -559,8 +634,8 @@ def build_pdf_report(
             side = "above" if r.get("side") == "above" else "below"
             t4_rows.append([
                 Paragraph(f"<b>{r['symbol']}</b>", cell_txt_bold),
-                Paragraph(f"₹{_fmt(float(r.get('close', 0) or 0))}", cell_txt_center),
-                Paragraph(f"₹{_fmt(float(r.get('level', 0) or 0))}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(float(r.get('close', 0) or 0))}", cell_txt_center),
+                Paragraph(f"{RUPEE}{_fmt(float(r.get('level', 0) or 0))}", cell_txt_center),
                 Paragraph(f"<b>{abs(float(r.get('gap_pct', 0) or 0)):.2f}% {side}</b>", cell_txt_center),
                 Paragraph(f"{int(r.get('pre', 0) or 0)}/8", cell_txt_center),
                 Paragraph(f"{float(r.get('day_ret', 0) or 0):+.1f}% · {float(r.get('rvol', 0) or 0):.1f}x", cell_txt_center),
