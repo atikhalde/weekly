@@ -1,7 +1,7 @@
 {
   "date": "2026-08-13",
-  "scan_time": "22:11",
-  "generated_at_ist": "2026-08-13T22:11:55",
+  "scan_time": "22:25",
+  "generated_at_ist": "2026-08-13T22:25:23",
   "too_late": true,
   "too_early": false,
   "top3_actionable": [
@@ -15,7 +15,7 @@
       "qty": 36,
       "invest": 97552.8017578125,
       "day_ret": 4.8319142405137905,
-      "rvol": 0.6524608621372455,
+      "rvol": 0.6690633570877358,
       "close_pos": 0.9194248117131295,
       "gap_pct": 0.9937870358741323,
       "prime": "\u2b50 Prime #1"
