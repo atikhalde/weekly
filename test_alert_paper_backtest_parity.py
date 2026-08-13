@@ -433,3 +433,61 @@ def test_dedup_fills_na_before_stringifying():
     seg = src.split("def _dedup_key", 1)[1][:700]
     assert 'fillna("").astype(str)' in seg, (
         "astype(str) alone is pandas-major dependent for missing values")
+
+
+# --------------------------------------------------------------------------- #
+#  9. the PDF report must be readable, and must describe itself correctly
+# --------------------------------------------------------------------------- #
+def test_pdf_font_supports_the_rupee_sign():
+    """2026-08-14: Helvetica is a base-14 Type1 font with no U+20B9, so every
+    price rendered as a stray "n" and the whole report looked corrupt even
+    though every value in it was right."""
+    import pdf_report
+    base, bold, rupee = pdf_report._register_fonts()
+    if base == "Helvetica":
+        assert rupee == "Rs ", "no Unicode font -> must fall back to ASCII"
+    else:
+        assert rupee == "\u20b9"
+        from reportlab.pdfbase import pdfmetrics
+        assert pdfmetrics.getFont(base) is not None
+
+
+def test_pdf_strips_emoji_the_font_cannot_draw():
+    """DejaVu has the rupee sign but not pictographs - a leftover emoji
+    renders as a NUL box."""
+    from pdf_report import _plain
+    assert _plain("\U0001f52d Anticipate (\u2b50 Prime #1)") == "Anticipate (Prime #1)"
+    assert _plain("\U0001f7e2 Confirmed") == "Confirmed"
+    assert _plain("plain text") == "plain text"
+    assert "\x00" not in _plain("\U0001f525 Prime #2")
+
+
+def test_watchlist_heading_is_not_hardcoded_to_two():
+    """btst.py now sends the nearest THREE anticipated names; the heading
+    silently kept claiming "Top 2" - a report mis-describing its contents."""
+    src = (ROOT / "pdf_report.py").read_text()
+    assert "(Top 2 Setups for Tomorrow)" not in src
+    assert "_n_ant" in src, "the count must be derived from the data"
+
+
+def test_pdf_kpis_match_the_ledger():
+    """The header block must be reproducible from ab_ledger.csv."""
+    import pdf_report
+    from ab_paper import summarise
+    led = ROOT / "ab_ledger.csv"
+    if not led.exists():
+        pytest.skip("no ledger committed")
+    df = pd.read_csv(led)
+    live = pdf_report.dedupe_live_trades(df)
+    if live.empty:
+        pytest.skip("no live-model trades yet")
+    s = summarise(live)
+    # every KPI the PDF prints must come from this one call - no second
+    # stats engine that can drift.
+    for k in ("n", "win", "pf", "avg_pct", "med_pct", "net"):
+        assert k in s, f"KPI {k} missing from summarise()"
+    # "Trades (closed)" means CLOSED - NO_FILL rows are signals that were
+    # never filled and must not be counted as trades.
+    closed = live[live["exit_reason"].astype(str) != "NO_FILL"]
+    assert s["n"] == len(closed), (
+        f"header says {s['n']} closed trades, ledger has {len(closed)}")
