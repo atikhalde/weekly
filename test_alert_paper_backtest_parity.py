@@ -596,3 +596,44 @@ def test_the_inverted_entry_bias_is_corrected_everywhere():
         text = (ROOT / name).read_text()
         assert "0.14% CHEAPER" not in text, f"{name} still claims the wrong sign"
         assert "0.14% LESS than the close" not in text, f"{name} still claims the wrong sign"
+
+
+# --------------------------------------------------------------------------- #
+#  11. tomorrow's 15:20 scan must not be blocked, and must not be pre-empted
+# --------------------------------------------------------------------------- #
+def test_a_premarket_snapshot_never_blocks_the_1520_scan(tmp_path):
+    """BUG 80 near-miss. _keep_enterable() protects an enterable snapshot from
+    a later review - but the 00:00 pre-market run is ALSO enterable. If the
+    guard keyed only on `enterable` it would freeze a midnight scan with zero
+    picks and the real 15:20 list could never land: every trade of the day
+    silently missed.
+
+    It does not, because a 15:20 run is itself enterable and the guard only
+    blocks non-enterable writers. This pins that down.
+    """
+    import json
+    from btst import _keep_enterable
+
+    live = tmp_path / "btst_alert_state.json"
+    live.write_text(json.dumps({"date": "2026-08-14", "scan_time": "00:00",
+                                "enterable": True, "too_early": True,
+                                "top3_actionable": []}))
+    # every in-window scan may still write
+    for _t in ("15:10", "15:15", "15:20", "15:26"):
+        assert _keep_enterable(live, "2026-08-14", enterable=True) is False, (
+            "an in-window scan must never be blocked by the pre-market file")
+    # and only after one lands do post-close reviews get locked out
+    live.write_text(json.dumps({"date": "2026-08-14", "scan_time": "15:20",
+                                "enterable": True, "too_early": False,
+                                "top3_actionable": [{"symbol": "REAL"}]}))
+    assert _keep_enterable(live, "2026-08-14", enterable=False) is True
+
+
+def test_premarket_scan_is_not_reported_as_the_days_verdict():
+    """BUG 80: btst.py writes too_early but pdf_report.py never read it, so
+    the 2026-08-14 00:00 scan rendered as "STOCKS ENTERED TODAY - No setups
+    qualified today" - a verdict on a session that had not opened."""
+    src = (ROOT / "pdf_report.py").read_text()
+    assert 'too_early = bool(alert_state.get("too_early", False))' in src
+    assert "PROVISIONAL - PRE-MARKET SCAN" in src
+    assert "The 15:20 scan decides." in src

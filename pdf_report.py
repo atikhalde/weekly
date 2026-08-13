@@ -511,7 +511,17 @@ def build_pdf_report(
     # the book is worse than no report, so the entry state now decides both
     # the heading and the per-row status.
     entered = bool(alert_state.get("enterable", True)) and not alert_state.get("too_late", False)
-    if entered:
+    # BUG 80: too_early was written by btst.py but never read here. The
+    # 2026-08-14 00:00 pre-market run is enterable and not too_late, so a
+    # midnight scan with nothing in range rendered as
+    # "1. STOCKS ENTERED TODAY - No setups qualified today" - a verdict on a
+    # session that had not opened yet. The 15:20 scan decides the day;
+    # anything before the entry window is provisional by definition.
+    too_early = bool(alert_state.get("too_early", False))
+    if too_early:
+        story.append(Paragraph(
+            f" 1. TODAY'S SETUPS — {today_str} (PROVISIONAL - PRE-MARKET SCAN)", section_head))
+    elif entered:
         story.append(Paragraph(f" 1. STOCKS ENTERED TODAY — {today_str}", section_head))
     else:
         story.append(Paragraph(f" 1. TODAY'S SETUPS — {today_str} (NOT ENTERED)", section_head))
@@ -565,7 +575,12 @@ def build_pdf_report(
         ]))
         story.append(t1_table)
     else:
-        story.append(Paragraph("<i>No setups qualified today matching quality filters.</i>", cell_txt))
+        if too_early:
+            story.append(Paragraph(
+                f"<b>Scan ran {alert_state.get('scan_time', '?')} IST, before the entry "
+                f"window - this is NOT the day's list.</b> The 15:20 scan decides.", cell_txt))
+        else:
+            story.append(Paragraph("<i>No setups qualified today matching quality filters.</i>", cell_txt))
     if excluded_locked:
         lock_names = ", ".join(f"<b>{s}</b> ({why})" for s, why in excluded_locked)
         story.append(Spacer(1, 2))
