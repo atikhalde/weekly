@@ -1,74 +1,46 @@
 {
   "date": "2026-08-13",
-  "scan_time": "19:26",
-  "generated_at_ist": "2026-08-13T19:26:32",
-  "too_late": false,
+  "scan_time": "20:39",
+  "generated_at_ist": "2026-08-13T20:39:12",
+  "too_late": true,
   "too_early": false,
-  "top3_actionable": [],
-  "next_anticipated": [
-    {
-      "symbol": "MUNJALAU",
-      "close": 119.37000274658203,
-      "level": 114.99,
-      "which": "C+D",
-      "gap_pct": -3.8090292604418097,
-      "side": "above",
-      "pre": 7,
-      "ret_12m": 65.30951981724952,
-      "dist_200dma": 38.982197860134036,
-      "day_ret": 7.029502423647904,
-      "close_pos": 0.9651742838257531,
-      "rvol": 26.534230603390988,
-      "vol_today": 41465636.0,
-      "vma50": 1562722.38,
-      "vma_bars": 50,
-      "atr_pct": 3.4717980892594125,
-      "turnover_cr": 27.942575495712436,
-      "partial_frac": 1.0,
-      "base_from_high": -13.183751903948316,
-      "ret_3m_prior": 9.703298715444708,
-      "ok": true,
-      "mcap_cr": 887.0,
-      "rank": 1
-    },
+  "top3_actionable": [
     {
       "symbol": "KMEW",
-      "close": 2709.800048828125,
-      "level": 2737.0,
-      "which": "C+D",
-      "gap_pct": 0.9937870358741323,
-      "side": "below",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 6/8",
+      "arm": "ant_below",
       "pre": 6,
-      "ret_12m": 224.62414481319257,
-      "dist_200dma": 47.88637500604595,
+      "price": 2709.800048828125,
+      "qty": 36,
+      "invest": 97552.8017578125,
       "day_ret": 4.8319142405137905,
+      "rvol": 0.6715587651039738,
       "close_pos": 0.9194248117131295,
-      "rvol": 0.6524608621372455,
-      "vol_today": 75984.0,
-      "vma50": 116457.56,
-      "vma_bars": 50,
-      "atr_pct": 4.319505481065433,
-      "turnover_cr": 22.41870017595215,
-      "partial_frac": 1.0,
-      "base_from_high": -5.012785939783527,
-      "ret_3m_prior": 33.61772699137357,
-      "ok": true,
-      "mcap_cr": 7067.64,
-      "rank": 2
+      "gap_pct": 0.9937870358741323,
+      "prime": "\u2b50 Prime #1"
+    },
+    {
+      "symbol": "MUNJALAU",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_above",
+      "pre": 7,
+      "price": 119.37000274658203,
+      "qty": 837,
+      "invest": 99912.69229888916,
+      "day_ret": 7.029502423647904,
+      "rvol": 26.508605815118337,
+      "close_pos": 0.9651742838257531,
+      "gap_pct": -3.8090292604418097,
+      "prime": ""
     }
   ],
+  "next_anticipated": [],
   "excluded_locked": [
     [
       "JUBLCPL",
       "Locked at Upper Circuit +20%"
-    ],
-    [
-      "MUNJALAU",
-      "Locked at Upper Circuit +5%"
-    ],
-    [
-      "KMEW",
-      "Locked at Upper Circuit +5%"
     ]
   ]
 }
