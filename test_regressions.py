@@ -2537,21 +2537,46 @@ def test_ab_ledger_upgrades_stale_no_fill_to_a_real_resolution(tmp_path):
 
 
 def test_pick_is_circuit_locked_matches_the_live_alert_exclusion():
-    """2026-08-14 bug fix - "excluded circuit stock still got a fake fill":
-    reproduces the exact real-world case found in ab_ledger.csv on
-    2026-08-13. AARTISURF (day_ret +12.6%, entry 572.0) and BLSE (day_ret
-    +2.0%, entry 318.4) were BOTH explicitly excluded from the real
-    2026-08-11 15:16 IST Telegram alert ("Locked at Upper Circuit... 0
-    sellers"), reconstructed via btst.build_actionable_lists() against the
-    real committed btst_picks.csv/anticipate_picks.csv rows for that date -
-    yet both appeared in ab_ledger.csv as fully resolved SL trades with a
-    real P&L, as if they had actually been bought. LUMAXTECH, the real
-    2026-08-11 confirmed pick, must NOT be flagged as locked."""
+    """2026-08-14 bug fix - "excluded circuit stock still got a fake fill",
+    fixed in two layers:
+
+    Layer 1 (root cause): the picks CSVs' only usable "day_ret" field is a
+    close-vs-OPEN intraday return, not a close-vs-prev-close one, so
+    approximating prev_close as `close / (1 + day_ret/100)` silently
+    computed today's OPEN. classify()/classify_approach() now persist the
+    REAL `prev_close` and `high` (both were already computed locally as
+    plain variables, just never surfaced) so downstream circuit checks use
+    real inputs, via the shared _resolve_prev_close() helper.
+
+    Layer 2 (verification data): every case below is checked against real
+    yfinance OHLC. AARTISURF closed 2026-08-11 at Close == High == 572.00,
+    exactly +10.00% over the real prior close of 520.00 - the textbook
+    signature of a stock pinned at its circuit with zero further trading,
+    and it is the ONLY genuinely locked case in this set. BLSE, MARINE,
+    KENNAMET, SJS and UNIPARTS all closed meaningfully below their real
+    day's high on the dates checked (verified via yfinance) and must NOT
+    be flagged - the ORIGINAL day_ret-only approximation incorrectly
+    flagged several of these as locked.
+    """
     from ab_paper import _pick_is_circuit_locked
 
-    assert _pick_is_circuit_locked({"entry": 572.0, "day_ret": 12.6}) is True, "AARTISURF"
-    assert _pick_is_circuit_locked({"entry": 318.4, "day_ret": 2.0}) is True, "BLSE"
-    assert _pick_is_circuit_locked({"entry": 2085.8, "day_ret": 15.22}) is False, "LUMAXTECH (real confirmed pick)"
+    assert _pick_is_circuit_locked({"entry": 572.0, "prev_close": 520.00, "high": 572.00}) is True, \
+        "AARTISURF - verified real circuit lock (close==high==572.00, prev close 520.00)"
+    assert _pick_is_circuit_locked({"entry": 2510.0, "prev_close": 2432.40, "high": 2543.10}) is False, \
+        "SJS (real confirmed pick, not circuit-related)"
+    assert _pick_is_circuit_locked({"entry": 318.85, "prev_close": 301.45, "high": 320.00}) is False, \
+        "BLSE (real prev_close/high - genuinely not locked)"
+    assert _pick_is_circuit_locked({"entry": 355.8, "prev_close": 336.90, "high": 357.80}) is False, \
+        "MARINE (real prev_close/high - genuinely not locked)"
+    assert _pick_is_circuit_locked({"entry": 3524.8, "prev_close": 3301.90, "high": 3614.90}) is False, \
+        "KENNAMET (real prev_close/high - genuinely not locked)"
+    assert _pick_is_circuit_locked({"entry": 786.1, "prev_close": 724.77, "high": 802.94}) is False, \
+        "UNIPARTS (real prev_close/high - genuinely not locked)"
+    # Backward compatibility: rows written before prev_close/high existed
+    # fall back to the (less accurate, but still directionally useful)
+    # day_ret approximation rather than crashing or silently skipping.
+    assert _pick_is_circuit_locked({"entry": 572.0, "day_ret": 12.6}) is True, \
+        "AARTISURF via the legacy day_ret-only fallback path"
     # Degenerate inputs must fail open (never crash the whole simulation run).
     assert _pick_is_circuit_locked({}) is False
     assert _pick_is_circuit_locked({"entry": 0, "day_ret": 50}) is False

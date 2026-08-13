@@ -466,28 +466,39 @@ def _pick_is_circuit_locked(row: dict) -> bool:
     sellers, un-buyable) at the time it was recorded in btst_picks.csv /
     anticipate_picks.csv?
 
-    Reuses btst.py's own get_circuit_info() - the exact same check the live
-    alert applies to decide "Excluded: X (Locked at Upper Circuit)" - rather
-    than restating the rule (and risking it drifting from the real one).
-    The picks CSVs don't persist the day's raw high, so "high" falls back
-    to the close, matching the identical fallback btst.py itself uses when
-    building the Telegram message (`float(r.get("high") or c_val)`).
+    Reuses btst.py's own get_circuit_info() and _resolve_prev_close() - the
+    exact same check the live alert applies to decide "Excluded: X (Locked
+    at Upper Circuit)" - rather than restating the rule (and risking it
+    drifting from the real one).
 
-    2026-08-14 fix: this check did not previously exist anywhere in
-    ab_paper.py's direct-picks simulation, so a circuit-locked pick could
-    still receive a fully simulated fill and P&L, contradicting the alert
-    that explicitly reported it as excluded/unfillable.
+    2026-08-14 history: this originally derived "prev_close" from
+    `close / (1 + day_ret/100)`, which silently computed today's OPEN
+    instead of yesterday's close (day_ret is a close-vs-open intraday
+    return, not close-vs-prev-close). That approximation correctly caught
+    AARTISURF's genuine 2026-08-11 circuit lock (verified via real yfinance
+    OHLC: close==high==572.00, real prev close 520.00, exactly +10.00%)
+    but ALSO produced false positives for several genuinely un-locked
+    stocks the same day and others (BLSE, MARINE, KENNAMET, SHRIPISTON,
+    SJS, SMLMAH, UNIPARTS - all verified to have closed well off the day's
+    high). Fixed by using btst.py's real `prev_close` field (persisted in
+    the picks CSVs since this fix) via the shared _resolve_prev_close()
+    helper, falling back to the old approximation only for rows written
+    before that field existed.
     """
     import btst as _btst
     try:
         c_val = float(row.get("entry") or 0.0)
-        day_ret_val = float(row.get("day_ret") or 0.0)
     except (TypeError, ValueError):
         return False
     if c_val <= 0:
         return False
-    pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
-    ckt = _btst.get_circuit_info(pc_val, c_val, c_val)
+    pc_val = _btst._resolve_prev_close({"prev_close": row.get("prev_close"),
+                                        "close": c_val, "day_ret": row.get("day_ret")})
+    try:
+        high_val = float(row.get("high") or c_val)
+    except (TypeError, ValueError):
+        high_val = c_val
+    ckt = _btst.get_circuit_info(pc_val, c_val, high_val)
     return bool(ckt["is_locked"])
 
 

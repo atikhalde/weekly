@@ -1118,6 +1118,35 @@ def classify(daily: pd.DataFrame, level: float,
         range_pct=(rng / c * 100.0),
         gap_pct=((o / float(prev.iloc[-1]["close"]) - 1) * 100.0)
         if float(prev.iloc[-1]["close"]) > 0 else float("nan"),
+        # 2026-08-14 fix - "excluded circuit stock still got a fake fill":
+        # the real previous session's close, for anyone computing circuit-
+        # band/upper-circuit status downstream. Before this field existed,
+        # the only way to approximate "prev_close" from a saved pick was
+        # `close / (1 + day_ret/100)` - but day_ret is (close/OPEN - 1)*100
+        # (an intraday return), not (close/prev_close - 1)*100, so that
+        # approximation actually computed today's OPEN, not the real
+        # previous close. Confirmed with real data: AARTISURF's 2026-08-11
+        # circuit lock (close==high==572.00, prev close 520.00, exactly
+        # +10.00%) was only detectable using the REAL prev_close; the
+        # day_ret-derived approximation (572/1.126=507.99, close to the
+        # real open of 510.00) put the estimated circuit band off by
+        # enough to misclassify several genuinely-unlocked stocks (BLSE,
+        # MARINE, KENNAMET, etc.) as locked, and could equally miss a real
+        # lock the other way.
+        prev_close=float(prev.iloc[-1]["close"]),
+        # 2026-08-14 fix (companion to prev_close above): the real day's
+        # high, so a downstream circuit-lock check can tell "closed AT the
+        # high, genuinely pinned" apart from "closed near an estimated
+        # limit that a bigger real band would clear" - get_circuit_info()'s
+        # second detection clause silently degenerates to "close >= ~99.8%
+        # of a (possibly mis-estimated) limit" whenever high defaults to
+        # close, which is what "high" always did everywhere in this
+        # codebase before this fix (the field was computed locally as `h`
+        # but never persisted into the row dict). Verified against real
+        # yfinance data: BLSE/MARINE/KENNAMET/SHRIPISTON/SJS/SMLMAH all
+        # closed well below their real day's high on the dates checked -
+        # without this field they were falsely flagged as circuit-locked.
+        high=h,
         atr_pct=atr_pct, turnover_cr=turnover, ret_12m=ret_12m,
         dist_200dma=dist_200dma,
         base_from_high=base_from_high, ret_3m_prior=ret_3m_prior,
@@ -1306,6 +1335,14 @@ def classify_approach(daily: pd.DataFrame, level_c: float, level_d: float,
              ret_12m=float(trend.get("ret_12m", float("nan"))),
              dist_200dma=float(trend.get("dist_200dma", float("nan"))),
              day_ret=(c / o - 1) * 100.0,
+             # 2026-08-14 fix - see classify()'s identical field for the
+             # full rationale: the real previous session's close, needed
+             # for an accurate circuit-band/upper-circuit check downstream
+             # (day_ret is an intraday, close-vs-OPEN return, not a
+             # close-vs-prev-close one, so it cannot substitute for this).
+             prev_close=float(cl[-2]) if len(cl) >= 2 else c,
+             # 2026-08-14 fix - see classify()'s identical field/comment.
+             high=h,
              close_pos=((c - lo) / rng) if rng > 0 else 0.5,
              rvol=(v / vma_cmp) if vma_cmp > 0 else float("nan"),
              vol_today=v, vma50=vma, vma_bars=int(_vma_n(prev)),
@@ -1553,6 +1590,42 @@ def actionable_priority(act: dict) -> float:
             + min(rvol, 30.0) + pre)
 
 
+def _resolve_prev_close(r: dict) -> float:
+    """The real previous session's close for a picks/anticipate row.
+
+    2026-08-14 fix - "excluded circuit stock still got a fake fill": prefers
+    the real `prev_close` field (added to classify()/classify_approach()'s
+    output) over the OLD approximation `close / (1 + day_ret/100)`, which
+    silently computed today's OPEN instead of yesterday's close - day_ret
+    is (close/open - 1)*100, an intraday return, not (close/prev_close -
+    1)*100. Confirmed with real data: AARTISURF's genuine 2026-08-11
+    circuit lock (close==high==572.00, real prev close 520.00, exactly
+    +10.00%) was undetectable via the day_ret approximation (which yields
+    ~507.99, close to the real OPEN of 510.00, not the real prev close of
+    520.00) - and the same flawed approximation produced FALSE positives
+    for several genuinely un-locked stocks that day (BLSE, and others on
+    other dates: MARINE, KENNAMET, SHRIPISTON, SJS, SMLMAH, UNIPARTS - all
+    verified via real yfinance OHLC to have closed well off their day's
+    high, i.e. clearly not pinned at a circuit).
+
+    Falls back to the old approximation only for rows written before this
+    field existed (backward compatibility with already-committed picks
+    files), which is strictly worse than not checking at all only in the
+    rare case a stock gapped hard between sessions - a materially smaller
+    error than treating day_ret as an overnight return.
+    """
+    pcv = r.get("prev_close")
+    try:
+        pcv = float(pcv)
+        if pcv > 0:
+            return pcv
+    except (TypeError, ValueError):
+        pass
+    c_val = float(r.get("close") or 0.0)
+    day_ret_val = float(r.get("day_ret") or 0.0)
+    return c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+
+
 def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tuple:
     """Build the exact (top3_actionable, next_anticipated, excluded_locked)
     triple the Telegram alert is rendered from.
@@ -1578,7 +1651,7 @@ def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tupl
     for r in picks:
         c_val = float(r.get("close") or 0.0)
         day_ret_val = float(r.get("day_ret") or 0.0)
-        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+        pc_val = _resolve_prev_close(r)
         ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
         if ckt["is_locked"]:
             excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
@@ -1605,7 +1678,7 @@ def build_actionable_lists(picks: list, ant_picks: list, ant_pool: list) -> tupl
     for r in ant_picks:
         c_val = float(r.get("close") or 0.0)
         day_ret_val = float(r.get("day_ret") or 0.0)
-        pc_val = c_val / (1.0 + day_ret_val / 100.0) if day_ret_val > -90 else c_val
+        pc_val = _resolve_prev_close(r)
         ckt = get_circuit_info(pc_val, c_val, float(r.get("high") or c_val))
         if ckt["is_locked"]:
             excluded_locked.append((r["symbol"], f"Locked at Upper Circuit +{int(ckt['band'])}%"))
@@ -2229,6 +2302,14 @@ def main() -> int:
             "entry": round(float(r["close"]), 2), "pre": int(r.get("pre", 0)),
             "level": round(float(r["level"]), 2),
             "day_ret": round(float(r["day_ret"]), 2),
+            # 2026-08-14 fix - see _resolve_prev_close()'s docstring: the
+            # real previous session's close, persisted so downstream
+            # consumers (ab_paper.py, pdf_report.py) can compute an
+            # accurate circuit-lock check instead of the flawed
+            # day_ret-derived approximation (day_ret is an intraday,
+            # close-vs-open return, not a close-vs-prev-close one).
+            "prev_close": _num(r.get("prev_close"), 2),
+            "high": _num(r.get("high"), 2),
             "close_pos": round(float(r["close_pos"]), 3),
             "rvol": round(float(r.get("rvol") or 0), 2),
             "atr_pct": round(float(r["atr_pct"]), 2),
@@ -2409,6 +2490,9 @@ def main() -> int:
                 "dist_200dma": _num(r.get("dist_200dma"), 1),
                 "close_pos": round(float(r["close_pos"]), 3),
                 "day_ret": round(float(r["day_ret"]), 2),
+                # 2026-08-14 fix - see _resolve_prev_close()'s docstring.
+                "prev_close": _num(r.get("prev_close"), 2),
+                "high": _num(r.get("high"), 2),
                 "rvol": round(float(r.get("rvol") or 0), 2),
                 # BUG 73b: the confirmed dump carries these; the anticipate
                 # file did not, so a questioned rvol here was still
