@@ -872,8 +872,16 @@ def append_ledger(path: Path, rows: list[dict]) -> tuple[int, int, int]:
     # the correct de-duplication automatically.
     def _dedup_key(frame: pd.DataFrame) -> pd.Series:
         """Per-row identity: BTST rows ignore signal_time, others keep it."""
-        src = frame["btst_source"].astype(str).str.strip().str.lower()
-        is_btst = ~src.isin(["", "nan", "none"])
+        # fillna BEFORE astype(str): on pandas 2.x a missing value stringifies
+        # to "nan", but on pandas 3.x astype(str) leaves the float nan in
+        # place, so an .isin(["nan", ...]) test silently misses it and a
+        # NON-BTST row gets the BTST key - dropping a legitimate second
+        # intraday trade. requirements.txt allows both majors, so this must
+        # not depend on which one is installed. (Caught by CI on pandas
+        # 3.0.5 while local ran 2.2.3.)
+        src = (frame["btst_source"].fillna("").astype(str)
+               .str.strip().str.lower())
+        is_btst = ~src.isin(["", "nan", "none", "<na>"])
         base = (frame["model"].astype(str) + "|" + frame["symbol"].astype(str)
                 + "|" + frame["signal_date"].astype(str))
         return base.where(is_btst, base + "|" + frame["signal_time"].astype(str))
@@ -1694,8 +1702,12 @@ def main() -> int:
         led = pd.read_csv(ledger_path) if ledger_path.exists() else pd.DataFrame()
         if not led.empty:
             src = led.get("btst_source", pd.Series("", index=led.index))
-            is_btst = src.astype(str).str.strip().str.lower().isin(
-                ["picks", "anticipate", "reconstructed"])
+            # fillna before astype(str) - see _dedup_key() on pandas 3.x.
+            # This test is POSITIVE (must be one of the BTST sources), so a
+            # stray nan fails it safely, but keep the handling identical so
+            # the two cannot diverge later.
+            is_btst = (src.fillna("").astype(str).str.strip().str.lower()
+                       .isin(["picks", "anticipate", "reconstructed"]))
             day = led["signal_date"].astype(str)
             sym = led["symbol"].astype(str).str.upper()
             gated_day = day.isin(alert_sel)

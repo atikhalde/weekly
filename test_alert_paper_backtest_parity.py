@@ -403,3 +403,33 @@ def test_eviction_is_wired_into_main():
     src = (ROOT / "ab_paper.py").read_text()
     assert "not in that day's alert" in src
     assert "pre-gate row(s) the" in src
+
+
+# --------------------------------------------------------------------------- #
+#  8. the BTST/non-BTST split must not depend on the pandas major
+# --------------------------------------------------------------------------- #
+def test_missing_btst_source_is_not_treated_as_btst(tmp_path):
+    """requirements.txt allows pandas 2.x AND 3.x. On 2.x a missing value
+    stringifies to "nan"; on 3.x astype(str) leaves the float nan in place.
+    A version-dependent test would classify a NON-BTST row as BTST and drop
+    a legitimate second intraday trade. Caught by CI on pandas 3.0.5 while
+    local ran 2.2.3."""
+    led = tmp_path / "l.csv"
+    base = dict(model="D_early", symbol="X", signal_date="2026-08-12",
+                exit_reason="TIME")
+    # btst_source omitted entirely -> NaN once it goes through the frame
+    ab_paper.append_ledger(led, [
+        dict(base, signal_time="09:30", pnl=100.0),
+        dict(base, signal_time="12:50", pnl=200.0),
+    ])
+    out = pd.read_csv(led)
+    assert len(out) == 2, (
+        "two distinct intraday crosses of a non-BTST model must both survive")
+    assert out.pnl.sum() == pytest.approx(300.0)
+
+
+def test_dedup_fills_na_before_stringifying():
+    src = (ROOT / "ab_paper.py").read_text()
+    seg = src.split("def _dedup_key", 1)[1][:700]
+    assert 'fillna("").astype(str)' in seg, (
+        "astype(str) alone is pandas-major dependent for missing values")
