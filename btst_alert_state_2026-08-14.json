@@ -1,31 +1,63 @@
 {
   "date": "2026-08-14",
-  "scan_time": "12:07",
-  "generated_at_ist": "2026-08-14T12:07:18",
+  "scan_time": "14:46",
+  "generated_at_ist": "2026-08-14T14:46:29",
   "too_late": false,
   "too_early": true,
   "top3_actionable": [
     {
-      "symbol": "SJS",
+      "symbol": "MOREPENLAB",
       "badge": "\ud83d\udd2d Anticipate",
       "tier": "PRE 6/8",
-      "arm": "ant_below",
+      "arm": "ant_above",
       "pre": 6,
-      "price": 2570.0,
-      "qty": 38,
-      "invest": 97660.0,
-      "day_ret": 6.4446696466978315,
-      "rvol": 2.5581206797114655,
-      "close_pos": 0.9497206703910615,
-      "gap_pct": 0.7722007722007722,
-      "prime": "\u2b50 Prime #1"
+      "price": 83.80000305175781,
+      "qty": 1193,
+      "invest": 99973.40364074707,
+      "day_ret": 2.7590434283270016,
+      "rvol": 1.6921405256134852,
+      "close_pos": 0.9217396611752717,
+      "gap_pct": -0.35928509192552394,
+      "prime": ""
     }
   ],
-  "next_anticipated": [],
+  "next_anticipated": [
+    {
+      "symbol": "E2E",
+      "close": 666.75,
+      "level": 627.7,
+      "which": "C",
+      "gap_pct": -6.221124741118361,
+      "side": "above",
+      "pre": 6,
+      "ret_12m": 219.7841726618705,
+      "dist_200dma": 117.39279244477126,
+      "day_ret": 3.855140186915884,
+      "prev_close": 631.4000244140625,
+      "high": 666.75,
+      "close_pos": 1.0,
+      "rvol": 0.534373560220234,
+      "vol_today": 1138014.0,
+      "vma50": 2129622.58,
+      "vma_bars": 50,
+      "atr_pct": 6.083347443769585,
+      "turnover_cr": 125.11736234355438,
+      "partial_frac": 1.0,
+      "base_from_high": -3.954973993676636,
+      "ret_3m_prior": 93.05327130412681,
+      "ok": true,
+      "mcap_cr": 12360.81,
+      "rank": 2
+    }
+  ],
   "excluded_locked": [
     [
       "GALAXYSURF",
       "Locked at Upper Circuit +20%"
+    ],
+    [
+      "E2E",
+      "Locked at Upper Circuit +5%"
     ]
   ],
   "enterable": true
