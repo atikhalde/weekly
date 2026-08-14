@@ -1,14 +1,30 @@
 {
   "date": "2026-08-14",
-  "scan_time": "02:04",
-  "generated_at_ist": "2026-08-14T02:04:23",
+  "scan_time": "12:07",
+  "generated_at_ist": "2026-08-14T12:07:18",
   "too_late": false,
   "too_early": true,
-  "top3_actionable": [],
+  "top3_actionable": [
+    {
+      "symbol": "SJS",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 6/8",
+      "arm": "ant_below",
+      "pre": 6,
+      "price": 2570.0,
+      "qty": 38,
+      "invest": 97660.0,
+      "day_ret": 6.4446696466978315,
+      "rvol": 2.5581206797114655,
+      "close_pos": 0.9497206703910615,
+      "gap_pct": 0.7722007722007722,
+      "prime": "\u2b50 Prime #1"
+    }
+  ],
   "next_anticipated": [],
   "excluded_locked": [
     [
-      "JUBLCPL",
+      "GALAXYSURF",
       "Locked at Upper Circuit +20%"
     ]
   ],
