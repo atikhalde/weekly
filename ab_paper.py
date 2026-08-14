@@ -570,9 +570,23 @@ def load_alert_selection(root: Path | str | None = None) -> dict[str, set[str]]:
         # A snapshot from a run that could not actually enter (post-close
         # review, or a scan outside the 15:00-15:30 window) describes a list
         # nobody could have bought. It must never define the tradeable set -
-        # otherwise the 2026-08-13 20:39 review would have become "the
-        # alert". Absent an enterable snapshot the day is simply ungated.
+        # otherwise the 2026-08-13 20:39 review would have become "the alert".
+        #
+        # BUG 81, 2026-08-14: `continue` here left the day UNGATED, which is
+        # the opposite of safe. Ungated means ab_paper falls back to replaying
+        # the raw picks CSVs, so 2026-08-13 - a day whose only scans ran after
+        # the close, where every ledger row was correctly NO_FILL/qty 0 - got
+        # its MOREPENLAB, PRECWIRE and MUNJALAU picks booked as REAL FILLS on
+        # the next day's run, once the 08-14 candle existed to resolve them.
+        # The report then showed -4,405 of "realized" P&L on trades that were
+        # never entered, and the KPI header jumped 33 -> 36 closed trades.
+        #
+        # A non-enterable snapshot is positive evidence that NOTHING was
+        # tradeable that day, so it must gate to the EMPTY set. Only the
+        # ABSENCE of any snapshot leaves a day ungated (historical backfill
+        # before write_alert_state() shipped).
         if not bool(state.get("enterable", True)):
+            out.setdefault(day, set())
             continue
         syms = {str(a.get("symbol", "")).strip().upper()
                 for a in (state.get("top3_actionable") or [])
