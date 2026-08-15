@@ -263,13 +263,25 @@ def test_after_close_review_no_longer_marks_picks_tradeable():
 
 
 def test_review_snapshot_never_defines_the_tradeable_set(tmp_path):
-    """A post-close snapshot must not become 'the alert'."""
+    """A post-close snapshot must not become 'the alert'.
+
+    BUG 81 refinement: the original assertion here was `== {}`, i.e. "leave
+    the day ungated". That encoded the bug - an ungated day falls back to
+    replaying the raw picks CSVs, which is how 2026-08-13 ended up booking
+    trades nobody entered. The requirement was always that the REVIEW'S
+    PICKS must not become tradeable; the correct expression of that is an
+    empty gate for the day, not the absence of a gate.
+    """
     import json
     (tmp_path / "btst_alert_state_2026-08-13.json").write_text(json.dumps({
         "date": "2026-08-13", "scan_time": "20:39", "enterable": False,
         "top3_actionable": [{"symbol": "KMEW"}, {"symbol": "MUNJALAU"}],
     }))
-    assert ab_paper.load_alert_selection(tmp_path) == {}
+    sel = ab_paper.load_alert_selection(tmp_path)
+    assert sel.get("2026-08-13") == set(), \
+        "the review's own picks must never be tradeable"
+    assert "KMEW" not in sel.get("2026-08-13", set())
+    assert "MUNJALAU" not in sel.get("2026-08-13", set())
 
 
 def test_enterable_snapshot_is_used(tmp_path):
@@ -637,3 +649,81 @@ def test_premarket_scan_is_not_reported_as_the_days_verdict():
     assert 'too_early = bool(alert_state.get("too_early", False))' in src
     assert "PROVISIONAL - PRE-MARKET SCAN" in src
     assert "The 15:20 scan decides." in src
+
+
+# ---------------------------------------------------------------------------
+# 12. BUG 81 - a day nobody could enter must never book trades
+#
+# 2026-08-13's only scans ran after the close (enterable=False, too_late).
+# load_alert_selection() used to `continue` past such a snapshot, which left
+# the day UNGATED - and an ungated day falls back to replaying the raw picks
+# CSVs. The 08-13 rows sat correctly at qty=0/NO_FILL until the 08-14 candle
+# arrived, at which point the resolver filled them in and the report booked
+# MOREPENLAB, PRECWIRE and MUNJALAU as realized closed trades worth -4,405
+# on a day the user entered nothing.
+# ---------------------------------------------------------------------------
+
+def _snap(day, enterable, syms, scan="15:20"):
+    return {"date": day, "scan_time": scan, "enterable": enterable,
+            "top3_actionable": [{"symbol": s} for s in syms]}
+
+
+def test_a_non_enterable_day_gates_to_empty_not_ungated(tmp_path):
+    """The 2026-08-13 bug: post-close review must mean 'nothing was buyable'."""
+    import json
+    from ab_paper import load_alert_selection
+    (tmp_path / "btst_alert_state_2026-08-13.json").write_text(
+        json.dumps(_snap("2026-08-13", False, ["KMEW", "MUNJALAU"], "22:56")))
+    sel = load_alert_selection(tmp_path)
+    # present in the mapping (so the day IS gated) but empty (so nothing fills)
+    assert "2026-08-13" in sel, "a non-enterable day must still be gated"
+    assert sel["2026-08-13"] == set(), \
+        "a day nobody could enter must gate to the empty set, not its picks"
+
+
+def test_absent_snapshot_still_leaves_a_day_ungated(tmp_path):
+    """Only the ABSENCE of a snapshot may leave a day ungated (backfill)."""
+    from ab_paper import load_alert_selection
+    assert load_alert_selection(tmp_path) == {}
+
+
+def test_an_enterable_snapshot_wins_over_a_post_close_review(tmp_path):
+    """A real 15:20 alert must survive an archived post-close review, and the
+    result must not depend on which file the glob happens to read first."""
+    import json
+    from ab_paper import load_alert_selection
+    for live, arch in ((True, False), (False, True)):
+        d = tmp_path / f"case_{live}"
+        d.mkdir()
+        (d / "btst_alert_state.json").write_text(
+            json.dumps(_snap("2026-08-13", live, ["REAL"] if live else ["REVIEW"])))
+        (d / "btst_alert_state_2026-08-13.json").write_text(
+            json.dumps(_snap("2026-08-13", arch, ["REAL"] if arch else ["REVIEW"])))
+        assert load_alert_selection(d)["2026-08-13"] == {"REAL"}
+
+
+def test_no_2026_08_13_btst_rows_survive_in_the_shipped_ledger():
+    """The phantom trades must be evicted from the committed ledger itself."""
+    import pandas as pd
+    led = pd.read_csv(ROOT / "ab_ledger.csv")
+    day = led[led["signal_date"].astype(str) == "2026-08-13"]
+    live = day[day["model"].isin(["E_btst", "E_btst_wide",
+                                  "F_anticipate", "F_anticipate_only"])]
+    assert live.empty, (
+        "2026-08-13 was not enterable - no BTST/anticipate row may remain:\n"
+        f"{live[['model', 'symbol', 'qty', 'exit_reason', 'pnl']]}")
+
+
+def test_yesterday_section_skips_a_no_entry_session():
+    """compute_yesterday_results() must fall back to the last session that
+    actually traded (2026-08-12), never invent a 2026-08-13 result set."""
+    import pandas as pd
+    from pdf_report import compute_yesterday_results
+    led = pd.read_csv(ROOT / "ab_ledger.csv")
+    rows = compute_yesterday_results(led, "2026-08-14")
+    assert rows, "expected the 08-12 cohort to be reported"
+    assert all(r["entry_date"] != "2026-08-13" for r in rows), \
+        "a session with zero entries must never appear as realized results"
+    for phantom in ("MOREPENLAB", "PRECWIRE", "MUNJALAU"):
+        assert not any(r["symbol"] == phantom and r["entry_date"] == "2026-08-13"
+                       for r in rows), f"{phantom} was never entered on 08-13"
