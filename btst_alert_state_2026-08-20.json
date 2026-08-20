@@ -1,49 +1,49 @@
 {
   "date": "2026-08-20",
-  "scan_time": "13:26",
-  "generated_at_ist": "2026-08-20T13:26:48",
+  "scan_time": "14:50",
+  "generated_at_ist": "2026-08-20T14:50:11",
   "too_late": false,
   "too_early": true,
   "top3_actionable": [
     {
-      "symbol": "NETWEB",
+      "symbol": "GAEL",
       "badge": "\ud83d\udd2d Anticipate",
       "tier": "PRE 7/8",
-      "arm": "ant_above",
+      "arm": "ant_below",
       "pre": 7,
-      "price": 5416.0,
-      "qty": 18,
-      "invest": 97488.0,
-      "day_ret": 6.054676257892222,
-      "rvol": 2.2690507688762835,
-      "close_pos": 0.9207525655644236,
-      "gap_pct": -2.789903207439742,
-      "prime": ""
+      "price": 181.77000427246094,
+      "qty": 550,
+      "invest": 99973.50234985352,
+      "day_ret": 4.465519696816633,
+      "rvol": 1.1226176222922781,
+      "close_pos": 0.9756360521126305,
+      "gap_pct": 1.2280576655039264,
+      "prime": "\u2b50 Prime #1"
     },
     {
-      "symbol": "SAILIFE",
+      "symbol": "DBOL",
       "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 6/8",
+      "tier": "PRE 8/8",
       "arm": "ant_above",
-      "pre": 6,
-      "price": 1480.0,
-      "qty": 67,
-      "invest": 99160.0,
-      "day_ret": 2.7135800488196526,
-      "rvol": 0.8061612318467772,
-      "close_pos": 0.9121338912133881,
-      "gap_pct": -0.3389830508474576,
+      "pre": 8,
+      "price": 138.32000732421875,
+      "qty": 722,
+      "invest": 99867.04528808594,
+      "day_ret": 5.5797367558865,
+      "rvol": 8.55480308728508,
+      "close_pos": 0.9369793627635542,
+      "gap_pct": -5.805868465335539,
       "prime": ""
     }
   ],
   "next_anticipated": [],
   "excluded_locked": [
     [
-      "STYLEBAAZA",
-      "Locked at Upper Circuit +10%"
+      "KRONOX",
+      "Locked at Upper Circuit +20%"
     ],
     [
-      "EPL",
+      "PRABHA",
       "Locked at Upper Circuit +5%"
     ]
   ],
