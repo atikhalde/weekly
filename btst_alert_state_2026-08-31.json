@@ -1,57 +1,39 @@
 {
   "date": "2026-08-31",
-  "scan_time": "14:23",
-  "generated_at_ist": "2026-08-31T14:23:26",
+  "scan_time": "15:04",
+  "generated_at_ist": "2026-08-31T15:04:00",
   "too_late": false,
-  "too_early": true,
-  "top3_actionable": [
+  "too_early": false,
+  "top3_actionable": [],
+  "next_anticipated": [
     {
-      "symbol": "SUVEN",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 7/8",
-      "arm": "ant_below",
-      "pre": 7,
-      "price": 387.25,
-      "qty": 258,
-      "invest": 99910.5,
-      "day_ret": 4.945799457994582,
-      "rvol": 0.9017385390224679,
-      "close_pos": 0.9233716654292045,
-      "gap_pct": 0.6796598968883105,
-      "prime": "\u2b50 Prime #1"
-    },
-    {
-      "symbol": "LUMAXTECH",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 6/8",
-      "arm": "ant_below",
+      "symbol": "AVALON",
+      "close": 2355.0,
+      "level": 2351.0,
+      "which": "C+D",
+      "gap_pct": -0.1701403658017865,
+      "side": "above",
       "pre": 6,
-      "price": 2086.5,
-      "qty": 47,
-      "invest": 98065.5,
-      "day_ret": 4.90196078431373,
-      "rvol": 1.1439842977345205,
-      "close_pos": 0.9797734627831715,
-      "gap_pct": 1.113744075829384,
-      "prime": "\u2b50 Prime #1"
-    },
-    {
-      "symbol": "CYIENTDLM",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 6/8",
-      "arm": "ant_below",
-      "pre": 6,
-      "price": 836.2000122070312,
-      "qty": 119,
-      "invest": 99507.80145263672,
-      "day_ret": 2.2374357802567246,
-      "rvol": 0.5581770292702096,
-      "close_pos": 0.9574973366477273,
-      "gap_pct": 0.011954512423387667,
-      "prime": "\u2b50 Prime #1"
+      "ret_12m": 183.49584271019305,
+      "dist_200dma": 84.24278233901357,
+      "day_ret": 4.853072128227964,
+      "prev_close": 2231.699951171875,
+      "high": 2356.300048828125,
+      "close_pos": 0.9920388950434833,
+      "rvol": 0.8727680080382217,
+      "vol_today": 381636.0,
+      "vma50": 437270.84,
+      "vma_bars": 50,
+      "atr_pct": 5.009098810827077,
+      "turnover_cr": 118.90980929996033,
+      "partial_frac": 1.0,
+      "base_from_high": -5.074438486947042,
+      "ret_3m_prior": 47.229177944493195,
+      "ok": true,
+      "mcap_cr": 15616.24,
+      "rank": 1
     }
   ],
-  "next_anticipated": [],
   "excluded_locked": [
     [
       "MODISONLTD",
@@ -60,6 +42,10 @@
     [
       "BIRLACABLE",
       "Locked at Upper Circuit +10%"
+    ],
+    [
+      "AVALON",
+      "Locked at Upper Circuit +5%"
     ]
   ],
   "enterable": true
