@@ -1,56 +1,55 @@
 {
   "date": "2026-08-31",
-  "scan_time": "15:20",
-  "generated_at_ist": "2026-08-31T15:20:27",
+  "scan_time": "15:21",
+  "generated_at_ist": "2026-08-31T15:21:58",
   "too_late": false,
   "too_early": false,
   "top3_actionable": [
-    {
-      "symbol": "LUMAXTECH",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 6/8",
-      "arm": "ant_below",
-      "pre": 6,
-      "price": 2083.800048828125,
-      "qty": 47,
-      "invest": 97938.60229492188,
-      "day_ret": 4.766216632887121,
-      "rvol": 1.5442093069781484,
-      "close_pos": 0.9072800676484667,
-      "gap_pct": 1.2417038470082937,
-      "prime": "\u2b50 Prime #1"
-    },
     {
       "symbol": "CYIENTDLM",
       "badge": "\ud83d\udd2d Anticipate",
       "tier": "PRE 6/8",
       "arm": "ant_above",
       "pre": 6,
-      "price": 843.0499877929688,
+      "price": 842.7999877929688,
       "qty": 118,
-      "invest": 99479.89855957031,
-      "day_ret": 3.0749434684176125,
-      "rvol": 0.7605365010692415,
-      "close_pos": 0.9054438928933859,
-      "gap_pct": -0.8071266409812509,
-      "prime": ""
-    },
-    {
-      "symbol": "PARAGMILK",
-      "badge": "\ud83d\udfe2 Confirmed",
-      "tier": "B",
-      "arm": "fresh_B",
-      "pre": 4,
-      "price": 255.17999267578125,
-      "qty": 391,
-      "invest": 99775.37713623047,
-      "day_ret": 6.769871412460771,
-      "rvol": 4.551335479415689,
-      "close_pos": 0.9843654978716937,
+      "invest": 99450.39855957031,
+      "day_ret": 3.0443773854566647,
+      "rvol": 0.7643465757708036,
+      "close_pos": 0.9006683437052293,
+      "gap_pct": -0.7772330616856491,
       "prime": ""
     }
   ],
-  "next_anticipated": [],
+  "next_anticipated": [
+    {
+      "symbol": "AVALON",
+      "close": 2390.0,
+      "level": 2351.0,
+      "which": "C+D",
+      "gap_pct": -1.658868566567418,
+      "side": "above",
+      "pre": 6,
+      "ret_12m": 187.70915672074798,
+      "dist_200dma": 86.9554015793469,
+      "day_ret": 6.411398040961713,
+      "prev_close": 2231.699951171875,
+      "high": 2391.300048828125,
+      "close_pos": 0.9934440317296552,
+      "rvol": 1.0908570990007016,
+      "vol_today": 477000.0,
+      "vma50": 437270.84,
+      "vma_bars": 50,
+      "atr_pct": 5.040346317781493,
+      "turnover_cr": 120.11619539996033,
+      "partial_frac": 1.0,
+      "base_from_high": -5.074438486947042,
+      "ret_3m_prior": 47.229177944493195,
+      "ok": true,
+      "mcap_cr": 15616.24,
+      "rank": 2
+    }
+  ],
   "excluded_locked": [
     [
       "DIFFNKG",
@@ -62,6 +61,10 @@
     ],
     [
       "BIRLACABLE",
+      "Locked at Upper Circuit +10%"
+    ],
+    [
+      "AVALON",
       "Locked at Upper Circuit +5%"
     ]
   ],
