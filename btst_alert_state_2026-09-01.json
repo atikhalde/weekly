@@ -1,7 +1,7 @@
 {
   "date": "2026-09-01",
-  "scan_time": "15:16",
-  "generated_at_ist": "2026-09-01T15:16:24",
+  "scan_time": "15:20",
+  "generated_at_ist": "2026-09-01T15:20:23",
   "too_late": false,
   "too_early": false,
   "top3_actionable": [
@@ -11,13 +11,13 @@
       "tier": "PRE 6/8",
       "arm": "ant_above",
       "pre": 6,
-      "price": 2558.60009765625,
+      "price": 2559.0,
       "qty": 39,
-      "invest": 99785.40380859375,
-      "day_ret": 6.71950355187696,
-      "rvol": 1.839904302970711,
-      "close_pos": 0.9434787916100543,
-      "gap_pct": -4.693326236581955,
+      "invest": 99801.0,
+      "day_ret": 6.736183524504691,
+      "rvol": 1.9159276069274207,
+      "close_pos": 0.9456521739130435,
+      "gap_pct": -4.709689523121084,
       "prime": ""
     }
   ],
