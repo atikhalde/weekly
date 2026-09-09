@@ -1,63 +1,57 @@
 {
   "date": "2026-09-09",
-  "scan_time": "15:16",
-  "generated_at_ist": "2026-09-09T15:16:25",
+  "scan_time": "15:20",
+  "generated_at_ist": "2026-09-09T15:20:32",
   "too_late": false,
   "too_early": false,
   "top3_actionable": [
-    {
-      "symbol": "INDNIPPON",
-      "badge": "\ud83d\udfe2 Confirmed",
-      "tier": "A",
-      "arm": "fresh_A",
-      "pre": 5,
-      "price": 1344.5999755859375,
-      "qty": 74,
-      "invest": 99500.39819335938,
-      "day_ret": 20.04285375352868,
-      "rvol": 28.33953004806654,
-      "close_pos": 0.9910827007276113,
-      "prime": "\ud83d\udd25 Prime #2"
-    },
-    {
-      "symbol": "CONFIPET",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 7/8",
-      "arm": "ant_above",
-      "pre": 7,
-      "price": 90.87000274658203,
-      "qty": 1100,
-      "invest": 99957.00302124023,
-      "day_ret": 9.153156452350796,
-      "rvol": 4.477434429267858,
-      "close_pos": 0.9483172899696314,
-      "gap_pct": -2.945515126764033,
-      "prime": ""
-    },
     {
       "symbol": "ARTEMISMED",
       "badge": "\ud83d\udd2d Anticipate",
       "tier": "PRE 8/8",
       "arm": "ant_above",
       "pre": 8,
-      "price": 354.3999938964844,
+      "price": 354.45001220703125,
       "qty": 282,
-      "invest": 99940.7982788086,
-      "day_ret": 3.929616978441164,
-      "rvol": 1.993617046272543,
-      "close_pos": 0.9230766341531981,
-      "gap_pct": -4.4503408920631085,
+      "invest": 99954.90344238281,
+      "day_ret": 3.9442851047012395,
+      "rvol": 2.035154572892659,
+      "close_pos": 0.9256416749168446,
+      "gap_pct": -4.465082510791783,
+      "prime": ""
+    },
+    {
+      "symbol": "RACLGEAR",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_above",
+      "pre": 7,
+      "price": 1638.699951171875,
+      "qty": 61,
+      "invest": 99960.69702148438,
+      "day_ret": 7.10457197201797,
+      "rvol": 2.2575457247750395,
+      "close_pos": 0.927024119395855,
+      "gap_pct": -1.2856126116535158,
       "prime": ""
     }
   ],
   "next_anticipated": [],
   "excluded_locked": [
     [
+      "INDNIPPON",
+      "Locked at Upper Circuit +20%"
+    ],
+    [
       "GOACARBON",
       "Locked at Upper Circuit +20%"
     ],
     [
       "ELLEN",
+      "Locked at Upper Circuit +10%"
+    ],
+    [
+      "CHENNPETRO",
       "Locked at Upper Circuit +10%"
     ],
     [
