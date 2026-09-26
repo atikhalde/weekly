@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -237,12 +237,112 @@ class Secrets:
 
 
 @dataclass
+class OBPrecision:
+    """
+    Inputs for the precision order-block tap scanner (`ob_tap_scan.py`).
+
+    Two halves live in one block on purpose:
+
+    * the RUNTIME knobs below, which belong to the scanner (how often it is
+      allowed to pull history, what it alerts on, where its state file is); and
+    * the INDICATOR inputs, which are a field-for-field mirror of `precision.txt`
+      ("Institutional OB — Precision Tap & Pre-Order"). `params()` hands those to
+      `ob_precision.OBParams`, which validates them and refuses unknown keys, so
+      a typo here fails loudly at start-up instead of silently changing the
+      strategy.
+
+    The scanner is additive: nothing else in the repo reads this section, and
+    `enabled: false` turns the whole thing off without touching any other job.
+    """
+
+    # --- scanner runtime -----------------------------------------------------
+    enabled: bool = True
+    # Its OWN state file. state.json belongs to scan.py and is read-only here.
+    state_file: str = "ob_precision_state.json"
+    # Daily bars per symbol. 250 sessions is ~one year: enough for ATR(14),
+    # sma(volume,20) and a meaningful set of order blocks, and short enough
+    # that a 370-name backfill fits inside the workflow's rate limits.
+    sessions: int = 250
+    # Cap on per-symbol history calls in ONE run. The backfill spreads over
+    # several runs rather than blowing the 12-minute job timeout; every run
+    # after the first only refreshes names whose session has not been replayed.
+    max_refresh_per_run: int = 250
+    # How many retained weeks of state.json to seed the waiting list from.
+    # state.py prunes to six weeks, so this is the full backfill.
+    backfill_weeks: int = 6
+    quote_batch: int = 1000          # Dhan's OHLC limit per request
+    # Which events reach Telegram. "ob" = a new precision order block,
+    # "tap" = price tapped the pre-order level. "approach" / "confirm" /
+    # "invalid" are computed and can be switched on, but are noisy by default.
+    alert_kinds: list[str] = field(default_factory=lambda: ["ob", "tap"])
+    alert_taps: list[int] = field(default_factory=lambda: [1])
+    # On the FIRST refresh a symbol replays a year of history, which contains
+    # order blocks born months ago. Only closed-bar events from this many days
+    # back are alertable, so the backfill cannot bury the chat. Live events
+    # (today's developing bar) are never filtered.
+    event_lookback_days: int = 5
+    # "Until tapped or invalidated": take the name off the active list on the
+    # first alerted tap. The record is kept for audit either way.
+    resolve_on_tap: bool = True
+
+    # --- indicator inputs (precision.txt, defaults unchanged) ----------------
+    # 1: volume-confirmed displacement
+    vol_len: int = 20
+    atr_len: int = 14
+    min_rvol: float = 1.8
+    min_range_atr: float = 1.20
+    min_body_frac: float = 0.55
+    min_clv: float = 0.72
+    structure_len: int = 8
+    origin_search: int = 8
+    allow_neutral: bool = True
+    neutral_body: float = 0.20
+    # 2: exact order-block zone
+    zone_method: str = "Open to low"
+    entry_mode: str = "Proximal"
+    front_run_mode: str = "Auto"
+    front_run_atr: float = 0.18
+    front_run_ticks: int = 2
+    max_zone_buffer: float = 0.40
+    entry_offset_ticks: int = 0
+    stop_atr: float = 0.15
+    approach_atr: float = 0.25
+    min_age: int = 3
+    max_zones: int = 30
+    max_touches: int = 4
+    raise_after_first_tap: bool = True
+    repeat_tap_atr: float = 0.05
+    require_departure: float = 1.0
+    # 3: optional defence confirmation
+    confirm_bars: int = 3
+    confirm_rvol: float = 1.3
+    confirm_clv: float = 0.65
+    confirm_bos_len: int = 3
+    require_sweep: bool = False
+    sweep_len: int = 5
+    # execution details Pine takes from the chart
+    mintick: float = 0.05
+    # Deviation #1: freeze the developing bar's thresholds at the last CLOSED
+    # ATR, so an intraday alert can never be retracted by a later ATR move.
+    live_atr_from_closed: bool = True
+
+    def params(self):
+        """The indicator half of this block, as a validated `OBParams`."""
+        from ob_precision import OBParams     # local: keeps config.py import-light
+        known = set(OBParams.__dataclass_fields__)
+        return OBParams.from_mapping(
+            {k: v for k, v in asdict(self).items() if k in known})
+
+
+@dataclass
 class Config:
     strategy: Strategy
     universe: Universe
     runtime: Runtime
     secrets: Secrets
     paths: dict[str, Path]
+    # Last and defaulted, so every existing Config(...) construction keeps working.
+    ob_precision: OBPrecision = field(default_factory=OBPrecision)
 
 
 def _section(raw: dict[str, Any], key: str) -> dict[str, Any]:
@@ -269,6 +369,9 @@ def load_config(path: str | Path | None = None) -> Config:
     strategy = _build(Strategy, _section(raw, "strategy"))
     universe = _build(Universe, _section(raw, "universe"))
     runtime = _build(Runtime, _section(raw, "runtime"))
+    # Optional: an absent section means "every default", so an older config.yaml
+    # keeps working unchanged. Unknown keys inside it still raise, via _build.
+    ob_precision = _build(OBPrecision, _section(raw, "ob_precision"))
 
     if strategy.gate_source not in ("live", "closed"):
         raise ValueError("strategy.gate_source must be 'live' or 'closed'")
@@ -292,6 +395,10 @@ def load_config(path: str | Path | None = None) -> Config:
         "universe": base / "universe.csv",
         "state": base / "state.json",
         "mcap": base / "mcap.csv",
+        # The precision-OB scanner's OWN state (waiting list, zone cache, alert
+        # de-dupe keys). Deliberately a separate file: state.json is scan.py's,
+        # and two jobs writing one file is how alert history gets lost.
+        "ob_state": base / ob_precision.state_file,
     }
     return Config(strategy=strategy, universe=universe, runtime=runtime,
-                  secrets=secrets, paths=paths)
+                  secrets=secrets, paths=paths, ob_precision=ob_precision)

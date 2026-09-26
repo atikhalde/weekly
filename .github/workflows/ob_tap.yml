@@ -1,0 +1,143 @@
+name: Precision OB Tap (5m)
+
+# Stage 2 behind "Intraday Scan (5m)": every name scan.py flagged as a weekly
+# breakout goes on a waiting list, and THIS job watches that list for a tap of
+# the precision order block from precision.txt.
+#
+# NSE cash session 09:15-15:30 IST == 03:45-10:00 UTC. The cron matches
+# scan.yml's on purpose: the tap is an intraday event, so it is worth exactly as
+# much as the five minutes it took to notice it.
+#
+# Cost shape (see ob_tap_scan.py): one daily-history call per waiting symbol per
+# SESSION, then one BULK quote for the whole list on every later run. A missed
+# slot never loses a tap permanently - the session's low is still in the next
+# quote - but it does delay the alert, which is the whole point of the schedule.
+on:
+  schedule:
+    - cron: "*/5 3-10 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even outside market hours"
+        type: boolean
+        default: false
+      heartbeat:
+        description: "Send a Telegram summary even with 0 alerts"
+        type: boolean
+        default: false
+      refresh_only:
+        description: "Rebuild the order-block cache, skip the live tap pass"
+        type: boolean
+        default: false
+      symbols:
+        description: "Comma-separated subset (blank = whole waiting list)"
+        type: string
+        default: ""
+  # BUG 55's lesson: on 03-Aug every cron-only workflow had zero scheduled runs.
+  # An external scheduler can drive this job on time when GitHub's does not. A
+  # dispatch does NOT imply --force: ob_tap_scan.py applies the same market-hours
+  # gate it applies to cron, so an outside trigger behaves exactly like the slot
+  # it is replacing. Use workflow_dispatch + force for an out-of-hours run.
+  repository_dispatch:
+    types: [ob_tap]
+
+concurrency:
+  group: ob-tap
+  cancel-in-progress: false        # let a slow run finish; never overlap
+
+permissions:
+  contents: write                  # to commit ob_precision_state.json
+
+jobs:
+  ob-tap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Shallow is fine: the waiting list and the zone cache come from the
+          # committed ob_precision_state.json, and the weekly alerts come from
+          # the committed state.json. Neither needs history.
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # The order-block logic is a Pine port with hand-derived expectations, and
+      # a silently wrong port would send confidently wrong price levels to a
+      # live chat. These tests are pure CPU and take about a second, so they run
+      # BEFORE any market data is fetched: a red test blocks the scan.
+      - name: Verify the order-block port
+        run: |
+          pip install "pytest>=8.0,<9.0"
+          python -m pytest test_ob_precision.py test_ob_tap_scan.py -q
+
+      # NOTE: deliberately NO actions/cache step for the state file, for the
+      # same reason scan.yml has none - a cache restore runs AFTER checkout and
+      # could overwrite fresh state with an older copy, which would re-alert a
+      # tap that was already sent.
+      - name: Run precision OB tap scan
+        env:
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python ob_tap_scan.py \
+            ${{ inputs.force && '--force' || '' }} \
+            ${{ inputs.heartbeat && '--heartbeat' || '' }} \
+            ${{ inputs.refresh_only && '--refresh-only' || '' }} \
+            ${{ inputs.symbols && format('--symbols {0}', inputs.symbols) || '' }}
+
+      # state.json is NOT committed here: it belongs to the intraday scan, and
+      # this job only reads it. Committing it from two workflows is how alert
+      # history gets lost in a rebase.
+      - name: Persist OB state
+        if: always()
+        run: |
+          if [[ -z "$(git status --porcelain ob_precision_state.json)" ]]; then
+            echo "no ob state change"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ob_precision_state.json
+          git commit -m "chore: precision OB state $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+
+          # The intraday scan (or the snapshot job) may have pushed meanwhile.
+          # Retry rebase+push a few times; losing this commit would let an
+          # already-sent tap fire again on the next run.
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin "${{ github.ref_name }}" \
+               && git push; then
+              echo "ob state pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push attempt $attempt failed - retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::warning::could not push ob_precision_state.json; the next run may re-alert"
+
+      # NOTE: a step's `if:` cannot read an `env:` defined on that same step, so
+      # the token check has to happen inside `run:`, not in the condition.
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
+            echo "Telegram secrets not set - skipping failure notice"
+            exit 0
+          fi
+          MSG=$'⚠️ <b>Precision OB scan failed</b>\n'"Check the log: ${RUN_URL}"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "text=${MSG}" > /dev/null

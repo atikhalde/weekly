@@ -92,6 +92,46 @@ Everything else stays **identical to the scan job**:
 Save → **TEST RUN** → expect **HTTP 204** (success, empty body). Then check the
 repo's **Actions** tab to confirm the run appeared.
 
+### 4. (New) Precision OB tap — every 5 minutes, market hours
+
+`ob_tap.yml` is **stage 2** behind the intraday scan: it keeps the waiting list
+of names `scan.py` flagged as weekly breakouts, and watches each one for a tap of
+the precision order block from `precision.txt`. When price touches the pre-order
+entry it sends `🟠 TAP 1 — SYMBOL`; when a new order block forms it sends
+`🎯 PRECISION OB — SYMBOL`. See README → *Stage 2 — precision order-block taps*.
+
+It is a 5-minute intraday job, so its relationship with GitHub's scheduler is the
+same as `scan.yml`'s: a skipped slot does not *lose* the tap (the session low is
+still in the next quote), but it delays the alert — and a delayed intrabar alert
+is worth less than a prompt one.
+
+| # | Title | URL (append to `https://api.github.com/repos/atikhalde/weekly/actions/workflows/`) | Schedule |
+|---|---|---|---|
+| 4 | NSE 5m precision OB tap | `ob_tap.yml/dispatches` | **every 5 min, 09:15–15:30, Mon–Fri** |
+
+Everything else identical to your existing scan job (POST, same headers,
+`{"ref":"main"}`). A dispatch does **not** imply `--force`: `ob_tap_scan.py`
+applies the same market-hours gate it applies to cron, so an outside trigger
+behaves exactly like the slot it is replacing.
+
+Three notes:
+
+- Your working 5-minute scan job already proves the free tier can do this, so
+  job 4 is one more clone of the same thing, not a new kind of job. If you would
+  rather not add it, `ob_tap.yml` also carries a GitHub `schedule:` and will run
+  — late or skipped on busy days, like everything else on that scheduler.
+- The **first run of the session is the expensive one**: a daily-history call per
+  waiting symbol (~370 names after the backfill), capped by
+  `ob_precision.max_refresh_per_run` and rolled over the following runs. Every
+  later run is one bulk quote for the whole list.
+- The very first run ever seeds the waiting list from all six weeks `state.json`
+  still holds. Historical order blocks are **not** dumped into the chat — only
+  closed-bar events from the last `event_lookback_days` (5) are alertable.
+- A **total data outage** — two or more history refreshes due and every one of
+  them failing — exits `3`, so the workflow's failure notice reaches Telegram
+  once (at most once a day; see README → *Failure behaviour*). A single broken
+  symbol never trips it: that run stays green and logs a warning.
+
 ### Why 15:18 and not 15:20
 
 The request is instant, but the GitHub runner needs ~45–60 s to boot and
@@ -124,6 +164,9 @@ an outage. They cannot cause double-runs:
 - `concurrency:` groups in each workflow prevent overlapping runs
 - `state.json` de-duplicates alerts
 - the BTST picks file de-duplicates on `(date, symbol)`
+- `ob_precision_state.json` de-duplicates precision-OB alerts on
+  `(symbol, zone, kind, tap number)` — and `ob_tap_scan.py` treats `state.json`
+  as **read-only**, so the two 5-minute jobs can never fight over it
 
 ---
 

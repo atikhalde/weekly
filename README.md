@@ -87,10 +87,134 @@ well under a minute.
 | `state.py` | Cross-run de-duplication |
 | `telegram.py` | Alert formatting and delivery |
 | `config.py` | Settings loader |
+| `precision.txt` | The Pine v6 order-block indicator this repo ports (source of truth) |
+| `ob_precision.py` | Pine-exact port of `precision.txt`: displacement → order block → tap |
+| `ob_tap_scan.py` | Stage-2 scanner (5-min cron): taps of the weekly-breakout waiting list |
 
 **Flat layout:** every Python file is in the repo root; `.github/workflows/` is
 the only folder. Generated files (`weekly_snapshot.csv`, `state.json`,
-`universe.csv`) are written to the root too.
+`universe.csv`, `ob_precision_state.json`) are written to the root too.
+
+---
+
+## Stage 2 — precision order-block taps (`ob_tap_scan.py`)
+
+The weekly scanner answers *"which stocks broke their 26-week high?"* — on the
+week of 07-Sep-2026 that was 67 names, and most went nowhere. Stage 2 answers
+the follow-up:
+
+> **Of the stocks the weekly scanner already flagged, which one has pulled back
+> into a precise institutional order block and is being defended right now?**
+
+```
+scan.py marks state.json  ──►  WAITING LIST  (this scanner's own state file)
+                                     │
+              daily bars ──► volume-confirmed displacement
+                                     │
+                          nearest bearish origin candle
+                                     │
+                                     ▼
+                       🎯 PRECISION OB  (zone frozen for life)
+                                     │  armed once price departs by 1×ATR
+                                     │  and the zone is ≥ 3 sessions old
+                                     ▼
+                  live intraday low taps the pre-order entry
+                                     │
+                                     ▼
+                        🟠 TAP 1  ──►  Telegram
+```
+
+The zone logic is a **Pine-exact port of `precision.txt`** (*"Institutional OB —
+Precision Tap & Pre-Order"*, Pine v6). Every input of that indicator is a key in
+the `ob_precision:` block of `config.yaml`, at the file's own defaults.
+
+### It does not repaint
+
+An intraday alert that later disappears is worse than no alert, so three rules
+are enforced (and tested):
+
+| Rule | Why |
+| --- | --- |
+| A zone is born **only on a closed daily bar** | a developing bar's shape is not known yet; `barstate.isconfirmed` in Pine |
+| Zone geometry is **frozen at birth** — top, bottom, entry, stop never move | re-deriving them from a shifting window is what makes indicators repaint |
+| Live thresholds use the **last closed ATR**, not the forming bar's | deviation #1: otherwise the tap level drifts as the day develops |
+
+A tap is judged from the session's actual low, and a session low can only go
+lower — so once a tap has fired it can never be retracted. Live events are
+stamped *"live intrabar touch — not close-confirmed"* so you can tell them from
+a closed-bar touch.
+
+### The waiting list outlives `state.json`
+
+`state.py` prunes to six weeks. A name stays on the waiting list **until tapped
+or invalidated**, with no calendar limit, so the list lives in this scanner's own
+`ob_precision_state.json` and keeps the 26-week level it broke — the weekly
+snapshot is overwritten every Monday, so that number is otherwise unrecoverable.
+`state.json` is **read-only** here; only `scan.py` writes it.
+
+Once every order block a name produced has been invalidated or exhausted
+(5 touches, or a close below the structural stop), it is marked `invalid` and
+drops off the active list. The record is kept for audit.
+
+### What it costs
+
+Daily history is one call **per symbol**, so it is paid once per session; every
+later run in the day judges the live tap from **one bulk quote** for the whole
+list, and symbols with no live zone are not quoted at all.
+
+| Run | Cost |
+| --- | --- |
+| first of the session | 1 daily-history call per waiting symbol (capped by `max_refresh_per_run`, rolls over) |
+| every later run | 1 bulk OHLC request per 1,000 quoted symbols |
+| after 15:35 IST | one more history call per symbol, so today's closed bar can create/confirm zones the same evening |
+
+The first run backfills every week `state.json` still retains (~370 names),
+spread over several runs by the cap. Historical order blocks are **not** dumped
+into the chat: only closed-bar events from the last `event_lookback_days` are
+alertable, and live taps are always new.
+
+### Alerts
+
+Two kinds, both restricted to waiting-list names, both de-duplicated across runs
+by `(symbol, zone, kind, tap number)`:
+
+- `🎯 PRECISION OB — SYMBOL` — a new order block, with zone top/bottom, the
+  pre-order entry, the structural stop, ATR/RVOL, and the weekly breakout it
+  came from
+- `🟠 TAP 1 — SYMBOL` — price tapped that entry, with the session low, LTP, the
+  stop, and the raised next-entry level
+
+The headers are deliberately unlike `scan.py`'s `🟢 BUY —`, so the two systems
+can never be confused in the same chat. `alert_kinds` also accepts `approach`,
+`confirm` and `invalid`; they are computed but off by default because they are
+chatty.
+
+### Running it
+
+```bash
+python ob_tap_scan.py                       # normal 5-minute run
+python ob_tap_scan.py --force --heartbeat   # out of hours, with a summary
+python ob_tap_scan.py --symbols SMSPHARMA   # one name
+python ob_tap_scan.py --refresh-only        # rebuild the zone cache, no live pass
+```
+
+`ob_precision.enabled: false` in `config.yaml` switches the whole thing off
+without touching any other job. The GitHub workflow is
+**Precision OB Tap (5m)** (`ob_tap.yml`), on the same `*/5 3-10 * * 1-5` UTC
+schedule as the intraday scan; it commits `ob_precision_state.json` and never
+`state.json`.
+
+### Failure behaviour
+
+A run exits `0` even when individual symbols fail — one delisted or badly-mapped
+name must not stop the rest of the list, it just logs a warning. The exception is
+a **total data outage**: when two or more history refreshes are due and every one
+of them fails, the run exits `3` so the workflow's `Notify on failure` step puts
+a message in Telegram. That happens at most once a day (`data_outage_on` in the
+state file), because a five-minute cron would otherwise turn a single outage into
+~78 notices; the flag clears on the first run that fetches data again, which
+re-arms it for later in the day. A run that refreshed nothing simply because
+everything was already cached today says nothing either way and stays green.
 
 ---
 
