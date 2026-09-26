@@ -1,0 +1,336 @@
+//@version=6
+indicator("Institutional OB — Precision Tap & Pre-Order", "OB Precision Tap", overlay=true, max_boxes_count=150, max_lines_count=300, max_labels_count=300)
+
+// Precision execution companion for IFP PRO.
+// Detects a volume-confirmed bullish displacement, then anchors a tight order block
+// to the nearest bearish/neutral origin candle preceding that displacement.
+// Closed-bar zone creation is non-repainting. A live touch alert can fire intrabar.
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Detection
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+g1 = "1 — Volume-confirmed displacement"
+volLen       = input.int(20, "Local volume average", minval=5, group=g1)
+atrLen       = input.int(14, "ATR length", minval=5, group=g1)
+minRVOL      = input.float(1.8, "Minimum displacement RVOL", minval=1.0, step=0.1, group=g1)
+minRangeATR  = input.float(1.20, "Minimum displacement range ÷ ATR", minval=0.3, step=0.05, group=g1)
+minBodyFrac  = input.float(0.55, "Minimum bullish body fraction", minval=0.2, maxval=1.0, step=0.05, group=g1)
+minCLV       = input.float(0.72, "Minimum close location", minval=0.5, maxval=1.0, step=0.02, group=g1)
+structureLen = input.int(8, "Structure-break lookback", minval=2, maxval=50, group=g1)
+originSearch = input.int(8, "Search back for origin candle", minval=1, maxval=20, group=g1)
+allowNeutral = input.bool(true, "Allow small neutral origin candle", group=g1)
+neutralBody  = input.float(0.20, "Neutral body maximum ÷ range", minval=0.02, maxval=0.5, step=0.02, group=g1)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Precision zone
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+g2 = "2 — Exact order-block zone"
+zoneMethod = input.string("Open to low", "Tight-zone method",
+ options=["Open to low", "Body to low", "Body only", "Lower half of candle"], group=g2,
+ tooltip="For a bearish origin candle, Open-to-low is the recommended institutional mitigation range.")
+entryMode = input.string("Proximal", "Pre-order entry",
+ options=["Proximal", "50%", "62%", "70.5%", "79%", "Distal + 1 tick"], group=g2)
+frontRunMode = input.string("Auto", "Near-miss/front-run buffer", options=["Auto", "ATR", "Ticks", "Off"], group=g2,
+ tooltip="Places the buy level slightly ABOVE the proximal OB edge because liquid orders often front-run the visible zone.")
+frontRunATR = input.float(0.18, "ATR buffer above OB", minval=0.0, maxval=0.5, step=0.01, group=g2)
+frontRunTicks = input.int(2, "Minimum tick buffer", minval=0, maxval=100, group=g2)
+maxZoneBuffer = input.float(0.40, "Auto buffer cap as zone fraction", minval=0.01, maxval=1.0, step=0.01, group=g2,
+ tooltip="Auto uses the larger of the tick/ATR buffer, capped to this fraction of OB width.")
+entryOffsetTicks = input.int(0, "Additional manual offset in ticks", minval=-100, maxval=100, group=g2)
+stopATR = input.float(0.15, "Stop buffer below distal ÷ ATR", minval=0.0, step=0.05, group=g2)
+approachATR = input.float(0.25, "Pre-alert distance above entry ÷ ATR", minval=0.0, step=0.05, group=g2)
+minAge = input.int(3, "Minimum bars before first tap", minval=1, group=g2)
+maxZones = input.int(30, "Maximum zones", minval=1, maxval=75, group=g2)
+maxTouches = input.int(4, "Maximum touches before exhaustion", minval=1, maxval=10, group=g2)
+raiseAfterFirstTap = input.bool(true, "Adapt entry after first defended tap", group=g2,
+ tooltip="After Tap 1, raise the next pre-order to just above the first reaction low. This catches later tests that front-run the first defended price.")
+repeatTapATR = input.float(0.05, "Repeat-entry buffer above Tap-1 low ÷ ATR", minval=0.0, maxval=0.30, step=0.01, group=g2)
+requireDeparture = input.float(1.0, "Required departure above proximal ÷ ATR", minval=0.1, step=0.1, group=g2)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Confirmation
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+g3 = "3 — Optional defence confirmation"
+confirmBars = input.int(3, "Bars after tap allowed for confirmation", minval=0, maxval=10, group=g3)
+confirmRVOL = input.float(1.3, "Confirmation minimum RVOL", minval=0.5, step=0.1, group=g3)
+confirmCLV  = input.float(0.65, "Confirmation minimum close location", minval=0.5, maxval=1.0, step=0.05, group=g3)
+confirmBOSLen = input.int(3, "Confirmation micro-BOS lookback", minval=1, maxval=10, group=g3)
+requireSweep = input.bool(false, "Require sell-side sweep on tap", group=g3,
+ tooltip="Leave off for proximal pre-orders. Turn on for fewer, later signals.")
+sweepLen = input.int(5, "Sweep lookback", minval=2, maxval=20, group=g3)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Display
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+g4 = "4 — Display"
+zoneColor = input.color(color.rgb(20, 105, 220), "Fresh precision OB", group=g4)
+tapColor = input.color(color.rgb(255, 152, 0), "Tapped OB", group=g4)
+confirmColor = input.color(color.rgb(0, 180, 105), "Confirmed defence", group=g4)
+deadColor = input.color(color.rgb(120, 120, 120), "Invalid/exhausted", group=g4)
+showLabels = input.bool(true, "Show labels", group=g4)
+showRisk = input.bool(true, "Plot entry and stop lines", group=g4)
+opacity = input.int(82, "Zone opacity", minval=0, maxval=100, group=g4)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Displacement and origin-candle selection
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+atr = ta.atr(atrLen)
+volMA = ta.sma(volume, volLen)
+rvol = volMA > 0 ? volume / volMA : 0.0
+rng = math.max(high - low, syminfo.mintick)
+body = math.abs(close - open)
+clv = (close - low) / rng
+priorStructure = ta.highest(high[1], structureLen)
+
+displacement = barstate.isconfirmed and close > open and rvol >= minRVOL and rng >= atr * minRangeATR and body / rng >= minBodyFrac and clv >= minCLV and close > priorStructure
+
+// Nearest bearish/neutral candle is preferred. Because the loop begins at 1,
+// the first match is the candle closest to displacement.
+int originOffset = na
+if displacement
+    for j = 1 to originSearch
+        candleRange = math.max(high[j] - low[j], syminfo.mintick)
+        bearish = close[j] < open[j]
+        neutral = allowNeutral and math.abs(close[j] - open[j]) / candleRange <= neutralBody
+        if na(originOffset) and (bearish or neutral)
+            originOffset := j
+
+// Fallback: immediately preceding candle if no opposing/neutral candle exists.
+if displacement and na(originOffset)
+    originOffset := 1
+
+float rawTop = na
+float rawBot = na
+if displacement and not na(originOffset)
+    o = open[originOffset]
+    c = close[originOffset]
+    h = high[originOffset]
+    l = low[originOffset]
+    rawTop := switch zoneMethod
+        "Open to low"         => o
+        "Body to low"         => math.max(o, c)
+        "Body only"           => math.max(o, c)
+        "Lower half of candle"=> l + (h - l) * 0.50
+    rawBot := switch zoneMethod
+        "Open to low"         => l
+        "Body to low"         => l
+        "Body only"           => math.min(o, c)
+        "Lower half of candle"=> l
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Storage
+// state: 0 fresh, 1 tapped/pending, 2 confirmed, -1 invalid/exhausted
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+var boxes = array.new_box()
+var tops = array.new_float()
+var bots = array.new_float()
+var entries = array.new_float()
+var stops = array.new_float()
+var born = array.new_int()
+var states = array.new_int()
+var taps = array.new_int()
+var tapBars = array.new_int()
+var departed = array.new_bool()
+var entryLines = array.new_line()
+var stopLines = array.new_line()
+
+f_depth(_mode) =>
+    switch _mode
+        "Proximal"        => 0.0
+        "50%"             => 0.50
+        "62%"             => 0.62
+        "70.5%"           => 0.705
+        "79%"             => 0.79
+        "Distal + 1 tick" => 1.0
+
+f_front_buffer(_width, _atr) =>
+    tickBuffer = frontRunTicks * syminfo.mintick
+    atrBuffer = frontRunATR * _atr
+    switch frontRunMode
+        "ATR"   => atrBuffer
+        "Ticks" => tickBuffer
+        "Off"   => 0.0
+        => math.min(math.max(tickBuffer, atrBuffer), _width * maxZoneBuffer)
+
+// Reject duplicates whose entry is already inside an existing live zone.
+bool duplicate = false
+if displacement and not na(rawTop) and rawTop > rawBot and array.size(boxes) > 0
+    candidateWidth = rawTop - rawBot
+    candidateBase = rawTop - candidateWidth * f_depth(entryMode)
+    candidateEntry = candidateBase + f_front_buffer(candidateWidth, atr) + entryOffsetTicks * syminfo.mintick
+    candidateEntry := entryMode == "Distal + 1 tick" ? rawBot + syminfo.mintick : candidateEntry
+    for i = 0 to array.size(boxes) - 1
+        if array.get(states, i) >= 0 and candidateEntry <= array.get(tops, i) and candidateEntry >= array.get(bots, i)
+            duplicate := true
+
+if displacement and not duplicate and not na(rawTop) and rawTop > rawBot
+    depth = f_depth(entryMode)
+    zoneWidth = rawTop - rawBot
+    baseEntry = rawTop - zoneWidth * depth
+    // Front-run buffer deliberately places the executable buy level above the
+    // theoretical OB level. Auto is volatility- and zone-width-normalized.
+    entry = baseEntry + f_front_buffer(zoneWidth, atr) + entryOffsetTicks * syminfo.mintick
+    // A distal entry remains inside the OB and is therefore not front-run.
+    entry := entryMode == "Distal + 1 tick" ? rawBot + syminfo.mintick : entry
+    stop = rawBot - atr * stopATR
+    leftBar = bar_index - originOffset
+    bx = box.new(leftBar, rawTop, bar_index + 1, rawBot, xloc=xloc.bar_index, extend=extend.right,
+      bgcolor=color.new(zoneColor, opacity), border_color=color.new(zoneColor, 15))
+    el = line.new(leftBar, entry, bar_index + 1, entry, xloc=xloc.bar_index, extend=extend.right,
+      color=zoneColor, width=2, style=line.style_solid)
+    sl = line.new(leftBar, stop, bar_index + 1, stop, xloc=xloc.bar_index, extend=extend.right,
+      color=showRisk ? color.new(color.red, 10) : color.new(color.red, 100), width=1, style=line.style_dashed)
+    array.push(boxes, bx)
+    array.push(tops, rawTop)
+    array.push(bots, rawBot)
+    array.push(entries, entry)
+    array.push(stops, stop)
+    array.push(born, bar_index)
+    array.push(states, 0)
+    array.push(taps, 0)
+    array.push(tapBars, -1)
+    array.push(departed, false)
+    array.push(entryLines, el)
+    array.push(stopLines, sl)
+    if showLabels
+        label.new(leftBar, rawBot, "PRECISION OB\nEntry " + str.tostring(entry, format.mintick) + "\nStop " + str.tostring(stop, format.mintick),
+          style=label.style_label_up, color=zoneColor, textcolor=color.white, size=size.tiny)
+
+if array.size(boxes) > maxZones
+    oldB = array.shift(boxes)
+    box.delete(oldB)
+    array.shift(tops)
+    array.shift(bots)
+    array.shift(entries)
+    array.shift(stops)
+    array.shift(born)
+    array.shift(states)
+    array.shift(taps)
+    array.shift(tapBars)
+    array.shift(departed)
+    oldE = array.shift(entryLines)
+    line.delete(oldE)
+    oldS = array.shift(stopLines)
+    line.delete(oldS)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Live approach/tap plus closed-bar confirmation
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+bool anyApproach = false
+bool anyTap = false
+bool anyConfirm = false
+bool anyDead = false
+float nearestEntry = na
+float nearestStop = na
+
+if array.size(boxes) > 0
+    for i = 0 to array.size(boxes) - 1
+        bx = array.get(boxes, i)
+        el = array.get(entryLines, i)
+        sl = array.get(stopLines, i)
+        top = array.get(tops, i)
+        bot = array.get(bots, i)
+        entry = array.get(entries, i)
+        stop = array.get(stops, i)
+        age = bar_index - array.get(born, i)
+        state = array.get(states, i)
+        tapCount = array.get(taps, i)
+        tapBar = array.get(tapBars, i)
+        hasDeparted = array.get(departed, i)
+
+        if state >= 0 and not hasDeparted and high >= top + atr * requireDeparture
+            hasDeparted := true
+            array.set(departed, i, true)
+
+        // Nearest untouched order above/below current market for data window.
+        if state >= 0 and (na(nearestEntry) or math.abs(close - entry) < math.abs(close - nearestEntry))
+            nearestEntry := entry
+            nearestStop := stop
+
+        approaching = state >= 0 and hasDeparted and age >= minAge and close > entry and low <= entry + atr * approachATR
+        if approaching
+            anyApproach := true
+
+        // This can trigger intrabar. Configure TradingView alert as "Once Per Bar"
+        // for a live touch, or "Once Per Bar Close" for closed-candle operation.
+        touched = state >= 0 and hasDeparted and age >= minAge and low <= entry and high >= bot
+        priorLow = ta.lowest(low[1], sweepLen)
+        swept = low < priorLow
+        qualifiedTap = touched and (not requireSweep or swept)
+        if qualifiedTap and (tapBar < 0 or bar_index > tapBar)
+            tapCount += 1
+            tapBar := bar_index
+            state := 1
+            array.set(taps, i, tapCount)
+            array.set(tapBars, i, tapBar)
+            array.set(states, i, state)
+
+            // Once the market reveals the first actually defended price, use it
+            // as additional information. Later tests commonly turn just above
+            // Tap 1 instead of revisiting the original theoretical OB.
+            if raiseAfterFirstTap and tapCount == 1
+                adaptiveEntry = math.max(entry, low + atr * repeatTapATR)
+                array.set(entries, i, adaptiveEntry)
+                line.set_y1(el, adaptiveEntry)
+                line.set_y2(el, adaptiveEntry)
+                entry := adaptiveEntry
+
+            box.set_bgcolor(bx, color.new(tapColor, opacity))
+            box.set_border_color(bx, tapColor)
+            line.set_color(el, tapColor)
+            anyTap := true
+            if showLabels
+                label.new(bar_index, low, "TAP " + str.tostring(tapCount) + "\nNext " + str.tostring(entry, format.mintick),
+                  style=label.style_label_up, color=tapColor, textcolor=color.black, size=size.tiny)
+
+        pending = state == 1 and tapBar >= 0 and bar_index - tapBar <= confirmBars
+        microBOS = close > ta.highest(high[1], confirmBOSLen)
+        defence = barstate.isconfirmed and pending and close > open and clv >= confirmCLV and rvol >= confirmRVOL and close > top and microBOS
+        if defence
+            state := 2
+            array.set(states, i, state)
+            box.set_bgcolor(bx, color.new(confirmColor, opacity))
+            box.set_border_color(bx, confirmColor)
+            line.set_color(el, confirmColor)
+            anyConfirm := true
+            if showLabels
+                label.new(bar_index, low, "DEFENCE CONFIRMED", style=label.style_label_up,
+                  color=confirmColor, textcolor=color.white, size=size.small)
+
+        if state == 1 and bar_index - tapBar > confirmBars
+            state := 0
+            array.set(states, i, state)
+            box.set_bgcolor(bx, color.new(zoneColor, opacity))
+            box.set_border_color(bx, color.new(zoneColor, 15))
+            line.set_color(el, zoneColor)
+
+        invalid = state >= 0 and (close < stop or tapCount > maxTouches)
+        if invalid
+            array.set(states, i, -1)
+            box.set_extend(bx, extend.none)
+            box.set_right(bx, bar_index)
+            line.set_extend(el, extend.none)
+            line.set_x2(el, bar_index)
+            line.set_extend(sl, extend.none)
+            line.set_x2(sl, bar_index)
+            box.set_bgcolor(bx, color.new(deadColor, 94))
+            box.set_border_color(bx, color.new(deadColor, 65))
+            line.set_color(el, color.new(deadColor, 60))
+            anyDead := true
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Outputs and alerts
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+plotshape(displacement and not duplicate, "New precision order block", shape.diamond, location.belowbar, zoneColor, size=size.tiny, text="OB")
+plotshape(anyTap, "Exact order-block tap", shape.circle, location.belowbar, tapColor, size=size.tiny, text="TAP")
+plotshape(anyConfirm, "Defence confirmed", shape.triangleup, location.belowbar, confirmColor, size=size.small, text="OK")
+
+plot(nearestEntry, "Nearest pre-order entry", color=color.new(zoneColor, 100), display=display.data_window)
+plot(nearestStop, "Associated structural stop", color=color.new(color.red, 100), display=display.data_window)
+plot(rvol, "Local RVOL", display=display.data_window)
+
+alertcondition(displacement and not duplicate, "New precision OB created", "New volume-confirmed precision order block on {{ticker}} {{interval}}.")
+alertcondition(anyApproach, "Price approaching pre-order", "{{ticker}} is approaching a precision order-block entry on {{interval}}.")
+alertcondition(anyTap, "Exact pre-order level tapped", "{{ticker}} tapped a precision order-block entry on {{interval}}.")
+alertcondition(anyConfirm, "Order-block defence confirmed", "{{ticker}} confirmed defence of a precision order block on {{interval}}.")
+alertcondition(anyDead, "Precision order block invalidated", "A precision order block failed or became exhausted on {{ticker}} {{interval}}.")
