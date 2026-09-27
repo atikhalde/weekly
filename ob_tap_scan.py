@@ -541,9 +541,17 @@ def format_tap(ev: dict[str, Any], rec: dict[str, Any], sym: str) -> str:
         f"Born {_esc(ev.get('born_session', ''))} · tapped on "
         f"<b>{_esc(ev.get('session', ''))}</b>",
     ]
-    if d.get("next_entry"):
-        lines.append(f"Next pre-order after this tap: <b>{_fmt(d['next_entry'])}</b> "
-                     f"(raised to the defended low)")
+    nxt = d.get("next_entry")
+    if nxt:
+        touched = tapped_entry(ev)
+        # The indicator adapts the entry with math.max(entry, low + atr * 0.05),
+        # so it can only ever move UP. A tap defended well below the pre-order -
+        # the common case on a sharp shakeout - leaves the level exactly where it
+        # was, and saying "raised" then would be a lie on a live trade alert.
+        moved = touched is None or float(nxt) > float(touched)
+        lines.append(f"Next pre-order after this tap: <b>{_fmt(nxt)}</b> "
+                     + ("(raised above the defended low)" if moved else
+                        "(unchanged - the defended low closed below it)"))
     lines.append(_breakout_line(rec))
     return "\n".join(lines)
 

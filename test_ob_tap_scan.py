@@ -724,6 +724,28 @@ def test_a_closed_tap_says_so():
     assert "Next pre-order after this tap" in text
 
 
+def test_the_next_entry_line_says_whether_the_level_actually_moved():
+    """
+    Real SMSPHARMA, 2026-09-16: the tap was defended at 393.25, far BELOW the
+    406.18 pre-order, so math.max leaves the entry where it was. The message must
+    not claim it was raised.
+    """
+    rec = {"exchange_segment": "NSE_EQ", "breakout_bar": "2026-09-11T10:00+05:30",
+           "breakout_price": 455.05, "level_26w": 447.8}
+    base = {"kind": "tap", "tap_number": 1, "low": 393.25, "top": 405.0,
+            "bottom": 402.05, "stop": 399.23, "atr": 22.27, "session": "2026-09-16",
+            "born_session": "2026-09-11", "confirmed": False, "price": 402.95}
+    unchanged = dict(base, entry=406.18,
+                     detail={"tapped_entry": 406.18, "next_entry": 406.18})
+    text = format_tap(unchanged, rec, "SMSPHARMA")
+    assert "unchanged" in text and "raised" not in text
+
+    raised = dict(base, entry=394.36,
+                  detail={"tapped_entry": 393.25, "next_entry": 394.36})
+    text = format_tap(raised, rec, "SMSPHARMA")
+    assert "raised above the defended low" in text and "unchanged" not in text
+
+
 def test_the_breakout_line_degrades_without_a_level():
     line = ob_tap_scan._breakout_line({"breakout_bar": "2026-08-26T10:00+05:30",
                                        "breakout_price": 105.5, "level_26w": None})
