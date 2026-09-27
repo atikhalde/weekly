@@ -13,6 +13,11 @@ name: Precision OB Tap (5m)
 # slot never loses a tap permanently - the session's low is still in the next
 # quote - but it does delay the alert, which is the whole point of the schedule.
 #
+# The waiting-list harvest follows scan.py's canonical per-symbol breakout record:
+# repeat weekly rows from the same 26-week breakout cycle cannot refresh the
+# waiting-list anchor. OB formation, taps and their own event de-duplication stay
+# independent and unchanged.
+#
 # The same cron also carries the DAILY WAITING LIST (README -> "The daily
 # waiting-list digest"): 03:40 UTC is 09:10 IST, which is the pre-open plan, and
 # the 10:05/10:10 UTC runs are the post-close recap. Neither needs its own
@@ -90,7 +95,7 @@ jobs:
       # a silently wrong port would send confidently wrong price levels to a
       # live chat. These tests are pure CPU and take about a second, so they run
       # BEFORE any market data is fetched: a red test blocks the scan.
-      - name: Verify the order-block port
+      - name: Verify order-block logic and breakout-cycle feed
         run: |
           pip install "pytest>=8.0,<9.0"
           python -m pytest test_ob_precision.py test_ob_tap_scan.py -q

@@ -1,4 +1,9 @@
 {
+  "breakout_alerts": {
+    "OAL": {
+      "bar_time": "2026-07-27T15:30:00+05:30"
+    }
+  },
   "stale_alert": "2026-09-21",
   "updated_at": "2026-09-21T09:00:50",
   "weeks": {

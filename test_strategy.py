@@ -205,6 +205,46 @@ def test_signal_fires_on_the_crossing_candle(snap):
     assert sig.trigger == "cross"
 
 
+def test_cooldown_ignores_pre_expiry_cross_until_a_new_cross(snap):
+    cfg = Strategy(strict_entry=False, one_per_week=True)
+    lv = snap.entry_level
+
+    # A breakout starts before expiry and remains above it: not a new cross.
+    carried = bars_from([lv * 0.98, lv * 1.01, lv * 1.02], snap)
+    cutoff = carried.iloc[2]["datetime"]
+    assert replay_week(snap, cfg, carried, eligible_after=cutoff).signals == []
+
+    # After expiry, price must fall back below and cross above again.
+    recross = bars_from(
+        [lv * 0.98, lv * 1.01, lv * 1.02, lv * 0.99, lv * 1.04], snap)
+    cutoff = recross.iloc[2]["datetime"]
+    result = replay_week(snap, cfg, recross, eligible_after=cutoff)
+    assert len(result.signals) == 1
+    assert result.signals[0].bar_time == recross.iloc[4]["datetime"]
+    assert result.signals[0].trigger == "cross"
+
+
+def test_rearmed_cycle_requires_a_confirmed_cross_at_week_open(snap):
+    cfg = Strategy(strict_entry=False, one_per_week=True)
+    lv = snap.entry_level
+    bars = bars_from([lv * 1.01, lv * 1.02], snap)
+    eligible_after = bars.iloc[0]["datetime"] - timedelta(days=1)
+
+    # Prior close still above the level means the breakout was carried through
+    # lock expiry, not freshly crossed on the first replayed candle.
+    assert replay_week(snap, cfg, bars, eligible_after=eligible_after,
+                       previous_close=lv * 1.005).signals == []
+
+    # A confirmed below-to-above transition after expiry remains eligible.
+    fresh = replay_week(snap, cfg, bars, eligible_after=eligible_after,
+                        previous_close=lv * 0.99)
+    assert len(fresh.signals) == 1
+    assert fresh.signals[0].bar_time == bars.iloc[0]["datetime"]
+
+    # Unknown prior close cannot prove that an opening-above price is fresh.
+    assert replay_week(snap, cfg, bars, eligible_after=eligible_after).signals == []
+
+
 def test_one_entry_per_week(snap):
     cfg = Strategy(strict_entry=False, one_per_week=True)
     lv = snap.entry_level

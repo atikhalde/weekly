@@ -23,6 +23,10 @@ scanner answers the follow-up question the user actually trades:
                                        ▼
                               🟠 TAP 1  ──► Telegram
 
+The waiting-list feed uses scan.py's first alert for the active 26-week breakout
+cycle, not later weekly duplicate rows. The OB zone, tap, and event de-duplication
+rules below remain independent and unchanged.
+
 The order-block logic is a Pine-exact port of `precision.txt`
 ("Institutional OB — Precision Tap & Pre-Order", Pine v6). `ob_precision.py`
 documents the two deliberate deviations, and both exist to keep the alert
@@ -248,16 +252,11 @@ def snapshot_levels(cfg) -> dict[str, tuple[str, float]]:
 # --------------------------------------------------------------------------- #
 #  Waiting list
 # --------------------------------------------------------------------------- #
-def weekly_alerts(cfg, backfill_weeks: int) -> dict[str, dict[str, Any]]:
-    """
-    symbol -> the most recent weekly-breakout alert, read straight out of
-    scan.py's state file.
-
-    READ-ONLY. `state.json` belongs to the weekly scanner; this module takes
-    the same view btst.py does (`alert_record`) and never marks anything.
-    """
-    st = AlertState(cfg.paths["state"])
-    weeks = getattr(st, "_data", {}).get("weeks") or {}
+def _weekly_alerts_from_data(data: dict[str, Any],
+                             backfill_weeks: int) -> dict[str, dict[str, Any]]:
+    """Build the backfill feed from an already-loaded weekly scanner state."""
+    weeks = data.get("weeks") or {}
+    cycle_alerts = data.get("breakout_alerts") or {}
     out: dict[str, dict[str, Any]] = {}
     for wk in sorted(weeks)[-max(1, backfill_weeks):]:
         for sym, rec in (weeks.get(wk) or {}).items():
@@ -265,12 +264,35 @@ def weekly_alerts(cfg, backfill_weeks: int) -> dict[str, dict[str, Any]]:
                 continue
             bar = str(rec.get("bar_time", ""))
             sym = str(sym).strip().upper()
+            cycle = cycle_alerts.get(sym)
+            if isinstance(cycle, dict):
+                first_bar = str(cycle.get("bar_time", ""))
+                if first_bar and bar != first_bar:
+                    continue                   # ignore later rows in this cycle
             prev = out.get(sym)
             if prev and str(prev.get("breakout_bar", "")) >= bar:
-                continue                      # keep the LATEST breakout only
+                continue
             out[sym] = {"week": wk, "breakout_bar": bar,
                         "breakout_price": float(rec.get("price") or 0.0)}
     return out
+
+
+def weekly_alerts(cfg, backfill_weeks: int) -> dict[str, dict[str, Any]]:
+    """
+    One canonical weekly-breakout alert per symbol's current 26-week cycle,
+    read from scan.py's state file.
+
+    The weekly `weeks` map still holds legacy and same-week de-duplication
+    records. `breakout_alerts` is the cross-week source of truth: while a cycle
+    is active, only its first alert may seed or refresh the OB waiting list.
+    After the 26-week lock expires, scan.py replaces that record only when a
+    fresh post-lockout 26-week cross actually alerts.
+
+    READ-ONLY. `state.json` belongs to the weekly scanner; this module reads it
+    and never marks anything there.
+    """
+    st = AlertState(cfg.paths["state"])
+    return _weekly_alerts_from_data(getattr(st, "_data", {}), backfill_weeks)
 
 
 def harvest_waiting(state: dict[str, Any], alerts: dict[str, dict[str, Any]],
@@ -320,15 +342,51 @@ def harvest_waiting(state: dict[str, Any], alerts: dict[str, dict[str, Any]],
             }
             added.append(sym)
         elif existing.get("status") == "waiting" and \
-                rec["breakout_bar"] > str(existing.get("breakout_bar", "")):
-            # A fresh breakout while still waiting: refresh the reference so the
-            # alert text quotes the breakout that is actually current.
+                rec["breakout_bar"] != str(existing.get("breakout_bar", "")):
+            # `weekly_alerts` returns the canonical first event in the active
+            # cycle. Reconcile in either direction: old state may have been
+            # refreshed by a later same-cycle duplicate before the lock existed,
+            # while a post-lockout new cycle naturally has a later timestamp.
             existing.update(week=rec["week"], breakout_bar=rec["breakout_bar"],
                             breakout_price=rec["breakout_price"])
             lvl_week, lvl = levels.get(sym, ("", None))
-            if lvl_week == rec["week"]:
-                existing["level_26w"] = lvl
+            existing["level_26w"] = lvl if lvl_week == rec["week"] else None
     return added
+
+
+def reconcile_waiting_cycles(state: dict[str, Any],
+                             cycle_alerts: dict[str, Any]) -> list[str]:
+    """
+    Correct an active waiter that predates the persistent cycle feed and was
+    anchored to a later duplicate, even when the canonical first row has since
+    fallen outside the weekly state's six-week retention window.
+
+    This only moves an existing waiting anchor backward. It does not seed old
+    symbols that are no longer in the backfill window or reopen resolved OB
+    records. Price/level details are cleared when the canonical state lacks
+    them rather than keeping numbers from the later duplicate.
+    """
+    corrected: list[str] = []
+    waiting = state.get("waiting") or {}
+    for raw_sym, cycle in (cycle_alerts or {}).items():
+        sym = str(raw_sym).strip().upper()
+        existing = waiting.get(sym)
+        if (not isinstance(existing, dict) or existing.get("status") != "waiting"
+                or not isinstance(cycle, dict)):
+            continue
+        first_bar = str(cycle.get("bar_time", ""))
+        old_bar = str(existing.get("breakout_bar", ""))
+        first_day, old_day = as_date(first_bar), as_date(old_bar)
+        if first_day is None or old_day is None:
+            continue
+        if first_day > old_day or (first_day == old_day and first_bar >= old_bar):
+            continue
+        existing["week"] = (first_day - timedelta(days=first_day.weekday())).isoformat()
+        existing["breakout_bar"] = first_bar
+        existing["breakout_price"] = cycle.get("price")
+        existing["level_26w"] = cycle.get("entry_level")
+        corrected.append(sym)
+    return corrected
 
 
 def harvest_stage(cfg, ob, state: dict[str, Any], today: str) -> tuple[list[str], bool]:
@@ -344,7 +402,14 @@ def harvest_stage(cfg, ob, state: dict[str, Any], today: str) -> tuple[list[str]
     start, or a Monday morning after a weekend the scheduler skipped, must not
     print an empty list while state.json is full of names.
     """
-    alerts = weekly_alerts(cfg, ob.backfill_weeks)
+    scanner_state = AlertState(cfg.paths["state"])
+    scanner_data = getattr(scanner_state, "_data", {})
+    alerts = _weekly_alerts_from_data(scanner_data, ob.backfill_weeks)
+    corrected = reconcile_waiting_cycles(
+        state, scanner_data.get("breakout_alerts") or {})
+    if corrected:
+        log.info("waiting list: corrected first-cycle anchor for %s",
+                 ", ".join(corrected[:12]) + (" ..." if len(corrected) > 12 else ""))
     if not alerts:
         # Not a Telegram alarm: scan.py owns the stale-snapshot outage notice
         # (BUG 49) and a second message would only contradict it. It is not

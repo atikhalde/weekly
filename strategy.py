@@ -672,12 +672,19 @@ class ReplayResult:
 
 
 def replay_week(snap: WeeklySnapshot, cfg: Strategy, bars: pd.DataFrame,
-                history: pd.DataFrame | None = None) -> ReplayResult:
+                history: pd.DataFrame | None = None,
+                eligible_after: datetime | pd.Timestamp | None = None,
+                previous_close: float | None = None) -> ReplayResult:
     """
     Walk this week's 5-minute candles in order and reproduce the Pine bar state.
 
     `bars` must be the current week's 5m candles, ascending, columns:
-    datetime, open, high, low, close, volume.
+    datetime, open, high, low, close, volume. If `eligible_after` is supplied,
+    only a fresh cross on/after that time may signal; a cross during the lockout
+    cannot become a deferred alert when the lock expires. `previous_close` seeds
+    the cross check when the lock expired before this week's first candle. If a
+    prior close is unknown for a previously-locked symbol, its opening candle
+    cannot prove a fresh cross and is suppressed.
     """
     result = ReplayResult()
     if bars.empty:
@@ -686,15 +693,31 @@ def replay_week(snap: WeeklySnapshot, cfg: Strategy, bars: pd.DataFrame,
     bars = bars.sort_values("datetime").reset_index(drop=True)
     result.bars = len(bars)
 
+    eligible_after_ts = None
+    if eligible_after is not None:
+        eligible_after_ts = pd.Timestamp(eligible_after)
+        first_bar_ts = pd.Timestamp(bars.iloc[0]["datetime"])
+        # A naïve timestamp is interpreted in the candle feed's timezone so
+        # tests/older state records remain compatible with timezone-aware bars.
+        if first_bar_ts.tzinfo is not None and eligible_after_ts.tzinfo is None:
+            eligible_after_ts = eligible_after_ts.tz_localize(first_bar_ts.tzinfo)
+        elif first_bar_ts.tzinfo is None and eligible_after_ts.tzinfo is not None:
+            eligible_after_ts = eligible_after_ts.tz_localize(None)
+        elif first_bar_ts.tzinfo is not None:
+            eligible_after_ts = eligible_after_ts.tz_convert(first_bar_ts.tzinfo)
+
     week_open = float(bars.iloc[0]["open"])
     week_volume = 0.0
     day_open = float(bars.iloc[0]["open"])
     current_day = pd.Timestamp(bars.iloc[0]["datetime"]).date()
 
     bars_seen = 0
-    prev_close: float | None = None      # Pine close[1]
+    prev_close: float | None = (float(previous_close)
+                                if previous_close is not None
+                                and not np.isnan(float(previous_close)) else None)
     took = False
-    saw_cross = False
+    saw_cross = False             # post-lockout cross, eligible for an alert
+    saw_any_cross = False         # diagnostic: any level cross this week
 
     # ---- which level does the cross fire on? -------------------------------
     # "entry"    (default)  highest(high, 26) as of the LAST CLOSED week.
@@ -745,13 +768,22 @@ def replay_week(snap: WeeklySnapshot, cfg: Strategy, bars: pd.DataFrame,
                       and (not cfg.req52 or prev_close > snap.level_52))
 
         cross_up = bar_above and not prev_above
+        signal_eligible = eligible_after_ts is None or ts >= eligible_after_ts
+        if (eligible_after_ts is not None and signal_eligible
+                and prev_close is None):
+            # A re-armed symbol needs a confirmed transition from below. Without
+            # the previous session's close, an already-above opening candle is
+            # ambiguous, so fail closed rather than treating it as a new cross.
+            cross_up = False
         if cross_up:
-            saw_cross = True
+            saw_any_cross = True
+            if signal_eligible:
+                saw_cross = True
 
         gate = gate_ok(snap, cfg, ev) if cfg.strict_entry else True
-        trig_cross = cross_up and gate
-        trig_defer = (cfg.defer_entry and cfg.strict_entry and saw_cross
-                      and not cross_up and bar_above and gate)
+        trig_cross = signal_eligible and cross_up and gate
+        trig_defer = (signal_eligible and cfg.defer_entry and cfg.strict_entry
+                      and saw_cross and not cross_up and bar_above and gate)
 
         entry = (trig_cross or trig_defer) and (not took if cfg.one_per_week else True)
 
@@ -847,5 +879,5 @@ def replay_week(snap: WeeklySnapshot, cfg: Strategy, bars: pd.DataFrame,
         prev_close = price
 
     result.took_this_week = took
-    result.saw_cross_this_week = saw_cross
+    result.saw_cross_this_week = saw_any_cross
     return result

@@ -14,6 +14,8 @@ The behaviours that matter most, and why:
   change.
 * The waiting list must OUTLIVE state.json, which prunes at six weeks. The user
   asked for "until tapped or invalidated", not "until the file forgets".
+* Later weekly rows from the same 26-week breakout cycle must not re-anchor the
+  waiting-list entry; a new cycle is accepted only after scan.py rearms it.
 * Nothing may be alerted twice, and the first (backfill) run may not dump a
   year of historical order blocks into the chat.
 
@@ -37,7 +39,7 @@ from dhan import DhanError, IST
 from ob_precision import Bar, bars_from_frame
 from ob_tap_scan import (
     STATE_LOGIC_VERSION, active_waiting, as_date, digest_slot, empty_state,
-    format_digest, format_heartbeat, format_tap, harvest_waiting,
+    format_digest, format_heartbeat, format_tap, harvest_stage, harvest_waiting,
     last_scan_of_day, load_state,
     post_close_pending, prune_closed_events, save_state, session_closed,
     weekly_alerts,
@@ -215,14 +217,92 @@ def test_weekly_alerts_reads_state_json_without_writing_it(ws):
     assert (ws.dir / "state.json").read_bytes() == before
 
 
-def test_weekly_alerts_keeps_only_the_latest_breakout_per_symbol(ws):
+def test_weekly_alerts_ignores_later_rows_in_the_same_breakout_cycle(ws):
     raw = json.loads((ws.dir / "state.json").read_text())
     raw["weeks"]["2026-08-31"] = {SYM: {"bar_time": "2026-09-02T10:00+05:30",
                                         "price": 120.0}}
     (ws.dir / "state.json").write_text(json.dumps(raw))
     alerts = weekly_alerts(ws.cfg, 6)
-    assert alerts[SYM]["week"] == "2026-08-31"
-    assert alerts[SYM]["breakout_price"] == 120.0
+    # The earliest retained weekly alert is the canonical first event. A later
+    # week's row must not refresh the OB waiting-list breakout reference.
+    assert alerts[SYM]["week"] == "2026-08-24"
+    assert alerts[SYM]["breakout_price"] == 105.5
+
+
+def test_weekly_alerts_ignores_repeats_when_first_alert_is_pruned(ws):
+    raw = json.loads((ws.dir / "state.json").read_text())
+    raw["breakout_alerts"] = {
+        SYM: {"bar_time": "2026-07-27T15:30+05:30"},
+    }
+    (ws.dir / "state.json").write_text(json.dumps(raw))
+    alerts = weekly_alerts(ws.cfg, 6)
+    # The cycle's first row is outside the six-week history and cannot seed a
+    # new OB waiting-list entry. Its later same-cycle rows are not substitutes.
+    assert SYM not in alerts
+
+
+def test_harvest_reanchors_existing_waiter_when_first_alert_is_pruned(ws):
+    raw = {
+        "breakout_alerts": {SYM: {"bar_time": "2026-07-27T15:30:00+05:30"}},
+        "weeks": {"2026-09-21": {SYM: {
+            "bar_time": "2026-09-21T13:55+05:30", "price": 561.7,
+        }}},
+    }
+    (ws.dir / "state.json").write_text(json.dumps(raw))
+    state = empty_state()
+    state["waiting"][SYM] = {
+        "symbol": SYM, "status": "waiting", "week": "2026-09-21",
+        "breakout_bar": "2026-09-21T13:55+05:30",
+        "breakout_price": 561.7, "level_26w": 559.8,
+        "added_at": "2026-09-27",
+    }
+
+    added, source_ok = harvest_stage(ws.cfg, ws.cfg.ob_precision, state, "2026-09-28")
+
+    assert added == [] and not source_ok  # outside backfill; do not create a new waiter
+    corrected = state["waiting"][SYM]
+    assert corrected["status"] == "waiting"
+    assert corrected["week"] == "2026-07-27"
+    assert corrected["breakout_bar"] == "2026-07-27T15:30:00+05:30"
+    # The old quote and level belonged to the duplicate, so don't mislabel them
+    # as the first alert when those canonical values are unavailable.
+    assert corrected["breakout_price"] is None
+    assert corrected["level_26w"] is None
+    assert corrected["added_at"] == "2026-09-27"
+
+
+def test_weekly_alerts_accepts_a_new_cycle_after_scan_rearms(ws):
+    raw = json.loads((ws.dir / "state.json").read_text())
+    new_bar = "2027-02-24T10:00+05:30"
+    raw["weeks"]["2027-02-22"] = {SYM: {"bar_time": new_bar, "price": 130.0}}
+    raw["breakout_alerts"] = {SYM: {
+        "bar_time": new_bar, "price": 130.0, "entry_level": 120.0,
+    }}
+    (ws.dir / "state.json").write_text(json.dumps(raw))
+    alerts = weekly_alerts(ws.cfg, 6)
+    assert alerts[SYM]["week"] == "2027-02-22"
+    assert alerts[SYM]["breakout_bar"] == new_bar
+    assert alerts[SYM]["breakout_price"] == 130.0
+
+
+def test_harvest_corrects_legacy_waiter_from_later_duplicate_to_first_cycle_alert(ws):
+    ids = ob_tap_scan.resolve_universe(ws.cfg)
+    levels = ob_tap_scan.snapshot_levels(ws.cfg)
+    state = empty_state()
+    # Simulate the pre-fix state: it adopted a later weekly repeat.
+    harvest_waiting(state, {
+        SYM: {"week": "2026-08-31", "breakout_bar": "2026-09-02T10:00+05:30",
+              "breakout_price": 120.0},
+    }, ids, levels, "2026-09-02")
+    assert state["waiting"][SYM]["breakout_bar"] == "2026-09-02T10:00+05:30"
+
+    # The canonical feed now points back to the first alert still in history.
+    canonical = weekly_alerts(ws.cfg, 6)[SYM]
+    harvest_waiting(state, {SYM: canonical}, ids, levels, "2026-09-03")
+    assert state["waiting"][SYM]["week"] == "2026-08-24"
+    assert state["waiting"][SYM]["breakout_bar"] == "2026-08-26T10:00+05:30"
+    assert state["waiting"][SYM]["breakout_price"] == 105.5
+    assert state["waiting"][SYM]["level_26w"] == 104.0
 
 
 def test_backfill_weeks_limits_the_harvest(ws):
