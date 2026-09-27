@@ -198,3 +198,93 @@ runtime:
   bar_interval_min: 5
   alert_cooldown_bars: 0
   dry_run: false                  # true = log alerts instead of sending them
+
+# ---------------------------------------------------------------------------
+# Precision OB tap scanner (ob_tap_scan.py) - stage 2 behind scan.py.
+#
+# scan.py answers "which stocks broke their 26-week high this week?". This
+# answers the follow-up: "of those, which one has pulled back into a precise
+# institutional order block and is being defended RIGHT NOW?".
+#
+#     scan.py marks state.json -> waiting list -> daily displacement -> origin
+#     candle -> precision OB -> departure arms it -> live intraday tap -> alert
+#
+# The zone logic is a Pine-exact port of precision.txt ("Institutional OB -
+# Precision Tap & Pre-Order"). The indicator inputs below are that file's
+# defaults; ob_precision.OBParams validates them and rejects unknown keys.
+#
+# Nothing here changes any other job: state.json stays read-only input and this
+# scanner writes only ob_precision_state.json. `enabled: false` switches the
+# whole thing off.
+# ---------------------------------------------------------------------------
+ob_precision:
+  enabled: true
+  state_file: "ob_precision_state.json"   # its OWN state, never state.json
+
+  # --- scanner runtime ---
+  sessions: 250                 # daily bars per symbol (~one trading year)
+  max_refresh_per_run: 250      # per-symbol history calls in one run; the
+                                # backfill spreads over runs instead of blowing
+                                # the workflow's timeout
+  backfill_weeks: 6             # seed the waiting list from every week
+                                # state.json still retains (it prunes at 6)
+  quote_batch: 1000             # Dhan OHLC limit per request
+  alert_kinds: ["ob", "tap"]    # "approach"/"confirm"/"invalid" are computed
+                                # but not sent: too noisy for a live chat
+  alert_taps: [1]               # only the FIRST tap of a zone
+  event_lookback_days: 5        # the first refresh replays a year of history;
+                                # only closed-bar events this recent are alertable
+                                # so the backfill cannot bury the chat
+  resolve_on_tap: true          # "until tapped or invalidated"
+
+  # --- the daily waiting-list digest ---
+  # Alerts only name the symbols that did something; this is the whole list, so
+  # it can be tracked by hand as well. Both slots ride the existing 5-minute
+  # cron - no extra schedule - and the pre-open one costs no API calls.
+  daily_digest: true
+  digest_after_close: true      # recap: first post-close run with a complete cache
+  digest_before_open: true      # plan for the day, from yesterday's closed levels
+  digest_pre_open_at: "09:10"   # IST; must be before runtime.market_open (09:15)
+  digest_max_rows: 0            # 0 = every name, chunked over several messages
+
+  # --- 1: volume-confirmed displacement (precision.txt) ---
+  vol_len: 20
+  atr_len: 14
+  min_rvol: 1.8
+  min_range_atr: 1.20
+  min_body_frac: 0.55
+  min_clv: 0.72
+  structure_len: 8
+  origin_search: 8
+  allow_neutral: true
+  neutral_body: 0.20
+
+  # --- 2: the exact order-block zone ---
+  zone_method: "Open to low"          # | Body to low | Body only | Lower half of candle
+  entry_mode: "Proximal"              # | 50% | 62% | 70.5% | 79% | Distal + 1 tick
+  front_run_mode: "Auto"              # | ATR | Ticks | Off
+  front_run_atr: 0.18
+  front_run_ticks: 2
+  max_zone_buffer: 0.40               # the front-run pad can never exceed 40% of the zone
+  entry_offset_ticks: 0
+  stop_atr: 0.15
+  approach_atr: 0.25
+  min_age: 3                          # bars between birth and the first legal tap
+  max_zones: 30
+  max_touches: 4                      # the 5th touch invalidates
+  raise_after_first_tap: true
+  repeat_tap_atr: 0.05
+  require_departure: 1.0              # price must clear the zone by 1 ATR first
+
+  # --- 3: optional defence confirmation ---
+  confirm_bars: 3
+  confirm_rvol: 1.3
+  confirm_clv: 0.65
+  confirm_bos_len: 3
+  require_sweep: false
+  sweep_len: 5
+
+  # --- execution details Pine reads off the chart ---
+  mintick: 0.05                       # NSE equity tick size
+  live_atr_from_closed: true          # NON-REPAINT: freeze the developing bar's
+                                      # thresholds at the last closed ATR
