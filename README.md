@@ -189,6 +189,30 @@ can never be confused in the same chat. `alert_kinds` also accepts `approach`,
 `confirm` and `invalid`; they are computed but off by default because they are
 chatty.
 
+### Bar parity with the chart
+
+`bars_from_frame()` drops two kinds of row before the replay, because TradingView
+would have drawn no bar for either and every rule in `precision.txt` is written
+against the chart's own `bar_index`, not against the calendar:
+
+- **a session with no trades** (`volume == 0`). The feed still returns a row,
+  filled with the previous close as `open=high=low=close`, so it looks perfectly
+  valid. Counting one inflates `age = bar_index - born` for every zone by a bar —
+  and `age >= minAge` is what gates the *first* tap, so Tap 1 fires a whole
+  session early. Volume only disqualifies a row when the feed actually reports
+  it: a frame with no volume column means *unknown*, not *no trades*.
+- **a row the feed could not price** (missing or non-finite OHLC) — the all-null
+  placeholder Yahoo emits for a market holiday.
+
+This was found on real data: SMSPHARMA broke out on 2026‑09‑11 and the chart put
+Tap 1 on **2026‑09‑17**, while a port that counted the no‑trade session of
+2026‑09‑14 put it on 2026‑09‑16. That symbol had four such sessions in one year.
+`test_smspharma_daily.csv` is the real year of bars, kept as a fixture: one test
+walks it the way the scanner does and asserts the 17th, another keeps the
+phantom rows and asserts the wrong answer, so loosening the filter fails loudly.
+Dropping the rows also moves ATR (a Wilder RMA over the bar series) onto the same
+series the chart computes it from.
+
 ### Running it
 
 ```bash

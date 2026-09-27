@@ -842,6 +842,59 @@ def test_bars_from_frame_tolerates_missing_volume():
     assert [b.volume for b in bars_from_frame(df)] == [0.0, 0.0]
 
 
+def test_bars_from_frame_drops_a_session_with_no_trades():
+    """
+    The SMSPHARMA 2026-09-14 row, verbatim: a session where nothing traded, which
+    the vendor fills with the previous close so it looks perfectly valid.
+    """
+    tz = "Asia/Kolkata"
+    df = pd.DataFrame({
+        "datetime": [pd.Timestamp("2026-09-11 09:15", tz=tz),
+                     pd.Timestamp("2026-09-14 09:15", tz=tz),
+                     pd.Timestamp("2026-09-15 09:15", tz=tz)],
+        "open": [417.85, 463.45, 477.95], "high": [469.00, 463.45, 482.00],
+        "low": [414.55, 463.45, 397.50], "close": [463.45, 463.45, 410.15],
+        "volume": [10401534.0, 0.0, 4315277.0],
+    })
+    assert [b.session for b in bars_from_frame(df)] == ["2026-09-11", "2026-09-15"]
+
+
+def test_bars_from_frame_drops_rows_it_cannot_price():
+    tz = "Asia/Kolkata"
+    df = pd.DataFrame({
+        "datetime": [pd.Timestamp("2026-05-01 09:15", tz=tz),
+                     pd.Timestamp("2026-05-04 09:15", tz=tz)],
+        "open": [None, 1.0], "high": [float("nan"), 1.5],
+        "low": [None, 0.5], "close": [None, 1.0], "volume": [None, 10.0],
+    })
+    assert [b.session for b in bars_from_frame(df)] == ["2026-05-04"]
+
+
+def test_a_no_trade_session_does_not_advance_the_min_age_gate():
+    """
+    The consequence, at engine level. `touched` needs `age >= minAge` (3) and age
+    counts BARS, not calendar days, so a session with no trades must not move the
+    first legal tap. Counting SMSPHARMA's 2026-09-14 phantom put Tap 1 on the
+    16th; the chart, which draws no bar for it, put it on the 17th.
+    """
+    tz = "Asia/Kolkata"
+    bars = scenario()[:22] + [
+        Bar(111.5, 111.5, 111.5, 111.5, 0.0, d(22)),    # nothing traded
+        Bar(105.0, 106.0, 100.5, 104.0, 200.0, d(23)),  # real age 2: too young
+        Bar(104.0, 105.0, 100.4, 103.5, 180.0, d(24)),  # real age 3: Tap 1
+    ]
+    df = pd.DataFrame({                      # through the real ingestion path
+        "datetime": [pd.Timestamp(b.time, tz=tz) for b in bars],
+        "open": [b.open for b in bars], "high": [b.high for b in bars],
+        "low": [b.low for b in bars], "close": [b.close for b in bars],
+        "volume": [b.volume for b in bars],
+    })
+    res = replay(bars_from_frame(df), OBParams())
+    taps = [(str(e.bar_session), e.tap_number) for e in res.events
+            if e.kind == "tap"]
+    assert taps == [(str(d(24)), 1)]        # NOT the 23rd, which is too young
+
+
 def test_bar_session_handles_dates_strings_and_none():
     assert Bar(1, 1, 1, 1, 1, d(3)).session == "2026-08-06"
     assert Bar(1, 1, 1, 1, 1, "2026-08-06 09:15:00+05:30").session \

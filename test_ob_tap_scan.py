@@ -25,14 +25,16 @@ from __future__ import annotations
 import json
 import sys
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 
+import ob_precision
 import ob_tap_scan
 from dhan import DhanError, IST
-from ob_precision import Bar
+from ob_precision import Bar, bars_from_frame
 from ob_tap_scan import (
     STATE_LOGIC_VERSION, active_waiting, as_date, empty_state, format_heartbeat,
     format_tap, harvest_waiting, load_state, prune_closed_events, save_state,
@@ -101,6 +103,9 @@ def scenario(n_quiet: int = 20, shift_days: int = 0) -> list[Bar]:
 
 
 TAP_BAR = Bar(110.0, 110.5, 100.5, 105.0, 200.0, D0 + timedelta(days=23))
+# A session where nothing traded: the vendor still returns a row, filled with the
+# previous close. TradingView draws no bar for it, so it must not age a zone.
+PHANTOM = Bar(111.5, 111.5, 111.5, 111.5, 0.0, D0 + timedelta(days=22))
 
 
 def frame(bars) -> pd.DataFrame:
@@ -722,6 +727,109 @@ def test_a_closed_tap_says_so():
     text = format_tap(ev, rec, "SYM")
     assert "closed-bar touch" in text and "not close-confirmed" not in text
     assert "Next pre-order after this tap" in text
+
+
+def test_a_no_trade_session_does_not_age_a_zone(ws):
+    """
+    End-to-end shape of the SMSPHARMA bug. History is quiet bars, the displacement
+    and the departure, then a session with volume 0. The live bar is therefore
+    only age 2, and `minAge` is 3, so there is no Tap 1 - even though the quote
+    sits exactly on the pre-order entry. Counting the phantom made this fire a
+    session early: 2026-09-16 instead of the chart's 2026-09-17.
+    """
+    ws.configure(**{"alert_kinds": ["tap"]})
+    ws.arm(bars=scenario()[:22] + [PHANTOM], quote=TAP_QUOTE)
+    assert ws.run() == 0
+    assert ws.tg.sent == []
+
+
+def test_a_no_trade_session_still_taps_one_session_later(ws):
+    """The same series plus ONE real session: now the live bar is age 3."""
+    ws.configure(**{"alert_kinds": ["tap"]})
+    ws.arm(bars=scenario()[:22] + [PHANTOM,
+                                   Bar(111.5, 112.5, 109.0, 110.0, 120.0,
+                                       D0 + timedelta(days=23))],
+           quote=TAP_QUOTE)
+    assert ws.run() == 0
+    assert "TAP 1" in "\n".join(ws.tg.sent)
+
+
+# --------------------------------------------------------------------------- #
+#  Real data: SMSPHARMA, September 2026
+# --------------------------------------------------------------------------- #
+SMS_DAILY = Path(__file__).parent / "test_smspharma_daily.csv"
+
+
+def _walk(bars, params, first="2026-09-11"):
+    """
+    Walk the bars the way the scanner walks them: for each session, replay the
+    history that is CLOSED (everything strictly before it) and judge that session
+    live from its own high/low. Returns the live events as
+    (session, kind, tap_number, entry, stop).
+    """
+    out = []
+    for i, b in enumerate(bars):
+        if str(b.session) < first:
+            continue
+        closed = bars[:i]
+        res = ob_precision.replay(closed, params)
+        ctx = res.context(closed, params)
+        for e in ob_precision.live_pass(ctx["zones"], ctx, params, open_=b.open,
+                                        high=b.high, low=b.low,
+                                        last_price=b.close, volume=b.volume,
+                                        session=b.session):
+            out.append((str(b.session), e.kind, int(e.tap_number or 0),
+                        round(e.zone.entry, 2), round(e.zone.stop, 2)))
+    return out
+
+
+def test_real_smspharma_tap1_is_the_17th_not_the_16th():
+    """
+    Real bars, real chart, the bug this fixture exists for.
+
+    SMSPHARMA broke out on Fri 2026-09-11 (417.85 -> 463.45 on 10.4m shares,
+    about 11x its 20-day average). Monday 2026-09-14 came back from the feed as
+    O=H=L=C=463.45 with volume 0: a session in which nothing traded. The chart
+    draws no bar for it, so Pine's `age = bar_index - born` never counts it, and
+    `age >= minAge` (3) puts the first legal tap on Thu 2026-09-17 - which is
+    what the indicator shows. A port that counted the no-trade session aged the
+    zone one bar too fast and fired Tap 1 on Wed 2026-09-16.
+
+    There are four such rows in this one year of SMSPHARMA (2026-01-15,
+    2026-05-28, 2026-06-26, 2026-09-14), plus one all-null market holiday, so
+    this is a systematic property of the feed rather than a one-off glitch.
+    """
+    df = pd.read_csv(SMS_DAILY)
+    bars = bars_from_frame(df.rename(columns={"date": "datetime"}))
+    assert len(df) == 252
+    assert len(bars) == 247                  # 4 no-trade sessions + 1 holiday
+    sessions = {b.session for b in bars}
+    assert "2026-09-14" not in sessions and "2026-05-01" not in sessions
+
+    ev = _walk(bars, ob_precision.OBParams())
+    taps = [r for r in ev if r[1] == "tap" and r[2] == 1]
+    assert [r[0] for r in taps] == ["2026-09-17"]      # NOT the 15th or 16th
+    assert not [r for r in ev if r[1] == "tap" and r[0] < "2026-09-17"]
+    assert taps[0][3] == 406.18              # frozen pre-order entry
+    # Stop is bottom - stopATR*ATR, and ATR is a Wilder RMA over the bar series -
+    # so dropping the four no-trade sessions moves it by a paisa (399.23 -> 399.22)
+    # and brings it onto the same series the chart computes it from.
+    assert taps[0][4] == 399.22
+
+
+def test_counting_a_no_trade_session_fires_the_tap_a_day_early():
+    """
+    The same walk with the phantom rows kept - i.e. the pre-fix behaviour - to
+    prove the test above actually discriminates, and to pin the symptom so that
+    loosening the filter in bars_from_frame fails loudly.
+    """
+    df = pd.read_csv(SMS_DAILY).dropna()     # keeps the four zero-volume rows
+    bars = [ob_precision.Bar(float(r.open), float(r.high), float(r.low),
+                             float(r.close), float(r.volume), r.date)
+            for r in df.itertuples()]
+    taps = [r for r in _walk(bars, ob_precision.OBParams())
+            if r[1] == "tap" and r[2] == 1]
+    assert [r[0] for r in taps] == ["2026-09-16"]     # the wrong answer
 
 
 def test_the_next_entry_line_says_whether_the_level_actually_moved():

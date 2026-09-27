@@ -149,15 +149,50 @@ class Bar:
 
 
 def bars_from_frame(df, time_col: str = "datetime") -> list[Bar]:
-    """Convert a dhan.py candle DataFrame into `Bar`s, oldest first."""
+    """
+    Convert a dhan.py candle DataFrame into `Bar`s, oldest first.
+
+    Two kinds of row are dropped, because TradingView would have drawn no bar for
+    either - and every rule in precision.txt is written against the chart's own
+    `bar_index`, not against the calendar:
+
+    * a row the feed could not price (missing or non-finite OHLC). Yahoo emits
+      these for market holidays: a timestamp and five nulls.
+    * a session with NO TRADES (volume 0). These are the dangerous ones, because
+      they do not look empty: the vendor fills them with the previous close as
+      open=high=low=close, so the row is perfectly well formed. Counting one
+      inflates `age = bar_index - born` for every zone by a bar, and `age >=
+      minAge` is what gates the FIRST tap - so a no-trade session makes Tap 1
+      fire a whole session early.
+
+      SMSPHARMA, September 2026, is the case this rule exists for: displacement
+      on Fri 11th, then Mon 14th came back O=H=L=C=463.45 with volume 0. The
+      chart, which has no bar for the 14th, put Tap 1 on Thu 17th; a port that
+      counted the 14th put it on Wed 16th.
+    Volume is only a disqualifier when the feed actually REPORTS it: a frame with
+    no volume column at all (or a null in it) means "unknown", not "no trades",
+    and deleting those bars would silently empty the series.
+    """
     out: list[Bar] = []
     for row in df.to_dict("records"):
-        out.append(Bar(
-            open=float(row["open"]), high=float(row["high"]),
-            low=float(row["low"]), close=float(row["close"]),
-            volume=float(row.get("volume") or 0.0),
-            time=row.get(time_col),
-        ))
+        try:
+            o = float(row["open"])
+            h = float(row["high"])
+            lo = float(row["low"])
+            c = float(row["close"])
+        except (TypeError, ValueError, KeyError):
+            continue                       # a row the feed could not price
+        if not all(math.isfinite(x) for x in (o, h, lo, c)):
+            continue                       # holiday placeholder: five nulls
+        try:
+            v = float(row.get("volume"))
+            reported = math.isfinite(v)
+        except (TypeError, ValueError):
+            v, reported = 0.0, False       # no volume column / null: unknown
+        if reported and v <= 0.0:
+            continue                       # an explicit zero: nothing traded
+        out.append(Bar(open=o, high=h, low=lo, close=c, volume=max(v, 0.0),
+                       time=row.get(time_col)))
     out.sort(key=lambda b: (b.time is None, str(b.time)))
     return out
 
