@@ -197,6 +197,9 @@ runtime:
   market_close: "15:30"
   bar_interval_min: 5
   alert_cooldown_bars: 0
+  # Once a symbol fires, suppress same-cycle repeat breakouts for 26 weeks.
+  # After expiry, a NEW 26-week-high cross is required before another alert.
+  breakout_cooldown_weeks: 26
   dry_run: false                  # true = log alerts instead of sending them
 
 # ---------------------------------------------------------------------------

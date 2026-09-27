@@ -180,7 +180,10 @@ def main() -> int:
             if _stop:
                 break
             try:
-                _, res = scan_symbol(client, snap, cfg, week_start_dt)
+                eligible_after = state.breakout_lock_until(
+                    snap.symbol, cfg.runtime.breakout_cooldown_weeks)
+                _, res = scan_symbol(client, snap, cfg, week_start_dt,
+                                     eligible_after=eligible_after)
             except DhanError as exc:
                 errors += 1
                 log.warning("%s: %s", snap.symbol, str(exc)[:100])
@@ -194,8 +197,16 @@ def main() -> int:
             for sig in res.signals:
                 if cfg.strategy.one_per_week and state.already_alerted(week, sig.symbol):
                     continue
+                if state.breakout_cooldown_active(
+                        sig.symbol, sig.bar_time,
+                        cfg.runtime.breakout_cooldown_weeks):
+                    log.info("%s: suppressing repeat 26W breakout inside %d-week cooldown",
+                             sig.symbol, cfg.runtime.breakout_cooldown_weeks)
+                    continue
                 signals.append(sig)
                 state.mark(week, sig.symbol, sig.bar_time, sig.price)
+                state.mark_breakout_alert(sig.symbol, sig.bar_time, sig.price,
+                                          sig.entry_level)
 
         elapsed = time.time() - t0
         if signals:

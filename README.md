@@ -124,6 +124,11 @@ scan.py marks state.json  ──►  WAITING LIST  (this scanner's own state fil
                         🟠 TAP 1  ──►  Telegram
 ```
 
+The waiting-list feed uses the weekly scanner's canonical first alert for each
+26-week breakout cycle; later weekly rows cannot refresh the same cycle's
+breakout anchor. This does **not** change the order-block, tap, or tap-deduping
+rules below.
+
 The zone logic is a **Pine-exact port of `precision.txt`** (*"Institutional OB —
 Precision Tap & Pre-Order"*, Pine v6). Every input of that indicator is a key in
 the `ob_precision:` block of `config.yaml`, at the file's own defaults.
@@ -369,7 +374,8 @@ Set `dry_run: true` in `config.yaml` to log alerts instead of sending them.
 | `gate_source` | `live` (matches the table, Pine default) or `closed` (non-repainting) |
 | `defer_entry` | fire later in the week if the gate turns true after the cross |
 | `req52` | also require a close above the 52W level |
-| `one_per_week` | first entry per symbol per week only |
+| `one_per_week` | prevents duplicate alerts for a symbol within the same week |
+| `runtime.breakout_cooldown_weeks` | cross-week 26W breakout lockout (default 26); after expiry, a fresh 26W cross is required |
 | `universe.exchange_segments` | `[NSE_EQ]`, add `BSE_EQ` for BSE cash |
 | `universe.series` | `[EQ, BE]` |
 | `runtime.prefilter` | stage-1 quote funnel; disable to force the full path |
@@ -382,9 +388,11 @@ Set `dry_run: true` in `config.yaml` to log alerts instead of sending them.
   every run replays the whole week, lateness delays an alert but never loses it.
 - **Weekly bars are Monday-anchored** from daily candles, matching TradingView's
   `"W"` resolution. A market holiday shortens the week, exactly as on the chart.
-- **State is committed back to the repo** (`state.json`) so `one_per_week`
-  survives across runs. If Telegram delivery fails, state is deliberately *not*
-  saved, so the next run retries the alert.
+- **State is committed back to the repo** (`state.json`) so the same-week
+  duplicate guard and the 26-week per-symbol breakout lock survive across runs.
+  The lock starts at the first alert in a breakout cycle; after its 26-week
+  expiry, a new 26W cross is required. If Telegram delivery fails, state is
+  deliberately *not* saved, so the next run retries the alert.
 - **Rate limits** honoured: Data 5/s, Quote 1/s, 100k requests/day.
 - Alerts fire on a **5-minute candle close**, not on every tick — same as the
   indicator.

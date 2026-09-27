@@ -199,6 +199,7 @@ class Runtime:
     market_close: str = "15:30"
     bar_interval_min: int = 5
     alert_cooldown_bars: int = 0
+    breakout_cooldown_weeks: int = 26      # require a fresh 26W cross after lockout
     dry_run: bool = False
     data_source: str = "yfinance"
 

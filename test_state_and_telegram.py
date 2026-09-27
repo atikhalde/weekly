@@ -1,6 +1,7 @@
 """De-duplication state and Telegram message formatting."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -27,6 +28,53 @@ def test_state_persists_across_processes(tmp_path):
     a.mark("2026-07-27", "TCS", datetime(2026, 7, 27, 11, 0), 3900.0)
     a.save()
     assert AlertState(p).already_alerted("2026-07-27", "TCS")
+
+
+def test_breakout_lock_persists_for_26_weeks(tmp_path):
+    p = tmp_path / "state.json"
+    ist = ZoneInfo("Asia/Kolkata")
+    first_alert = datetime(2026, 7, 27, 10, 5, tzinfo=ist)
+
+    state = AlertState(p)
+    state.mark_breakout_alert("OAL", first_alert, 402.65, 390.0)
+    state.save()
+
+    restored = AlertState(p)
+    expires = first_alert + timedelta(weeks=26)
+    assert restored.breakout_lock_until("OAL", 26) == expires
+    assert restored.breakout_cooldown_active(
+        "OAL", expires - timedelta(minutes=5), 26)
+    assert not restored.breakout_cooldown_active("OAL", expires, 26)
+    assert restored.breakout_lock_until("UNKNOWN", 26) is None
+    assert restored.breakout_lock_until("OAL", 0) is None
+
+
+def test_legacy_weekly_alerts_migrate_from_earliest_retained_week(tmp_path):
+    p = tmp_path / "state.json"
+    state = AlertState(p)
+    state.mark("2026-08-24", "OAL", datetime(2026, 8, 26, 15, 20), 402.65)
+    state.mark("2026-09-21", "OAL", datetime(2026, 9, 21, 13, 55), 561.70)
+    state.save()
+
+    migrated = AlertState(p)
+    assert migrated.breakout_record("OAL")["bar_time"] == "2026-08-26T15:20"
+    assert migrated.breakout_lock_until("OAL", 26) == datetime(2027, 2, 24, 15, 20)
+    migrated.save()
+    assert AlertState(p).breakout_record("OAL")["bar_time"] == "2026-08-26T15:20"
+
+
+def test_explicit_first_alert_date_overrides_legacy_weekly_history(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(
+        '{"weeks": {"2026-08-24": {"OAL": '
+        '{"bar_time": "2026-08-26T15:20", "price": 402.65}}}, '
+        '"breakout_alerts": {"OAL": '
+        '{"bar_time": "2026-07-27T15:30+05:30"}}}'
+    )
+    state = AlertState(p)
+    assert state.breakout_record("OAL")["bar_time"] == "2026-07-27T15:30+05:30"
+    assert state.breakout_lock_until("OAL", 26) == datetime(
+        2027, 1, 25, 15, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
 
 
 def test_state_survives_corrupt_file(tmp_path):

@@ -9,7 +9,9 @@ Two-stage funnel so a full cash-segment universe fits inside one cron slot:
            never discard a candle that the indicator would have marked.
 
   Stage 2  for the handful that survive, pull this week's 5-minute candles and
-           replay them bar by bar through the exact Pine logic.
+           replay them bar by bar through the exact Pine logic. When a prior
+           breakout lock has expired before the week opens, seed from the prior
+           session close so an already-above price cannot masquerade as a fresh cross.
 
     python scan.py [--force] [--symbols A,B] [--heartbeat]
 """
@@ -268,22 +270,47 @@ def prefilter(client: DhanClient, snaps: list[WeeklySnapshot], cfg) -> list[Week
     return keep
 
 
-def scan_symbol(client: DhanClient, snap: WeeklySnapshot, cfg, week_start_dt):
-    """Fetch this week's 5m candles and replay them."""
+def scan_symbol(client: DhanClient, snap: WeeklySnapshot, cfg, week_start_dt,
+                eligible_after: datetime | None = None):
+    """Fetch/replay this week's 5m candles, with prior-close context on re-arm."""
     now = datetime.now(IST)
     from_dt = datetime.combine(week_start_dt.date(), dtime(9, 0)).replace(tzinfo=IST)
     to_dt = now + timedelta(minutes=5)
+
+    # If a previous cycle's lock expired before this week's opening candle,
+    # fetch the previous session close too. Otherwise a replay that starts above
+    # the level on Monday would mistake an old, carried breakout for a fresh one.
+    seed_previous_close = False
+    if eligible_after is not None:
+        cutoff = pd.Timestamp(eligible_after)
+        if cutoff.tzinfo is None:
+            cutoff = cutoff.tz_localize(IST)
+        else:
+            cutoff = cutoff.tz_convert(IST)
+        session_open = datetime.combine(
+            week_start_dt.date(), parse_hhmm(getattr(cfg.runtime, "market_open", "09:15"))
+        ).replace(tzinfo=IST)
+        seed_previous_close = cutoff <= pd.Timestamp(session_open)
+
+    fetch_from = from_dt - timedelta(days=7) if seed_previous_close else from_dt
     bars = client.intraday_candles(snap.security_id, snap.exchange_segment,
-                                   from_dt, to_dt, interval=cfg.runtime.bar_interval_min,
+                                   fetch_from, to_dt, interval=cfg.runtime.bar_interval_min,
                                    symbol=snap.symbol)
     if bars.empty:
         return snap, None
 
-    bars = bars[pd.to_datetime(bars["datetime"]).dt.tz_convert(IST)
-                >= pd.Timestamp(from_dt)].reset_index(drop=True)
+    bar_times = pd.to_datetime(bars["datetime"]).dt.tz_convert(IST)
+    previous_close = None
+    if seed_previous_close:
+        prior = bars[bar_times < pd.Timestamp(from_dt)]
+        if not prior.empty:
+            previous_close = float(prior.iloc[-1]["close"])
+    bars = bars[bar_times >= pd.Timestamp(from_dt)].reset_index(drop=True)
     if bars.empty:
         return snap, None
-    return snap, replay_week(snap, cfg.strategy, bars)
+    return snap, replay_week(snap, cfg.strategy, bars,
+                             eligible_after=eligible_after,
+                             previous_close=previous_close)
 
 
 def main() -> int:
@@ -352,8 +379,13 @@ def main() -> int:
     # ---- stage 2
     signals, errors, last_bar = [], 0, None
     with ThreadPoolExecutor(max_workers=cfg.runtime.max_workers) as pool:
-        futures = {pool.submit(scan_symbol, client, s, cfg, week_start_of(now.date())): s
-                   for s in candidates}
+        futures = {}
+        for snap in candidates:
+            eligible_after = state.breakout_lock_until(
+                snap.symbol, cfg.runtime.breakout_cooldown_weeks)
+            futures[pool.submit(
+                scan_symbol, client, snap, cfg, week_start_of(now.date()), eligible_after
+            )] = snap
         for fut in as_completed(futures):
             snap = futures[fut]
             try:
@@ -371,8 +403,16 @@ def main() -> int:
             for sig in res.signals:
                 if cfg.strategy.one_per_week and state.already_alerted(week, sig.symbol):
                     continue
+                if state.breakout_cooldown_active(
+                        sig.symbol, sig.bar_time,
+                        cfg.runtime.breakout_cooldown_weeks):
+                    log.info("%s: suppressing repeat 26W breakout inside %d-week cooldown",
+                             sig.symbol, cfg.runtime.breakout_cooldown_weeks)
+                    continue
                 signals.append(sig)
                 state.mark(week, sig.symbol, sig.bar_time, sig.price)
+                state.mark_breakout_alert(sig.symbol, sig.bar_time, sig.price,
+                                          sig.entry_level)
                 last_bar = max(last_bar or sig.bar_time, sig.bar_time)
 
     signals.sort(key=lambda s: (s.bar_time, s.symbol))

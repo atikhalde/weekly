@@ -174,6 +174,77 @@ def test_signal_survives_the_full_alert_pipeline(setup, tmp_path):
         assert "not required for entry" not in msg
 
 
+def test_scan_symbol_honors_cross_week_cooldown_cutoff(setup):
+    from types import SimpleNamespace
+
+    from scan import scan_symbol
+
+    snap, strategy_cfg = setup
+    bars = week_of_bars(snap, breakout_index=18, n=30)
+    assert replay_week(snap, strategy_cfg, bars).signals
+
+    class CandleClient:
+        def intraday_candles(self, *args, **kwargs):
+            return bars.copy()
+
+    cfg = SimpleNamespace(
+        strategy=strategy_cfg,
+        runtime=SimpleNamespace(bar_interval_min=5),
+    )
+    week_start = pd.Timestamp(bars.iloc[0]["datetime"])
+    # The first cross happens at bar 18; setting eligibility after it must not
+    # turn the still-above price into a delayed/deferred repeat alert.
+    cutoff = pd.Timestamp(bars.iloc[19]["datetime"])
+    _, result = scan_symbol(CandleClient(), snap, cfg, week_start, cutoff)
+    assert result is not None
+    assert result.signals == []
+
+
+def test_scan_symbol_uses_prior_session_close_for_rearmed_cycle(setup):
+    from types import SimpleNamespace
+
+    from config import Strategy
+    from scan import scan_symbol
+
+    snap, _ = setup
+    cfg = SimpleNamespace(
+        strategy=Strategy(strict_entry=False, one_per_week=True),
+        runtime=SimpleNamespace(bar_interval_min=5, market_open="09:15"),
+    )
+    bars = week_of_bars(snap, breakout_index=0, n=4)
+    week_start = pd.Timestamp(bars.iloc[0]["datetime"])
+    expiry = datetime(2025, 3, 2, 15, 30, tzinfo=IST)
+
+    class CandleClient:
+        def __init__(self, previous_close):
+            self.previous_close = previous_close
+            prior_bar = pd.DataFrame([{
+                "datetime": datetime(2025, 2, 28, 15, 25, tzinfo=IST),
+                "open": previous_close, "high": previous_close,
+                "low": previous_close, "close": previous_close, "volume": 1.0,
+            }])
+            self.data = pd.concat([prior_bar, bars], ignore_index=True)
+
+        def intraday_candles(self, *args, **kwargs):
+            # scan_symbol must widen the request for an expired lock so it can
+            # distinguish a fresh open cross from a carried prior-week move.
+            assert args[2].date() < week_start.date()
+            return self.data.copy()
+
+    # Already above on Friday and Monday: no fresh cross, no repeat alert.
+    _, carried = scan_symbol(
+        CandleClient(snap.entry_level * 1.01), snap, cfg, week_start,
+        eligible_after=expiry)
+    assert carried is not None and carried.signals == []
+
+    # Friday below, Monday first close above: this is a genuine post-expiry cross.
+    _, fresh = scan_symbol(
+        CandleClient(snap.entry_level * 0.99), snap, cfg, week_start,
+        eligible_after=expiry)
+    assert fresh is not None and len(fresh.signals) == 1
+    assert fresh.signals[0].bar_time == bars.iloc[0]["datetime"]
+
+
 def test_rescanning_the_same_week_is_idempotent(setup):
     """Every cron run replays the week from bar 1 - the answer must not drift."""
     snap, cfg = setup
