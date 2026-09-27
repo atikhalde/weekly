@@ -213,6 +213,16 @@ phantom rows and asserts the wrong answer, so loosening the filter fails loudly.
 Dropping the rows also moves ATR (a Wilder RMA over the bar series) onto the same
 series the chart computes it from.
 
+A second fixture, `test_pgil_daily.csv`, covers the case where the date survives
+but the levels do not. PGIL displaced on 2026‑06‑24 and its no‑trade session fell
+on 2026‑06‑26; the first tap came on **2026‑07‑08**, nine bars after birth, so
+counting the phantom only ages the zone 10 instead of 9 and both clear
+`minAge = 3`. The frozen numbers still change — ATR 42.84 → 40.59, entry
+955.05 → 954.93, stop 915.87 → 915.97 — and those are the levels a live trade is
+sized against. Bar parity is therefore not a one-symbol quirk: either the series
+matches the chart's bars or the alert prints the wrong prices, and only sometimes
+is the date wrong too.
+
 ### Running it
 
 ```bash

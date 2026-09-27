@@ -832,6 +832,67 @@ def test_counting_a_no_trade_session_fires_the_tap_a_day_early():
     assert [r[0] for r in taps] == ["2026-09-16"]     # the wrong answer
 
 
+PGIL_DAILY = Path(__file__).parent / "test_pgil_daily.csv"
+
+
+def test_real_pgil_tap1_is_the_8th_of_july():
+    """
+    A second symbol, a second shape of the same story.
+
+    PEARL GLOBAL (PGIL) displaced on Wed 2026-06-24: 932.55 -> 1040.50 (+10.2%)
+    on 5,228,316 shares against a ~200k average, and that same session took out
+    the frozen 26-week level (985.05) the weekly scanner had been waiting on.
+    The origin candle is Tue 2026-06-23, so the zone is its open->low,
+    922.75-946.80, and the pre-order entry freezes at 955.05 with the stop at
+    915.87.
+
+    Fri 2026-06-26 then came back O=H=L=C=1035.50 with volume 0 - the third of
+    five no-trade sessions in PGIL's year, and the same phantom that broke
+    SMSPHARMA. Price first reaches the entry on Wed 2026-07-08 (low 950.65),
+    when the zone is 9 bars old, comfortably past minAge 3.
+    """
+    df = pd.read_csv(PGIL_DAILY)
+    bars = bars_from_frame(df.rename(columns={"date": "datetime"}))
+    assert len(df) == 252
+    assert len(bars) == 247                       # five no-trade sessions
+    assert "2026-06-26" not in {b.session for b in bars}
+
+    ev = _walk(bars, ob_precision.OBParams(), first="2026-06-24")
+    taps = [r for r in ev if r[1] == "tap" and r[2] == 1]
+    assert [r[0] for r in taps] == ["2026-07-08"]
+    assert taps[0][3] == 955.05                   # frozen pre-order entry
+    assert taps[0][4] == 915.87                   # bottom - stopATR * ATR
+    # the pullback of 29-30 June (lows 995.00 / 985.55) never reached the entry,
+    # so nothing fires in between - the zone is not tapped on the way down
+    assert not [r for r in ev if r[1] == "tap" and r[0] < "2026-07-08"]
+
+
+def test_a_phantom_bar_far_from_the_age_gate_still_moves_the_frozen_levels():
+    """
+    The complement to the SMSPHARMA test above, and the reason the filter is not
+    optional even when it looks harmless.
+
+    PGIL's tap lands 9 bars after birth, so counting the 2026-06-26 no-trade
+    session does NOT change the DATE - it only ages the zone to 10 instead of 9,
+    and both clear minAge 3. What it does change is every number the alert
+    prints: ATR is a Wilder RMA over the bar series, so one phantom bar pulls it
+    from 42.84 to 40.59 and with it the frozen entry (955.05 -> 954.93) and stop
+    (915.87 -> 915.97). Those are the levels a live trade is sized against.
+
+    So the filter is not "a fix for one unlucky symbol in September": either the
+    series matches the chart's bars or the levels are wrong, and only sometimes
+    is the date wrong too.
+    """
+    df = pd.read_csv(PGIL_DAILY)
+    bars = [ob_precision.Bar(float(r.open), float(r.high), float(r.low),
+                             float(r.close), float(r.volume), r.date)
+            for r in df.itertuples()]            # bypasses the filter
+    taps = [r for r in _walk(bars, ob_precision.OBParams(), first="2026-06-24")
+            if r[1] == "tap" and r[2] == 1]
+    assert [r[0] for r in taps] == ["2026-07-08"]  # date survives
+    assert (taps[0][3], taps[0][4]) == (954.93, 915.97)   # levels do not
+
+
 def test_the_next_entry_line_says_whether_the_level_actually_moved():
     """
     Real SMSPHARMA, 2026-09-16: the tap was defended at 393.25, far BELOW the
