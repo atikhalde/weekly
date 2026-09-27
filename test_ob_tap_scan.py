@@ -633,6 +633,41 @@ def test_a_total_data_outage_fails_the_run_once_a_day(ws, monkeypatch):
     assert ws.run() == 3
 
 
+def test_the_tail_of_a_capped_backfill_is_not_a_data_outage(ws, monkeypatch):
+    """
+    Found by running a whole session at real scale (266 waiting names, cap 250).
+
+    With more names than `max_refresh_per_run`, the second run of a session only
+    asks about the tail. If every name in that tail has no fetchable history -
+    delisted, suspended, freshly listed, badly mapped - the run used to conclude
+    the FEED was down: rc 3, a red workflow, and a failure notice in the chat,
+    minutes after the previous run had refreshed 250 symbols successfully.
+
+    MIN_SAMPLE is pinned to 1 here so two symbols can reproduce a tail that the
+    real threshold of 2 would need a bigger fixture for; the guard under test is
+    "did the feed answer for ANYONE today", not the sample size.
+    """
+    monkeypatch.setattr(ob_tap_scan, "OUTAGE_MIN_SAMPLE", 1)
+    ws.arm(quote=FLAT_QUOTE)                       # TESTSYM has real bars
+    assert ws.run("--symbols", SYM) == 0           # a healthy refresh today
+    assert ws.state()["zones"][SYM].get("no_history") is not True
+
+    # OLDSYM has no frame at all: the tail of the backfill, and nothing else.
+    assert ws.run("--symbols", OLD) == 0           # was 3 before the guard
+    assert ws.state()["data_outage_on"] is None
+
+
+def test_a_cold_session_with_no_data_anywhere_is_still_an_outage(ws, monkeypatch):
+    """
+    The other half of the guard: "the feed answered for someone today" must not
+    become "never report an outage". On the FIRST run of a session nothing has
+    been refreshed today, so a dead feed still fails the run.
+    """
+    monkeypatch.setattr(ob_tap_scan, "OUTAGE_MIN_SAMPLE", 1)
+    assert ws.run("--symbols", OLD) == 3           # nothing in the cache yet
+    assert ws.state()["data_outage_on"] == "2026-08-27"
+
+
 def test_one_broken_symbol_is_not_reported_as_a_data_outage(ws):
     """
     A delisted or badly-mapped name fails every single run. That is a symbol

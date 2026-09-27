@@ -1155,7 +1155,27 @@ def main() -> int:
     # Two or more, because a single name failing is a broken symbol (delisted,
     # suspended, wrong security id), not a broken feed - and late in a session
     # one straggler is often the only thing left to refresh.
-    outage = len(needs) >= OUTAGE_MIN_SAMPLE and refreshed == 0 and errors >= len(needs)
+    # A run that only asked about names the feed has NEVER had bars for is not
+    # evidence about the feed - it is evidence about those names. That is exactly
+    # what the TAIL of a capped backfill looks like: with more waiting names than
+    # max_refresh_per_run, the second run of a session asks about the
+    # alphabetically-last few, and if those happen to be delisted, suspended or
+    # freshly listed then every one of them comes back empty.
+    #
+    # Found at real scale (266 waiting names against a cap of 250): the 09:20 run
+    # asked about the 16 the 09:15 run had not reached, all of them no-data in
+    # that simulation, and concluded the feed was down - rc 3, a red workflow and
+    # a failure notice in the chat, five minutes after 250 symbols had refreshed
+    # perfectly well.
+    #
+    # `refreshed_on == today` is what keeps this from hiding a real outage: on
+    # the FIRST run of a session nothing has been refreshed today yet, so a
+    # feed-down morning fails the run exactly as it did before.
+    feed_answered_today = any(
+        isinstance(c, dict) and c.get("refreshed_on") == today
+        and not c.get("no_history") for c in zones.values())
+    outage = (len(needs) >= OUTAGE_MIN_SAMPLE and refreshed == 0
+              and errors >= len(needs) and not feed_answered_today)
     new_outage = outage and state.get("data_outage_on") != today
     if new_outage:
         state["data_outage_on"] = today
