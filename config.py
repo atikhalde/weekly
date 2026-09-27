@@ -285,6 +285,26 @@ class OBPrecision:
     # first alerted tap. The record is kept for audit either way.
     resolve_on_tap: bool = True
 
+    # --- the daily waiting-list digest ---------------------------------------
+    # Alerts only ever name the symbols that DID something. The list itself is
+    # the thing worth tracking by hand - what is armed, at what price, and how
+    # long it has been waiting - so once per slot the whole active list goes to
+    # the same chat. Both slots ride the existing 5-minute cron: no extra
+    # schedule, and the pre-open one costs no API calls at all because it is
+    # built from the cache the post-close run left behind.
+    daily_digest: bool = True
+    # Post-close recap: the first run after the bell whose zone cache is
+    # complete for today (the 15:35 run, or the 15:40 one when a large list is
+    # still spreading its refreshes over runs).
+    digest_after_close: bool = True
+    # Pre-open plan: the first run at or after this time (IST) on a weekday,
+    # before the market opens. Yesterday's closed levels, read before the bell.
+    digest_before_open: bool = True
+    digest_pre_open_at: str = "09:10"
+    # 0 = every waiting name, however many Telegram messages that takes. A cap
+    # drops the OLDEST breakouts and says how many were dropped.
+    digest_max_rows: int = 0
+
     # --- indicator inputs (precision.txt, defaults unchanged) ----------------
     # 1: volume-confirmed displacement
     vol_len: int = 20

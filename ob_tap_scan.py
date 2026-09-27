@@ -120,6 +120,14 @@ def empty_state() -> dict[str, Any]:
         # between runs so a five-minute cron cannot send the same failure notice
         # 78 times a day; `load_state` must carry it back or the guard is a no-op.
         "data_outage_on": None,
+        # Slot -> date the daily waiting-list digest was last DELIVERED on
+        # ("post_close" / "pre_open"). Same one-per-day discipline as the outage
+        # marker, and again only written once Telegram confirms delivery, so a
+        # failed send is retried by the next run instead of being swallowed.
+        # Additive: an older state file simply has no key, which reads as "never
+        # sent", so STATE_LOGIC_VERSION does not move and the zone cache - which
+        # costs ~370 history calls to rebuild - stays warm across the upgrade.
+        "digest_on": {},
     }
 
 
@@ -146,9 +154,12 @@ def load_state(path: Path) -> dict[str, Any]:
         data["waiting"] = raw.get("waiting") or {}
         data["alerts"] = raw.get("alerts") or {}
         return data
-    for key in ("waiting", "zones", "alerts", "updated_at", "data_outage_on"):
+    for key in ("waiting", "zones", "alerts", "updated_at", "data_outage_on",
+                "digest_on"):
         if key in raw:
             data[key] = raw[key]
+    if not isinstance(data.get("digest_on"), dict):
+        data["digest_on"] = {}
     return data
 
 
@@ -598,6 +609,213 @@ def format_heartbeat(waiting: int, refreshed: int, quoted: int, events: int,
 
 
 # --------------------------------------------------------------------------- #
+#  The daily waiting-list digest
+# --------------------------------------------------------------------------- #
+SLOT_LABELS = {"post_close": "post-close recap", "pre_open": "pre-open plan",
+               "manual": "on demand"}
+
+
+def digest_slot(now: datetime, cfg, ob) -> str | None:
+    """
+    Which of the day's two digest slots this run falls in, or None.
+
+    "post_close" from five minutes after the bell, "pre_open" from
+    `digest_pre_open_at` up to the bell. Everything in between is the ordinary
+    five-minute scan and sends no list: a digest every five minutes would be
+    noise rather than something to track by hand.
+    """
+    if now.weekday() >= 5:
+        return None                      # the cron does not run at the weekend
+    if session_closed(now, cfg):
+        return "post_close"
+    if not market_is_open(cfg, now) and now.time() >= parse_hhmm(ob.digest_pre_open_at):
+        return "pre_open"
+    return None
+
+
+def digest_due(state: dict[str, Any], slot: str | None, today: str, ob) -> bool:
+    """
+    One digest per slot per day, and only while that slot is switched on.
+
+    Anything that is not one of the two scheduled slots - a weekend, an evening
+    run, mid-session - is never "due" on its own. Only an explicit --digest or
+    --digest-only sends off-schedule, and that is labelled "manual" so it cannot
+    spend either of the day's real slots.
+    """
+    if not ob.daily_digest or slot not in ("post_close", "pre_open"):
+        return False
+    if slot == "post_close" and not ob.digest_after_close:
+        return False
+    if slot == "pre_open" and not ob.digest_before_open:
+        return False
+    return (state.get("digest_on") or {}).get(slot) != today
+
+
+def post_close_pending(waiting: list[str], zones: dict[str, Any], today: str) -> list[str]:
+    """Waiting names whose post-close replay has not run yet today."""
+    return [s for s in waiting
+            if (zones.get(s) or {}).get("post_close_done") != today]
+
+
+def last_scan_of_day(now: datetime, cfg) -> bool:
+    """
+    True on the final run the cron will make today: `market_is_open` gives up ten
+    minutes after the bell, so 15:40 IST is the last one.
+
+    The post-close digest would rather wait until every symbol's cache is current
+    for today, but it must not wait past this run - a large list spreads its
+    refreshes over two runs by design, and one permanently broken symbol would
+    otherwise cost the day's list entirely.
+    """
+    end = datetime.combine(now.date(), parse_hhmm(cfg.runtime.market_close),
+                           tzinfo=now.tzinfo)
+    return now >= end + timedelta(minutes=10)
+
+
+def _d(iso: Any) -> str:
+    """2026-08-26 -> 26-Aug. Short, because this prints ~370 times a message."""
+    day = as_date(iso)
+    return day.strftime("%d-%b") if day else "?"
+
+
+def _digest_row(sym: str, rec: dict[str, Any], ctx: dict[str, Any] | None) -> str:
+    """One waiting name on one line: what it broke out on, and what is armed."""
+    ctx = ctx or {}
+    brk = f"brk {_d(str(rec.get('breakout_bar') or '')[:10])}"
+    if rec.get("breakout_price"):
+        brk += f" @{_fmt(rec.get('breakout_price'))}"
+        if rec.get("level_26w"):
+            brk += f" >{_fmt(rec.get('level_26w'))}"
+    live = [z for z in (ctx.get("zones") or []) if isinstance(z, dict)]
+    if live:
+        z = max(live, key=lambda z: str(z.get("born_session") or ""))
+        arm = (f"OB {_d(z.get('born_session'))} entry {_fmt(z.get('entry'))} "
+               f"stop {_fmt(z.get('stop'))}")
+        if int(z.get("taps") or 0):
+            arm += f" · tapped {_d(z.get('tap_session'))}"
+        if len(live) > 1:
+            arm += f" · +{len(live) - 1} older zone(s)"
+    elif ctx.get("no_history"):
+        arm = "no daily history"
+    else:
+        arm = "no live zone yet"
+    return f"<b>{_esc(sym)}</b> · {brk} · {arm}"
+
+
+# Telegram's hard limit is 4096 characters. `telegram._split` would chop a long
+# list for us, but it chops blindly: everything after the first chunk arrives
+# with no header, and 266 waiting names is four chunks. Paging here instead means
+# each message says what it is and which part of the list it carries.
+DIGEST_PAGE_CHARS = 3800
+
+
+def format_digest(state: dict[str, Any], zones: dict[str, Any], now: datetime,
+                  slot: str, ob, added: list[str] | None = None) -> list[str]:
+    """
+    The whole active waiting list, newest breakout first, as one string per
+    Telegram message.
+
+    This is the manual-tracking view: alerts only ever name the symbols that did
+    something, so a name sitting armed and untouched for three weeks is invisible
+    in the chat even though it is exactly the one worth watching. Every level
+    printed here is already frozen in the cache - nothing is recomputed for the
+    message, so it cannot disagree with an alert.
+    """
+    waiting = state.get("waiting") or {}
+    active = [s for s in active_waiting(state)]
+    recs = sorted(((s, waiting[s]) for s in active), key=lambda x: x[0])
+    recs.sort(key=lambda x: str(x[1].get("breakout_bar") or ""), reverse=True)
+
+    armed = sum(1 for s, _r in recs if (zones.get(s) or {}).get("zones"))
+    today_iso = now.date().isoformat()
+    tapped = sum(1 for _s, r in waiting.items() if r.get("status") == "tapped"
+                 and str(r.get("resolved_at") or "") == today_iso)
+    invalid = sum(1 for _s, r in waiting.items() if r.get("status") == "invalid"
+                  and str(r.get("resolved_at") or "") == today_iso)
+
+    head = [
+        f"📋 <b>PRECISION WAITING LIST — {SLOT_LABELS.get(slot, slot)}</b>",
+        f"{now.strftime('%d-%b-%Y %H:%M')} IST · <b>{len(recs)}</b> waiting · "
+        f"{armed} armed"
+        + (f" · +{len(added)} new today" if added else "")
+        + (f" · {tapped} tapped today" if tapped else "")
+        + (f" · {invalid} invalidated today" if invalid else ""),
+        "<i>newest breakout first · entry/stop are the newest live zone's, "
+        "frozen at birth</i>",
+    ]
+    if slot == "post_close":
+        # A recap that quietly mixed yesterday's levels into today's would be
+        # worse than no recap. The pre-open plan is EXPECTED to show yesterday,
+        # so it carries no warning - this is only for the run after the bell,
+        # where a failed or still-pending refresh is the exception.
+        stale = post_close_pending([s for s, _r in recs], zones, today_iso)
+        if stale:
+            head.append(f"⚠️ {len(stale)} name(s) not replayed since the bell — "
+                        f"their levels are from an earlier session")
+    if not recs:
+        return ["\n".join(head + ["<i>The waiting list is empty.</i>"])]
+
+    cap = int(ob.digest_max_rows or 0)
+    rows = [_digest_row(s, r, zones.get(s)) for s, r in recs]
+    if cap > 0 and len(rows) > cap:
+        head.append(f"… showing the {cap} newest of {len(rows)} "
+                    f"(digest_max_rows={cap})")
+        rows = rows[:cap]
+
+    label = SLOT_LABELS.get(slot, slot)
+    # Same header on every page: the (k/n) suffix below is what marks a
+    # continuation, and repeating the slot label means a page read on its own -
+    # forwarded, or scrolled to days later - still says what it is.
+    cont = f"📋 <b>PRECISION WAITING LIST — {_esc(str(label))}</b>"
+    pages: list[list[str]] = []
+    cur: list[str] = []
+    cur_len = 0
+    for row in rows:
+        while True:
+            if not cur:
+                cur = list(head) if not pages else [cont]
+                cur_len = sum(len(x) + 1 for x in cur)
+            fits = cur_len + len(row) + 1 <= DIGEST_PAGE_CHARS
+            if fits or len(cur) == (len(head) if not pages else 1):
+                cur.append(row)                 # a row longer than a page still
+                cur_len += len(row) + 1         # has to go somewhere
+                break
+            pages.append(cur)
+            cur, cur_len = [], 0
+    if cur:
+        pages.append(cur)
+    if len(pages) > 1:
+        for i, page in enumerate(pages):
+            page[0] = page[0].replace("</b>", f" ({i + 1}/{len(pages)})</b>", 1)
+    return ["\n".join(page) for page in pages]
+
+
+def send_digest(state: dict[str, Any], zones: dict[str, Any], now: datetime,
+                cfg, ob, tg, slot: str, today: str,
+                added: list[str] | None = None) -> bool:
+    """
+    Deliver the list and mark the slot - in that order.
+
+    The marker is written only once Telegram confirms delivery, which is the same
+    rule the alerts follow: a failed send must be retried by the next run rather
+    than silently swallowing the day's list.
+    """
+    pages = format_digest(state, zones, now, slot, ob, added)
+    for i, page in enumerate(pages):
+        if not tg.send(page):
+            # Stop rather than deliver half a list: the slot stays unmarked, so
+            # the next run resends the whole thing. A page may therefore arrive
+            # twice after a partial failure, which beats a list with a hole in it.
+            log.error("daily digest (%s) page %d/%d NOT delivered - slot left "
+                      "unmarked so the next run retries", slot, i + 1, len(pages))
+            return False
+    state.setdefault("digest_on", {})[slot] = today
+    log.info("daily digest (%s) sent: %d waiting over %d message(s)", slot,
+             len(active_waiting(state)), len(pages))
+    return True
+
+
+# --------------------------------------------------------------------------- #
 #  Main
 # --------------------------------------------------------------------------- #
 def main() -> int:
@@ -611,6 +829,10 @@ def main() -> int:
                     help="override ob_precision.state_file")
     ap.add_argument("--refresh-only", action="store_true",
                     help="rebuild the zone cache and exit (no live tap pass)")
+    ap.add_argument("--digest", action="store_true",
+                    help="send the waiting-list digest now, whatever the slot")
+    ap.add_argument("--digest-only", action="store_true",
+                    help="send the digest and exit: no history calls, no quotes")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -634,20 +856,36 @@ def main() -> int:
     not_before = (now.date()
                   - timedelta(days=max(0, ob.event_lookback_days))).isoformat()
 
-    if not args.force and not market_is_open(cfg, now):
-        log.info("market closed (%s IST) - nothing to do", now.strftime("%a %H:%M"))
-        return 0
-    closed_today = session_closed(now, cfg)
-
     state_path = Path(args.state_file) if args.state_file else cfg.paths["ob_state"]
     state = load_state(state_path)
     # A copy of what was on disk, so save_state() can tell "something changed"
     # from "only the timestamp moved" and skip the write (and the commit) when
     # nothing did.
     original = json.loads(json.dumps(state, default=str))
+    zones = state.setdefault("zones", {})
+
+    # ---- outside market hours the only thing a run can do is send the list ---
+    # The pre-open plan is built entirely from the cache that yesterday's
+    # post-close replay froze, so this branch never constructs a DhanClient: a
+    # 09:10 run that pulled ~370 histories would duplicate the 09:15 one and
+    # spend the workflow's rate budget to learn nothing new.
+    if args.digest_only or (not args.force and not market_is_open(cfg, now)):
+        slot = digest_slot(now, cfg, ob)
+        if args.digest or args.digest_only or digest_due(state, slot, today, ob):
+            tg = build_telegram(cfg, dry_run=cfg.runtime.dry_run)
+            # Off-schedule sends are labelled (and marked) "manual", so a forced
+            # digest cannot spend the day's pre-open or post-close slot.
+            send_digest(state, zones, now, cfg, ob, tg, slot or "manual", today)
+            save_state(state_path, state, original)
+        else:
+            log.info("market closed (%s IST) - nothing to do",
+                     now.strftime("%a %H:%M"))
+        return 0
+    closed_today = session_closed(now, cfg)
 
     # ---- stage 0: the waiting list, harvested from the weekly scanner -------
     alerts = weekly_alerts(cfg, ob.backfill_weeks)
+    added: list[str] = []
     if alerts:
         ids = resolve_universe(cfg)
         levels = snapshot_levels(cfg)
@@ -681,7 +919,6 @@ def main() -> int:
     client = DhanClient(cfg.secrets.dhan_client_id, cfg.secrets.dhan_access_token,
                         data_rate=cfg.runtime.data_rate_per_sec,
                         quote_rate=cfg.runtime.quote_rate_per_sec)
-    zones = state.setdefault("zones", {})
     alerts_seen = state.setdefault("alerts", {})
     errors = 0
 
@@ -882,6 +1119,21 @@ def main() -> int:
         # Note the test is `refreshed`, not `not outage` - a run that refreshed
         # nothing because everything was already cached says nothing either way.
         state["data_outage_on"] = None
+
+    # ---- the daily list, once the day's statuses are final ------------------
+    # Deliberately AFTER the taps are sent and the resolved statuses are set, so
+    # the counts in the header describe the day that just finished, and BEFORE
+    # save_state so the slot marker is persisted with everything else.
+    slot = digest_slot(now, cfg, ob)
+    due = bool(args.digest) or digest_due(state, slot, today, ob)
+    if due and slot == "post_close" and not args.digest:
+        pending = post_close_pending(active_waiting(state), zones, today)
+        if pending and not last_scan_of_day(now, cfg):
+            log.info("post-close digest deferred: %d waiting symbol(s) have not "
+                     "been replayed since the bell", len(pending))
+            due = False
+    if due:
+        send_digest(state, zones, now, cfg, ob, tg, slot or "manual", today, added)
 
     if save_state(state_path, state, original):
         log.info("state saved: %d waiting, %d cached, %d alert key(s), %d KB",

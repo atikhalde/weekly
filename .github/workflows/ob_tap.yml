@@ -12,6 +12,13 @@ name: Precision OB Tap (5m)
 # SESSION, then one BULK quote for the whole list on every later run. A missed
 # slot never loses a tap permanently - the session's low is still in the next
 # quote - but it does delay the alert, which is the whole point of the schedule.
+#
+# The same cron also carries the DAILY WAITING LIST (README -> "The daily
+# waiting-list digest"): 03:40 UTC is 09:10 IST, which is the pre-open plan, and
+# the 10:05/10:10 UTC runs are the post-close recap. Neither needs its own
+# schedule, and the pre-open one makes no market-data call at all - it prints the
+# cache the previous evening froze. If GitHub's scheduler skips 03:40 the plan
+# simply does not go out that day; the recap is unaffected.
 on:
   schedule:
     - cron: "*/5 3-10 * * 1-5"
@@ -27,6 +34,10 @@ on:
         default: false
       refresh_only:
         description: "Rebuild the order-block cache, skip the live tap pass"
+        type: boolean
+        default: false
+      digest_only:
+        description: "Send the waiting-list digest and exit (no market data)"
         type: boolean
         default: false
       symbols:
@@ -91,6 +102,7 @@ jobs:
             ${{ inputs.force && '--force' || '' }} \
             ${{ inputs.heartbeat && '--heartbeat' || '' }} \
             ${{ inputs.refresh_only && '--refresh-only' || '' }} \
+            ${{ inputs.digest_only && '--digest-only' || '' }} \
             ${{ inputs.symbols && format('--symbols {0}', inputs.symbols) || '' }}
 
       # state.json is NOT committed here: it belongs to the intraday scan, and

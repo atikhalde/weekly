@@ -189,6 +189,57 @@ can never be confused in the same chat. `alert_kinds` also accepts `approach`,
 `confirm` and `invalid`; they are computed but off by default because they are
 chatty.
 
+### The daily waiting-list digest
+
+Alerts only ever name the symbols that *did* something. A name sitting armed and
+untouched for three weeks is invisible in the chat — and it is exactly the one
+worth tracking by hand — so the whole active list goes out twice a session:
+
+- **pre-open plan, 09:10 IST** — yesterday's frozen levels, read before the bell.
+  It costs no API calls at all: that branch never builds a `DhanClient`, because
+  everything it prints was already computed by the post-close replay.
+- **post-close recap, 15:35 IST** — today's closed bar, including any zone born
+  on it. When a large list is still spreading its refreshes over runs
+  (`max_refresh_per_run`), the recap defers to the 15:40 run rather than print
+  half-stale levels — but never past the last run of the day, or one broken
+  symbol would cost the list entirely.
+
+Newest breakout first, one line per name:
+
+```text
+📋 PRECISION WAITING LIST — post-close recap
+25-Sep-2026 15:35 IST · 367 waiting · 42 armed · +3 new today · 1 tapped today
+newest breakout first · entry/stop are the newest live zone's, frozen at birth
+PGIL · brk 24-Jun @986.35 >985.05 · OB 24-Jun entry 955.05 stop 915.87
+SMSPHARMA · brk 11-Sep @455.05 >447.80 · OB 11-Sep entry 406.18 stop 399.22 · tapped 17-Sep
+AAKASH · brk 18-Aug @55.00 · no live zone yet
+```
+
+A name with no zone yet says so instead of being omitted, and one whose history
+cannot be fetched says `no daily history`, so a hole in the list is always a real
+hole.
+
+The real list is ~266 names and ~15k characters, which is more than one Telegram
+message, so the digest pages itself at 3800 characters and repeats the header on
+every page with a `(k/n)` suffix — `telegram._split` would chop it for us, but
+blindly, and everything after the first chunk would arrive with no header at all.
+`digest_max_rows: 0` (the default) sends every name; a cap drops the *oldest*
+breakouts and says how many were dropped. `daily_digest: false` turns both slots
+off, and `digest_after_close` / `digest_before_open` / `digest_pre_open_at`
+control them one at a time.
+
+If a name could not be replayed since the bell, the recap says so in the header
+(`⚠️ N name(s) not replayed since the bell`) rather than quietly mixing an older
+session's levels into today's list. The pre-open plan carries no such warning —
+yesterday's levels are exactly what it is for.
+
+Both slots ride the existing `*/5 3-10 * * 1-5` UTC cron, so **no new schedule is
+needed** — 03:40 UTC *is* 09:10 IST, and 10:05/10:10 UTC are the recap. Each slot sends once per day, and the marker
+in `ob_precision_state.json` is written only after Telegram confirms delivery, so
+a failed send is retried by the next run instead of being swallowed. An explicit
+`--digest` / `--digest-only` sends off-schedule and is marked `manual`, which
+cannot spend either of the day's real slots.
+
 ### Bar parity with the chart
 
 `bars_from_frame()` drops two kinds of row before the replay, because TradingView
@@ -230,7 +281,12 @@ python ob_tap_scan.py                       # normal 5-minute run
 python ob_tap_scan.py --force --heartbeat   # out of hours, with a summary
 python ob_tap_scan.py --symbols SMSPHARMA   # one name
 python ob_tap_scan.py --refresh-only        # rebuild the zone cache, no live pass
+python ob_tap_scan.py --digest              # send the waiting list now
+python ob_tap_scan.py --digest-only         # ...and do nothing else: no API calls
 ```
+
+`--digest-only` is also a `workflow_dispatch` input on **Precision OB Tap (5m)**,
+so the list can be pulled from the Actions tab at any hour.
 
 `ob_precision.enabled: false` in `config.yaml` switches the whole thing off
 without touching any other job. The GitHub workflow is

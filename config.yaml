@@ -237,6 +237,16 @@ ob_precision:
                                 # so the backfill cannot bury the chat
   resolve_on_tap: true          # "until tapped or invalidated"
 
+  # --- the daily waiting-list digest ---
+  # Alerts only name the symbols that did something; this is the whole list, so
+  # it can be tracked by hand as well. Both slots ride the existing 5-minute
+  # cron - no extra schedule - and the pre-open one costs no API calls.
+  daily_digest: true
+  digest_after_close: true      # recap: first post-close run with a complete cache
+  digest_before_open: true      # plan for the day, from yesterday's closed levels
+  digest_pre_open_at: "09:10"   # IST; must be before runtime.market_open (09:15)
+  digest_max_rows: 0            # 0 = every name, chunked over several messages
+
   # --- 1: volume-confirmed displacement (precision.txt) ---
   vol_len: 20
   atr_len: 14

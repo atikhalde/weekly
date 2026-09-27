@@ -36,9 +36,11 @@ import ob_tap_scan
 from dhan import DhanError, IST
 from ob_precision import Bar, bars_from_frame
 from ob_tap_scan import (
-    STATE_LOGIC_VERSION, active_waiting, as_date, empty_state, format_heartbeat,
-    format_tap, harvest_waiting, load_state, prune_closed_events, save_state,
-    session_closed, weekly_alerts,
+    STATE_LOGIC_VERSION, active_waiting, as_date, digest_slot, empty_state,
+    format_digest, format_heartbeat, format_tap, harvest_waiting,
+    last_scan_of_day, load_state,
+    post_close_pending, prune_closed_events, save_state, session_closed,
+    weekly_alerts,
 )
 
 # Thursday, mid-session: market_is_open() is True and session_closed() is False.
@@ -991,3 +993,272 @@ def test_the_state_file_stays_small_enough_to_commit(ws):
     size = (ws.dir / "ob_precision_state.json").stat().st_size
     per_symbol = size / 2
     assert per_symbol < 8192, f"{per_symbol:.0f} bytes per symbol is too fat to commit"
+
+
+# --------------------------------------------------------------------------- #
+#  The daily waiting-list digest
+# --------------------------------------------------------------------------- #
+# Alerts only ever name the symbols that DID something. The user tracks the list
+# by hand as well, so the whole active list goes out twice a session: a pre-open
+# plan built from yesterday's frozen cache, and a post-close recap.
+CLOSE_THU = datetime(2026, 8, 27, 15, 37, tzinfo=IST)     # first run after the bell
+LAST_THU = datetime(2026, 8, 27, 15, 40, tzinfo=IST)      # the last run of the day
+PRE_OPEN_FRI = datetime(2026, 8, 28, 9, 10, tzinfo=IST)
+QUIET = scenario()[:20]              # history, but no displacement -> no zone
+
+
+def _digests(tg) -> list[str]:
+    return [m for m in tg.sent if "PRECISION WAITING LIST" in m]
+
+
+def _arm_both(ws):
+    ws.arm(quote=FLAT_QUOTE)                            # TESTSYM: one armed zone
+    ws.arm(OLD, OLD_SID, bars=QUIET, quote=FLAT_QUOTE)  # OLDSYM: history, no zone
+
+
+@pytest.mark.parametrize("now,expected", [
+    (datetime(2026, 8, 27, 9, 9, tzinfo=IST), None),       # before 09:10
+    (datetime(2026, 8, 27, 9, 10, tzinfo=IST), "pre_open"),
+    (datetime(2026, 8, 27, 9, 14, tzinfo=IST), "pre_open"),
+    (datetime(2026, 8, 27, 9, 15, tzinfo=IST), None),      # the bell: a scan run
+    (datetime(2026, 8, 27, 11, 0, tzinfo=IST), None),      # mid-session
+    (datetime(2026, 8, 27, 15, 34, tzinfo=IST), None),     # feed still settling
+    (datetime(2026, 8, 27, 15, 35, tzinfo=IST), "post_close"),
+    (datetime(2026, 8, 27, 20, 0, tzinfo=IST), "post_close"),
+    (datetime(2026, 8, 29, 11, 0, tzinfo=IST), None),      # Saturday
+])
+def test_only_two_slots_a_day_can_carry_the_list(ws, now, expected):
+    """A digest every five minutes would be noise, not something to track by."""
+    assert digest_slot(now, ws.cfg, ws.cfg.ob_precision) == expected
+
+
+def test_the_recap_waits_for_the_cache_but_never_past_the_last_run(ws):
+    cfg = ws.cfg
+    assert last_scan_of_day(CLOSE_THU, cfg) is False
+    assert last_scan_of_day(LAST_THU, cfg) is True
+    zones = {"A": {"post_close_done": "2026-08-27"},
+             "B": {"post_close_done": "2026-08-26"}, "C": {}}
+    assert post_close_pending(["A", "B", "C"], zones, "2026-08-27") == ["B", "C"]
+
+
+def test_the_daily_digest_lists_every_waiting_name_newest_breakout_first(ws, monkeypatch):
+    """
+    The whole active list, not just the names that alerted: a symbol sitting
+    armed and untouched for three weeks is invisible in the chat otherwise, and
+    it is exactly the one worth watching by hand.
+    """
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    _arm_both(ws)
+    assert ws.run() == 0
+    dig = _digests(ws.tg)
+    assert len(dig) == 1
+    text = dig[0]
+    assert "post-close recap" in text
+    assert "<b>2</b> waiting" in text and "1 armed" in text and "+2 new today" in text
+    lines = text.splitlines()
+    sym = next(ln for ln in lines if "TESTSYM" in ln)
+    old = next(ln for ln in lines if "OLDSYM" in ln)
+    assert lines.index(sym) < lines.index(old)        # 26-Aug breakout first
+    assert "brk 26-Aug @105.50 >104.00" in sym        # breakout price over the 26W level
+    assert "OB 23-Aug entry 100.60 stop 97.50" in sym  # frozen at birth
+    assert "brk 18-Aug @55.00" in old                 # level from another week: none
+    assert "no live zone yet" in old
+
+
+def test_a_symbol_with_no_daily_history_says_so_instead_of_vanishing(ws, monkeypatch):
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    ws.arm(quote=FLAT_QUOTE)                          # OLDSYM is never armed
+    assert ws.run() == 0
+    old = next(ln for ln in _digests(ws.tg)[0].splitlines() if "OLDSYM" in ln)
+    assert "no daily history" in old
+
+
+def test_the_recap_is_deferred_until_every_symbol_has_been_replayed(ws, monkeypatch):
+    """
+    With a cap on per-run refreshes a big list finishes over two runs. Printing
+    half of yesterday's levels as today's recap would be worse than waiting five
+    minutes - so the 15:35 run defers and the 15:40 one sends.
+    """
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    ws.configure(**{"max_refresh_per_run": 1})
+    _arm_both(ws)
+    assert ws.run() == 0
+    assert _digests(ws.tg) == []                       # TESTSYM not replayed yet
+    assert ws.state()["digest_on"].get("post_close") is None
+
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: LAST_THU)
+    ws.tg.sent.clear()
+    assert ws.run() == 0
+    assert len(_digests(ws.tg)) == 1
+    assert ws.state()["digest_on"]["post_close"] == "2026-08-27"
+
+
+def test_one_digest_per_slot_per_day(ws, monkeypatch):
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    _arm_both(ws)
+    assert ws.run() == 0
+    assert len(_digests(ws.tg)) == 1
+    assert ws.state()["digest_on"]["post_close"] == "2026-08-27"
+
+    ws.tg.sent.clear()
+    assert ws.run() == 0                               # the 15:40 run
+    assert _digests(ws.tg) == []
+
+    monkeypatch.setattr(ob_tap_scan, "_now",
+                        lambda: datetime(2026, 8, 28, 15, 37, tzinfo=IST))
+    ws.tg.sent.clear()
+    assert ws.run() == 0                               # next session
+    assert len(_digests(ws.tg)) == 1
+
+
+def test_a_digest_that_fails_to_send_is_retried_not_swallowed(ws, monkeypatch):
+    """The alert rule: if it did not arrive, do not record it as sent."""
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    ws.arm(quote=FLAT_QUOTE)
+    ws.tg.ok = False
+    assert ws.run() == 0
+    assert ws.state()["digest_on"].get("post_close") is None
+    ws.tg.ok = True
+    ws.tg.sent.clear()
+    assert ws.run() == 0
+    assert len(_digests(ws.tg)) == 1
+    assert ws.state()["digest_on"]["post_close"] == "2026-08-27"
+
+
+def test_the_pre_open_plan_costs_no_api_calls(ws, monkeypatch):
+    """
+    09:10 IST: the bell has not gone, so there is nothing to scan. Everything the
+    plan prints was frozen by yesterday's post-close replay, which is why this
+    run never builds a DhanClient - a 09:10 history pull would duplicate the
+    09:15 one and spend the workflow's rate budget to learn nothing.
+    """
+    _arm_both(ws)
+    assert ws.run() == 0                               # Thursday: harvest + cache
+    assert ws.state()["waiting"]
+    ws.tg.sent.clear()
+    ws.client.history_calls.clear()
+    ws.client.ohlc_calls.clear()
+
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: PRE_OPEN_FRI)
+    assert ws.run() == 0
+    dig = _digests(ws.tg)
+    assert len(dig) == 1 and "pre-open plan" in dig[0]
+    assert "TESTSYM" in dig[0] and "entry 100.60 stop 97.50" in dig[0]
+    assert ws.client.history_calls == [] and ws.client.ohlc_calls == []
+    assert ws.state()["digest_on"]["pre_open"] == "2026-08-28"
+
+    # ...and the pre-open slot does not spend the day's recap
+    monkeypatch.setattr(ob_tap_scan, "_now",
+                        lambda: datetime(2026, 8, 28, 15, 37, tzinfo=IST))
+    ws.tg.sent.clear()
+    assert ws.run() == 0
+    assert len(_digests(ws.tg)) == 1
+
+
+def test_a_long_list_is_paged_and_every_page_says_what_it_is():
+    """
+    266 real waiting names is ~15k characters, which is four Telegram messages.
+    `telegram._split` would chop that for us, but blindly: everything after the
+    first chunk arrives with no header at all. Paging here means each message
+    carries the slot label and its own (k/n), and no name is lost or duplicated
+    across the breaks.
+    """
+    state = empty_state()
+    zones: dict = {}
+    for i in range(300):
+        sym = f"SYM{i:03d}"
+        state["waiting"][sym] = {
+            "symbol": sym, "security_id": i, "exchange_segment": "NSE_EQ",
+            "week": "2026-09-21", "breakout_bar": f"2026-09-{(i % 25) + 1:02d}T10:00+05:30",
+            "breakout_price": 100.0 + i, "level_26w": 99.0 + i,
+            "added_at": "2026-09-25", "status": "waiting",
+            "resolved_at": None, "resolved_reason": None,
+        }
+        if i % 3 == 0:
+            zones[sym] = {"zones": [{"born_session": "2026-09-24", "entry": 100.6,
+                                     "stop": 97.5, "taps": 0, "tap_session": ""}]}
+    pages = format_digest(state, zones, CLOSE_THU, "post_close",
+                          SimpleNamespace(digest_max_rows=0))
+    assert len(pages) > 1
+    assert all(len(p) <= 4096 for p in pages)              # Telegram's hard limit
+    assert all("PRECISION WAITING LIST" in p.splitlines()[0] for p in pages)
+    assert all("post-close recap" in p.splitlines()[0] for p in pages)
+    for i, page in enumerate(pages):
+        assert f"({i + 1}/{len(pages)})" in page.splitlines()[0]
+    listed = [ln.split("</b>")[0].replace("<b>", "") for p in pages
+              for ln in p.splitlines() if ln.startswith("<b>SYM")]
+    assert len(listed) == 300 and len(set(listed)) == 300   # nothing lost or doubled
+    assert "100 armed" in pages[0]                          # the counts stay on page 1
+
+
+def test_the_recap_says_when_levels_are_not_from_today():
+    """
+    A recap that quietly mixed yesterday's levels into today's would be worse
+    than no recap at all. The pre-open plan is *meant* to show yesterday, so it
+    carries no warning.
+    """
+    ob = SimpleNamespace(digest_max_rows=0)
+    state = empty_state()
+    for i, sym in enumerate(("FRESH", "STALE")):
+        state["waiting"][sym] = {
+            "symbol": sym, "security_id": i, "exchange_segment": "NSE_EQ",
+            "week": "2026-08-24", "breakout_bar": "2026-08-26T10:00+05:30",
+            "breakout_price": 105.5, "level_26w": 104.0, "added_at": "2026-08-26",
+            "status": "waiting", "resolved_at": None, "resolved_reason": None}
+    zones = {"FRESH": {"post_close_done": "2026-08-27", "zones": []},
+             "STALE": {"post_close_done": "2026-08-26", "zones": []}}
+    recap = format_digest(state, zones, CLOSE_THU, "post_close", ob)[0]
+    assert "1 name(s) not replayed since the bell" in recap
+    plan = format_digest(state, zones, CLOSE_THU, "pre_open", ob)[0]
+    assert "not replayed" not in plan
+    fresh = dict(zones, STALE={"post_close_done": "2026-08-27", "zones": []})
+    assert "not replayed" not in format_digest(state, fresh, CLOSE_THU,
+                                               "post_close", ob)[0]
+
+
+def test_the_list_can_be_capped_and_says_how_much_it_dropped(ws, monkeypatch):
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    ws.configure(**{"digest_max_rows": 1})
+    _arm_both(ws)
+    assert ws.run() == 0
+    text = _digests(ws.tg)[0]
+    assert "TESTSYM" in text and "OLDSYM" not in text
+    assert "showing the 1 newest of 2" in text
+
+
+def test_daily_digest_off_sends_no_list(ws, monkeypatch):
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    ws.configure(**{"daily_digest": False})
+    _arm_both(ws)
+    assert ws.run() == 0
+    assert _digests(ws.tg) == []
+    assert ws.state()["digest_on"] == {}
+
+
+def test_digest_only_sends_the_list_and_touches_nothing_else(ws, monkeypatch):
+    _arm_both(ws)
+    assert ws.run() == 0                               # Thursday mid-session
+    ws.tg.sent.clear()
+    ws.client.history_calls.clear()
+    ws.client.ohlc_calls.clear()
+    assert ws.run("--digest-only") == 0
+    text = _digests(ws.tg)[0]
+    assert "on demand" in text and "TESTSYM" in text
+    assert ws.client.history_calls == [] and ws.client.ohlc_calls == []
+    assert ws.state()["digest_on"]["manual"] == "2026-08-27"
+
+    # a manual send must not spend either scheduled slot
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    ws.tg.sent.clear()
+    assert ws.run() == 0
+    assert len(_digests(ws.tg)) == 1
+    assert ws.state()["digest_on"]["post_close"] == "2026-08-27"
+
+
+def test_an_empty_waiting_list_still_says_so(ws, monkeypatch):
+    """A blank message would look like a broken job rather than an empty list."""
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: PRE_OPEN_FRI)
+    (ws.dir / "ob_precision_state.json").write_text(json.dumps(empty_state()))
+    assert ws.run("--digest-only") == 0
+    text = _digests(ws.tg)[0]
+    assert "<b>0</b> waiting" in text and "waiting list is empty" in text

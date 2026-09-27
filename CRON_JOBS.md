@@ -127,6 +127,11 @@ Three notes:
 - The very first run ever seeds the waiting list from all six weeks `state.json`
   still holds. Historical order blocks are **not** dumped into the chat — only
   closed-bar events from the last `event_lookback_days` (5) are alertable.
+- **No extra job for the daily list.** `ob_tap_scan.py` also sends the whole
+  waiting list twice a session — a pre-open plan at 09:10 IST and a post-close
+  recap from 15:35 — and both ride this same 5-minute cron (03:40 UTC *is*
+  09:10 IST). The pre-open one makes no API calls at all. See README →
+  *The daily waiting-list digest*.
 - A **total data outage** — two or more history refreshes due and every one of
   them failing — exits `3`, so the workflow's failure notice reaches Telegram
   once (at most once a day; see README → *Failure behaviour*). A single broken
