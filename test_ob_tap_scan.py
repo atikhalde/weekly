@@ -1402,3 +1402,163 @@ def test_a_hostile_cache_cannot_crash_the_digest():
     assert "?" in text                              # ...and so do unparseable dates
     assert "tapped" in text                         # taps survived being a string
     assert all(len(p) <= 4096 for p in pages)
+
+
+# --------------------------------------------------------------------------- #
+#  Same-evening OB alerts, one-shot announce, waiting-list sweep
+#  (b722e46 / 58016a1 - the three changes that complete the stage-2 scanner)
+# --------------------------------------------------------------------------- #
+def test_first_zone_after_breakout_finds_the_right_one():
+    """
+    The first precision OB born AFTER the weekly breakout, not an older zone
+    that happened to be lying around from months before.
+
+    SMSPHARMA: breakout 2026-09-11, first zone born 2026-09-11 (origin
+    2026-09-10) -> that zone is the one that matters for the sweep.
+
+    PTCIL: breakout, first zone born after breakout, never tapped -> stays.
+    """
+    from ob_tap_scan import first_zone_after_breakout
+
+    rec = {"breakout_bar": "2026-09-11T10:00+05:30", "added_at": "2026-09-11"}
+    ctx = {"zones": [
+        {"born_session": "2026-08-20", "top": 100, "bottom": 90, "entry": 95},
+        {"born_session": "2026-09-11", "top": 105, "bottom": 95, "entry": 100,
+         "signature": "2026-09-11|105|95"},
+        {"born_session": "2026-09-15", "top": 110, "bottom": 100, "entry": 105},
+    ]}
+    first = first_zone_after_breakout(rec, ctx)
+    assert first is not None
+    assert first["born_session"] == "2026-09-11"
+
+    # no zone after breakout -> None
+    ctx_old = {"zones": [{"born_session": "2026-08-20", "top": 1, "bottom": 0}]}
+    assert first_zone_after_breakout(rec, ctx_old) is None
+
+    # no zones at all -> None
+    assert first_zone_after_breakout(rec, {}) is None
+    assert first_zone_after_breakout(rec, None) is None
+
+    # breakout date unparseable -> None, not a crash
+    rec_bad = {"breakout_bar": "not-a-date"}
+    assert first_zone_after_breakout(rec_bad, ctx) is None
+
+
+def test_sweep_retires_names_whose_first_post_breakout_ob_is_tapped():
+    """
+    Waiting-list sweep: remove names where the first post-breakout OB is
+    already tapped - SMSPHARMA retired, PTCIL stays.
+
+    Without this a name that tapped its first post-breakout zone stays on the
+    list forever as "waiting" with no live zone, because the zone is now
+    exhausted and the next refresh finds no armed zone - but the status is
+    still waiting. The user then sees "no live zone yet" for a name that has
+    already completed its trade.
+    """
+    from ob_tap_scan import sweep_waiting_list
+
+    state = empty_state()
+    # SMSPHARMA-shaped record: breakout 11th, first zone 11th, tapped 17th
+    state["waiting"]["SMSPHARMA"] = {
+        "symbol": "SMSPHARMA", "security_id": "1", "exchange_segment": "NSE_EQ",
+        "week": "2026-09-07", "breakout_bar": "2026-09-11T10:00+05:30",
+        "breakout_price": 417.85, "level_26w": 410.0,
+        "added_at": "2026-09-11", "status": "waiting",
+        "resolved_at": None, "resolved_reason": None,
+    }
+    # PTCIL-shaped record: breakout, first zone, never tapped
+    state["waiting"]["PTCIL"] = {
+        "symbol": "PTCIL", "security_id": "2", "exchange_segment": "NSE_EQ",
+        "week": "2026-09-07", "breakout_bar": "2026-09-11T10:00+05:30",
+        "breakout_price": 100.0, "level_26w": 99.0,
+        "added_at": "2026-09-11", "status": "waiting",
+        "resolved_at": None, "resolved_reason": None,
+    }
+    zones = {
+        "SMSPHARMA": {"zones": [
+            {"born_session": "2026-09-11", "top": 420, "bottom": 410,
+             "entry": 415, "signature": "2026-09-11|420|410"}]},
+        "PTCIL": {"zones": [
+            {"born_session": "2026-09-12", "top": 110, "bottom": 100,
+             "entry": 105, "signature": "2026-09-12|110|100"}]},
+    }
+    alerts = {
+        "SMSPHARMA|2026-09-11|420|410|tap|tap1": {"sent_at": "2026-09-17T10:00:00"},
+    }
+
+    retired = sweep_waiting_list(state, zones, alerts, "2026-09-17")
+    assert retired == ["SMSPHARMA"]
+    assert state["waiting"]["SMSPHARMA"]["status"] == "tapped"
+    assert "sweep" in state["waiting"]["SMSPHARMA"]["resolved_reason"]
+    assert state["waiting"]["PTCIL"]["status"] == "waiting"
+
+
+def test_sweep_does_not_retire_on_an_old_zone_tap():
+    """
+    An older zone tapped BEFORE the breakout must not retire the name - only
+    the first zone born ON OR AFTER the breakout matters.
+    """
+    from ob_tap_scan import sweep_waiting_list
+
+    state = empty_state()
+    state["waiting"]["X"] = {
+        "symbol": "X", "security_id": "1", "exchange_segment": "NSE_EQ",
+        "week": "2026-09-07", "breakout_bar": "2026-09-11T10:00+05:30",
+        "breakout_price": 100.0, "level_26w": 99.0,
+        "added_at": "2026-09-11", "status": "waiting",
+        "resolved_at": None, "resolved_reason": None,
+    }
+    zones = {"X": {"zones": [
+        {"born_session": "2026-08-20", "top": 90, "bottom": 80,
+         "entry": 85, "signature": "2026-08-20|90|80"},
+        {"born_session": "2026-09-12", "top": 110, "bottom": 100,
+         "entry": 105, "signature": "2026-09-12|110|100"},
+    ]}}
+    alerts = {"X|2026-08-20|90|80|tap|tap1": {"sent_at": "2026-08-25"}}
+
+    retired = sweep_waiting_list(state, zones, alerts, "2026-09-17")
+    assert retired == []
+    assert state["waiting"]["X"]["status"] == "waiting"
+
+
+def test_announce_existing_one_shot_announces_armed_zones(ws):
+    """
+    --announce-existing: one-shot announce of all currently armed zones.
+
+    For a manual audit / backfill it should announce every armed zone that has
+    never been announced before, even if born long ago. Once announced the
+    de-dupe key prevents it from firing again.
+    """
+    ws.configure(**{"alert_kinds": ["ob", "tap"]})
+    ws.arm(quote=FLAT_QUOTE)  # one armed zone (scenario() has 2 OBs, so 2 events)
+    assert ws.run("--announce-existing") == 0
+    txt = "\n".join(ws.tg.sent)
+    assert "TESTSYM" in txt and ("new OB" in txt or "PRECISION OB" in txt)
+    # second run without the flag -> no re-announce
+    ws.tg.sent.clear()
+    assert ws.run() == 0
+    assert ws.tg.sent == []
+
+    # second run WITH the flag again -> still no re-announce because de-dupe
+    ws.tg.sent.clear()
+    assert ws.run("--announce-existing") == 0
+    assert ws.tg.sent == []
+
+
+def test_same_evening_ob_alert_born_today_is_alerted_today(ws, monkeypatch):
+    """
+    Same-evening OB: a zone born on today's CLOSED bar must be alerted today,
+    not tomorrow. The post-close run replays today's bar as closed, so the OB
+    is in closed_events and is alertable the same evening.
+
+    This is the post-close catch-up that completes the stage-2 scanner.
+    """
+    monkeypatch.setattr(ob_tap_scan, "_now",
+                        lambda: datetime(2026, 8, 27, 15, 37, tzinfo=IST))
+    ws.configure(**{"alert_kinds": ["ob"]})
+    # scenario() ends 2026-08-25, plus today's bar 2026-08-27 that creates a new OB
+    bars = scenario() + [Bar(101.0, 103.0, 100.60, 102.5, 260.0, date(2026, 8, 27))]
+    ws.arm(bars=bars, quote=FLAT_QUOTE)
+    assert ws.run() == 0
+    assert "PRECISION OB" in "\n".join(ws.tg.sent)
+    assert ws.state()["zones"][SYM]["as_of"] == "2026-08-27"

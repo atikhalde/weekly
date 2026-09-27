@@ -36,8 +36,16 @@ on:
         description: "Rebuild the order-block cache, skip the live tap pass"
         type: boolean
         default: false
+      digest:
+        description: "Send the waiting-list digest now (still runs the scan)"
+        type: boolean
+        default: false
       digest_only:
         description: "Send the waiting-list digest and exit (no market data)"
+        type: boolean
+        default: false
+      announce_existing:
+        description: "One-shot announce all currently armed OB zones"
         type: boolean
         default: false
       symbols:
@@ -102,7 +110,9 @@ jobs:
             ${{ inputs.force && '--force' || '' }} \
             ${{ inputs.heartbeat && '--heartbeat' || '' }} \
             ${{ inputs.refresh_only && '--refresh-only' || '' }} \
+            ${{ inputs.digest && '--digest' || '' }} \
             ${{ inputs.digest_only && '--digest-only' || '' }} \
+            ${{ inputs.announce_existing && '--announce-existing' || '' }} \
             ${{ inputs.symbols && format('--symbols {0}', inputs.symbols) || '' }}
 
       # state.json is NOT committed here: it belongs to the intraday scan, and

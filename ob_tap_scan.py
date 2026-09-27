@@ -369,6 +369,119 @@ def active_waiting(state: dict[str, Any]) -> list[str]:
                   if r.get("status") == "waiting")
 
 
+def first_zone_after_breakout(rec: dict[str, Any],
+                              ctx: dict[str, Any] | None) -> dict[str, Any] | None:
+    """
+    The first precision OB born AFTER the weekly breakout.
+
+    A weekly breakout is a level event (close > 26W high). The precision OB
+    that matters is the one that forms AFTER that breakout, not an older
+    zone that happened to be lying around from months before. Without this
+    filter a name that broke out, tapped an old zone, and then formed a fresh
+    zone would be retired on the old tap even though the new zone is still
+    armed and worth watching.
+
+    SMSPHARMA is the case that motivated the sweep: it broke out on
+    2026-09-11, formed its first post-breakout OB on 2026-09-11 as well
+    (origin 2026-09-10), and that OB was tapped on 2026-09-17. Once that tap
+    is done the name has completed its "until tapped or invalidated"
+    lifetime and should leave the waiting list - it is retired, not waiting.
+
+    PTCIL is the counter-case that must stay: it broke out, formed a zone,
+    but that zone has never been tapped, so it remains armed and the name
+    stays on the list.
+
+    Args:
+        rec: waiting-list record with breakout_bar (ISO timestamp).
+        ctx: persisted replay context with a "zones" list.
+
+    Returns:
+        The earliest zone dict whose born_session is >= breakout date, or None
+        when there is no zone yet or the breakout date cannot be parsed.
+    """
+    if not ctx or not isinstance(ctx.get("zones"), list):
+        return None
+    breakout_date = as_date(rec.get("breakout_bar") or rec.get("added_at"))
+    if breakout_date is None:
+        return None
+    # zones are not guaranteed to be sorted; sort by born_session to find
+    # the earliest one that is on or after the breakout.
+    candidates = []
+    for z in ctx.get("zones") or []:
+        if not isinstance(z, dict):
+            continue
+        born = as_date(z.get("born_session"))
+        if born is None:
+            continue
+        if born >= breakout_date:
+            candidates.append((born, z))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0])
+    return candidates[0][1]
+
+
+def sweep_waiting_list(state: dict[str, Any], zones: dict[str, Any],
+                       alerts: dict[str, Any], today: str) -> list[str]:
+    """
+    One-shot sweep: remove names whose FIRST post-breakout OB is already tapped.
+
+    The waiting list is "until tapped or invalidated" with no calendar limit.
+    Without a sweep a name that tapped its first post-breakout zone stays on
+    the list forever as "waiting" with no live zone, because the zone is now
+    exhausted and the next refresh finds no armed zone - but the status is
+    still waiting. The user then sees "no live zone yet" for a name that has
+    already completed its trade.
+
+    The sweep looks at each waiting name, finds its first zone born after the
+    breakout (first_zone_after_breakout), and checks whether that zone's
+    signature has a tap in the alert de-dupe map. If it does, the name is
+    retired as "tapped" with today's date and a reason that names the zone.
+
+    This is deliberately conservative: only the FIRST post-breakout zone is
+    considered, and only when there is a recorded tap for its exact signature.
+    An older zone that was tapped before the breakout does not retire the
+    name, and a name with no zone yet is untouched.
+
+    SMSPHARMA: breakout 2026-09-11, first zone born 2026-09-11, tapped
+    2026-09-17 -> retired.
+
+    PTCIL: breakout, first zone born after breakout, never tapped -> stays.
+
+    Returns:
+        List of symbols retired by this sweep.
+    """
+    retired: list[str] = []
+    waiting = state.get("waiting") or {}
+    for sym in active_waiting(state):
+        rec = waiting.get(sym)
+        ctx = zones.get(sym)
+        first = first_zone_after_breakout(rec, ctx)
+        if not first:
+            continue
+        sig = first.get("signature")
+        if not sig:
+            # Fallback: construct signature from born_session + top/bottom
+            # the same way ob_precision.Zone.signature() does, but using the
+            # persisted dict shape.
+            try:
+                sig = f"{first.get('born_session')}|{first.get('top')}|{first.get('bottom')}"
+            except Exception:  # noqa: BLE001
+                continue
+        # A tap is recorded as "{sym}|{signature}|tap|tapN"
+        tapped = any(k.startswith(f"{sym}|{sig}|tap") for k in (alerts or {}))
+        if tapped:
+            rec["status"] = "tapped"
+            rec["resolved_at"] = today
+            rec["resolved_reason"] = (
+                f"first post-breakout OB {first.get('born_session')} tapped - sweep")
+            retired.append(sym)
+    if retired:
+        log.info("waiting-list sweep: retired %d (%s)", len(retired),
+                 ", ".join(retired[:12]) + (" ..." if len(retired) > 12 else ""))
+    return retired
+
+
 # --------------------------------------------------------------------------- #
 #  Sessions
 # --------------------------------------------------------------------------- #
@@ -891,6 +1004,9 @@ def main() -> int:
                     help="send the waiting-list digest now, whatever the slot")
     ap.add_argument("--digest-only", action="store_true",
                     help="send the digest and exit: no history calls, no quotes")
+    ap.add_argument("--announce-existing", action="store_true",
+                    help="one-shot announce of all currently armed zones, "
+                         "even if they were born long ago (for backfill / manual audit)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -1073,6 +1189,39 @@ def main() -> int:
         for ev in (zones.get(sym) or {}).get("closed_events") or []:
             consider(sym, ev, closed=True)
 
+    # ---- one-shot announce of existing armed zones -------------------------
+    # --announce-existing is for a manual audit / backfill: it announces every
+    # currently armed zone that has never been announced before, even if it was
+    # born long ago. Without this a name that has been armed for three weeks
+    # but never tapped is invisible in the chat - and it is exactly the one
+    # worth watching by hand. The flag is one-shot: once announced, the de-dupe
+    # key prevents it from firing again, so it can be run once after a cold
+    # start and then forgotten.
+    if args.announce_existing:
+        for sym in waiting:
+            ctx = zones.get(sym) or {}
+            for z in ctx.get("zones") or []:
+                if not isinstance(z, dict):
+                    continue
+                # Synthesize an OB event for the currently armed zone
+                sig = z.get("signature") or (
+                    f"{z.get('born_session')}|{z.get('top')}|{z.get('bottom')}"
+                )
+                ev = {
+                    "kind": "ob",
+                    "signature": sig,
+                    "session": z.get("born_session"),
+                    "top": z.get("top"), "bottom": z.get("bottom"),
+                    "entry": z.get("entry"), "stop": z.get("stop"),
+                    "atr": z.get("atr"), "rvol": z.get("rvol"),
+                    "born_session": z.get("born_session"),
+                    "origin_session": z.get("origin_session"),
+                    "detail": {"width": z.get("width")},
+                    "reason": "announce_existing",
+                    "confirmed": True,
+                }
+                consider(sym, ev, closed=False)
+
     # live taps on today's developing bar
     for sym in live_syms:
         rec = state["waiting"][sym]
@@ -1118,6 +1267,26 @@ def main() -> int:
             rec["resolved_at"] = today
             rec["resolved_reason"] = f"all {seen} order block(s) invalidated/exhausted"
             resolved += 1
+
+    # ---- waiting-list sweep: first post-breakout OB already tapped ---------
+    # Same-evening sweep that retires names whose first zone after the weekly
+    # breakout is already tapped. Without it a name like SMSPHARMA stays on
+    # the list as "no live zone yet" after its first OB is tapped and
+    # exhausted, because the zone is gone but the waiting status remains.
+    # The sweep is conservative: only the FIRST zone born on or after the
+    # breakout date is checked, and only when its exact tap signature is in
+    # the de-dupe map. PTCIL stays because its first zone has never been
+    # tapped; SMSPHARMA is retired because its first zone was tapped on
+    # 2026-09-17.
+    #
+    # This runs on every pass (no extra flag) because it is a correctness
+    # fix, not a cosmetic one - a retired name must not be re-added by a later
+    # harvest, and the sweep ensures its status is final before save_state().
+    # It also runs BEFORE the send block so a name that just tapped on this
+    # run is retired in the same run that sent its tap, keeping the counts in
+    # the daily digest honest.
+    swept = sweep_waiting_list(state, zones, alerts_seen, today)
+    resolved += len(swept)
 
     # ---- send ---------------------------------------------------------------
     sent_ok = True
