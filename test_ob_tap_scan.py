@@ -1258,7 +1258,112 @@ def test_digest_only_sends_the_list_and_touches_nothing_else(ws, monkeypatch):
 def test_an_empty_waiting_list_still_says_so(ws, monkeypatch):
     """A blank message would look like a broken job rather than an empty list."""
     monkeypatch.setattr(ob_tap_scan, "_now", lambda: PRE_OPEN_FRI)
+    (ws.dir / "state.json").write_text(json.dumps({"weeks": {}}))   # no source either
     (ws.dir / "ob_precision_state.json").write_text(json.dumps(empty_state()))
     assert ws.run("--digest-only") == 0
     text = _digests(ws.tg)[0]
     assert "<b>0</b> waiting" in text and "waiting list is empty" in text
+
+
+def test_digest_only_harvests_the_list_on_a_cold_start(ws, monkeypatch):
+    """
+    "Show me the list" must not answer "empty" while state.json is full of names.
+
+    The first thing anyone does with the dispatch button is press it before the
+    scanner has ever run - and the pre-open plan on a Monday after a weekend the
+    scheduler skipped is the same shape. Harvesting is three committed files and
+    no API calls, so both paths do it first.
+    """
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: FIXED)
+    assert ws.run("--digest-only") == 0
+    text = _digests(ws.tg)[0]
+    assert "TESTSYM" in text and "OLDSYM" in text and "<b>2</b> waiting" in text
+    assert ws.client.history_calls == [] and ws.client.ohlc_calls == []
+    # ...and the names it harvested are persisted, not thrown away
+    assert sorted(ws.state()["waiting"]) == [OLD, SYM]
+
+
+def test_a_bad_digest_time_disables_the_slot_not_the_scanner(ws, monkeypatch):
+    """
+    A typo in a cosmetic knob must not take the tap alerts down with it. The
+    pre-open time is read on the scan path too, so a raise here would red-flag
+    every run of the day AND stop the live pass.
+    """
+    ws.configure(**{"digest_pre_open_at": "half past nine"})
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: PRE_OPEN_FRI)
+    ws.arm(quote=FLAT_QUOTE)
+    assert ws.run() == 0                       # no crash, no digest
+    assert _digests(ws.tg) == []
+
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: FIXED)
+    ws.tg.sent.clear()
+    ws.arm(quote=TAP_QUOTE)
+    assert ws.run() == 0                       # scanning still works
+    assert ws.client.history_calls and "TAP 1" in "\n".join(ws.tg.sent)
+
+    # the recap does not depend on that knob at all
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: CLOSE_THU)
+    ws.tg.sent.clear()
+    assert ws.run() == 0
+    assert len(_digests(ws.tg)) == 1
+
+
+def test_a_subset_debug_run_does_not_spend_the_days_slot(ws, monkeypatch):
+    """
+    --symbols scans one name, so its cache is partial by definition. Printing
+    that as the day's recap - and marking the slot done - would send a list with
+    a hole in it and then suppress the real one.
+    """
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: LAST_THU)   # 15:40: no deferral
+    ws.arm(quote=FLAT_QUOTE)                     # TESTSYM only; OLDSYM never fetched
+    assert ws.run("--symbols", SYM) == 0
+    assert _digests(ws.tg) == []
+    assert ws.state()["digest_on"].get("post_close") is None
+
+    ws.tg.sent.clear()
+    assert ws.run() == 0                         # the full run still sends it
+    assert len(_digests(ws.tg)) == 1
+    assert ws.state()["digest_on"]["post_close"] == "2026-08-27"
+
+
+def test_a_hostile_cache_cannot_crash_the_digest():
+    """
+    The digest reads a state file that several different versions of the scanner
+    have written, and prints whatever it finds. A corrupt or half-written record
+    must cost one ugly row, not the run: this is on the same code path as the
+    alerts, so a raise here would take the taps down too.
+    """
+    def rec(**kw):
+        base = {"symbol": "X", "security_id": 1, "exchange_segment": "NSE_EQ",
+                "status": "waiting", "added_at": "2026-08-26"}
+        base.update(kw)
+        return base
+
+    state = {"waiting": {
+        "NOKEYS": rec(breakout_bar=None),
+        "STRPX": rec(breakout_bar="2026-08-26T10:00+05:30", breakout_price="12.5"),
+        "NAN": rec(breakout_bar="not-a-date", breakout_price=float("nan"),
+                   level_26w=float("inf")),
+        # The KEY is what prints, and it arrives from a JSON file - so it is the
+        # key that has to be hostile to prove the escaping is real.
+        "<script>&": rec(breakout_bar="2026-08-26T10:00+05:30", breakout_price=1.0),
+        "GONE": dict(rec(breakout_bar="2026-08-20T10:00+05:30"), status="tapped",
+                     resolved_at="2026-08-27"),
+    }, "digest_on": {}}
+    zones = {
+        "NOKEYS": None,                                       # not a dict at all
+        "STRPX": {"zones": [{"born_session": None, "entry": None, "stop": None}]},
+        "NAN": {"zones": "not-a-list"},                       # iterable, not zones
+        "<script>&": {"zones": [{"born_session": "2026-08-25", "entry": 1.0,
+                                 "stop": 0.5, "taps": "2", "tap_session": ""}]},
+    }
+    ob = SimpleNamespace(digest_max_rows="not a number")
+    pages = format_digest(state, zones, CLOSE_THU, "post_close", ob)
+    text = pages[0]
+    assert "<b>4</b> waiting" in text              # GONE is tapped: not active
+    assert "not replayed since the bell" in text   # and it says the levels are stale
+    assert "<script>" not in text and "&lt;script&gt;" in text
+    assert "n/a" in text                            # unparseable numbers degrade
+    assert "?" in text                              # ...and so do unparseable dates
+    assert "tapped" in text                         # taps survived being a string
+    assert all(len(p) <= 4096 for p in pages)

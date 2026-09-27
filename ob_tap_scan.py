@@ -331,6 +331,39 @@ def harvest_waiting(state: dict[str, Any], alerts: dict[str, dict[str, Any]],
     return added
 
 
+def harvest_stage(cfg, ob, state: dict[str, Any], today: str) -> tuple[list[str], bool]:
+    """
+    Stage 0: fold the weekly scanner's alerts into the waiting list.
+
+    Returns (names added this run, whether state.json had any alerts at all) -
+    the second value is what tells main() "there is no source to build a list
+    from", which is a harder failure than an empty list.
+
+    Three committed files and no API calls, which is why the pre-open and
+    --digest-only runs do it as well: a manual "show me the list" on a cold
+    start, or a Monday morning after a weekend the scheduler skipped, must not
+    print an empty list while state.json is full of names.
+    """
+    alerts = weekly_alerts(cfg, ob.backfill_weeks)
+    if not alerts:
+        # Not a Telegram alarm: scan.py owns the stale-snapshot outage notice
+        # (BUG 49) and a second message would only contradict it. It is not
+        # fatal here either - names ALREADY on the waiting list keep being
+        # scanned, because the list is designed to outlive state.json's
+        # six-week prune. Only an empty list with no source to refill it is an
+        # error worth a red workflow.
+        log.error("no weekly alerts in %s - the waiting list cannot be EXTENDED "
+                  "this run. Is the intraday scan running?", cfg.paths["state"])
+        return [], False
+    ids = resolve_universe(cfg)
+    levels = snapshot_levels(cfg)
+    added = harvest_waiting(state, alerts, ids, levels, today)
+    if added:
+        log.info("waiting list: +%d new (%s)", len(added),
+                 ", ".join(added[:12]) + (" ..." if len(added) > 12 else ""))
+    return added, True
+
+
 def active_waiting(state: dict[str, Any]) -> list[str]:
     return sorted(s for s, r in (state.get("waiting") or {}).items()
                   if r.get("status") == "waiting")
@@ -615,6 +648,25 @@ SLOT_LABELS = {"post_close": "post-close recap", "pre_open": "pre-open plan",
                "manual": "on demand"}
 
 
+def _pre_open_time(ob):
+    """
+    `digest_pre_open_at` as a time, or None when it does not parse.
+
+    A typo in a COSMETIC knob must not take the tap alerts down with it. This is
+    read on the scan path as well as the digest path, so letting parse_hhmm raise
+    here would red-flag every run of the day and stop the live pass - the exact
+    opposite of what a tracking aid is for. Say so loudly, drop the pre-open
+    slot, and carry on scanning.
+    """
+    try:
+        return parse_hhmm(ob.digest_pre_open_at)
+    except (AttributeError, TypeError, ValueError):
+        log.error("ob_precision.digest_pre_open_at=%r is not HH:MM - the pre-open "
+                  "digest is off for this run (scanning is unaffected)",
+                  ob.digest_pre_open_at)
+        return None
+
+
 def digest_slot(now: datetime, cfg, ob) -> str | None:
     """
     Which of the day's two digest slots this run falls in, or None.
@@ -628,7 +680,8 @@ def digest_slot(now: datetime, cfg, ob) -> str | None:
         return None                      # the cron does not run at the weekend
     if session_closed(now, cfg):
         return "post_close"
-    if not market_is_open(cfg, now) and now.time() >= parse_hhmm(ob.digest_pre_open_at):
+    at = _pre_open_time(ob)
+    if at is not None and not market_is_open(cfg, now) and now.time() >= at:
         return "pre_open"
     return None
 
@@ -733,8 +786,9 @@ def format_digest(state: dict[str, Any], zones: dict[str, Any], now: datetime,
     invalid = sum(1 for _s, r in waiting.items() if r.get("status") == "invalid"
                   and str(r.get("resolved_at") or "") == today_iso)
 
+    label = _esc(str(SLOT_LABELS.get(slot, slot)))
     head = [
-        f"📋 <b>PRECISION WAITING LIST — {SLOT_LABELS.get(slot, slot)}</b>",
+        f"📋 <b>PRECISION WAITING LIST — {label}</b>",
         f"{now.strftime('%d-%b-%Y %H:%M')} IST · <b>{len(recs)}</b> waiting · "
         f"{armed} armed"
         + (f" · +{len(added)} new today" if added else "")
@@ -755,18 +809,22 @@ def format_digest(state: dict[str, Any], zones: dict[str, Any], now: datetime,
     if not recs:
         return ["\n".join(head + ["<i>The waiting list is empty.</i>"])]
 
-    cap = int(ob.digest_max_rows or 0)
+    try:
+        cap = int(ob.digest_max_rows or 0)
+    except (TypeError, ValueError):
+        log.error("ob_precision.digest_max_rows=%r is not a number - sending the "
+                  "whole list", ob.digest_max_rows)
+        cap = 0
     rows = [_digest_row(s, r, zones.get(s)) for s, r in recs]
     if cap > 0 and len(rows) > cap:
         head.append(f"… showing the {cap} newest of {len(rows)} "
                     f"(digest_max_rows={cap})")
         rows = rows[:cap]
 
-    label = SLOT_LABELS.get(slot, slot)
     # Same header on every page: the (k/n) suffix below is what marks a
     # continuation, and repeating the slot label means a page read on its own -
     # forwarded, or scrolled to days later - still says what it is.
-    cont = f"📋 <b>PRECISION WAITING LIST — {_esc(str(label))}</b>"
+    cont = head[0]
     pages: list[list[str]] = []
     cur: list[str] = []
     cur_len = 0
@@ -871,11 +929,15 @@ def main() -> int:
     # spend the workflow's rate budget to learn nothing new.
     if args.digest_only or (not args.force and not market_is_open(cfg, now)):
         slot = digest_slot(now, cfg, ob)
-        if args.digest or args.digest_only or digest_due(state, slot, today, ob):
+        subset = bool(args.symbols)
+        if args.digest or args.digest_only or (not subset
+                                               and digest_due(state, slot, today, ob)):
+            added, _source_ok = harvest_stage(cfg, ob, state, today)
             tg = build_telegram(cfg, dry_run=cfg.runtime.dry_run)
             # Off-schedule sends are labelled (and marked) "manual", so a forced
             # digest cannot spend the day's pre-open or post-close slot.
-            send_digest(state, zones, now, cfg, ob, tg, slot or "manual", today)
+            send_digest(state, zones, now, cfg, ob, tg, slot or "manual", today,
+                        added)
             save_state(state_path, state, original)
         else:
             log.info("market closed (%s IST) - nothing to do",
@@ -884,24 +946,7 @@ def main() -> int:
     closed_today = session_closed(now, cfg)
 
     # ---- stage 0: the waiting list, harvested from the weekly scanner -------
-    alerts = weekly_alerts(cfg, ob.backfill_weeks)
-    added: list[str] = []
-    if alerts:
-        ids = resolve_universe(cfg)
-        levels = snapshot_levels(cfg)
-        added = harvest_waiting(state, alerts, ids, levels, today)
-        if added:
-            log.info("waiting list: +%d new (%s)", len(added),
-                     ", ".join(added[:12]) + (" ..." if len(added) > 12 else ""))
-    else:
-        # Not a Telegram alarm: scan.py owns the stale-snapshot outage notice
-        # (BUG 49) and a second message would only contradict it. It is not
-        # fatal here either - names ALREADY on the waiting list keep being
-        # scanned, because the list is designed to outlive state.json's
-        # six-week prune. Only an empty list with no source to refill it is an
-        # error worth a red workflow.
-        log.error("no weekly alerts in %s - the waiting list cannot be EXTENDED "
-                  "this run. Is the intraday scan running?", cfg.paths["state"])
+    added, source_ok = harvest_stage(cfg, ob, state, today)
 
     want = None
     if args.symbols:
@@ -909,7 +954,7 @@ def main() -> int:
     waiting = [s for s in active_waiting(state) if want is None or s in want]
     if not waiting:
         save_state(state_path, state, original)
-        if not alerts:
+        if not source_ok:
             return 2          # nothing to scan, and no source to build one from
         log.info("waiting list is empty - nothing to scan")
         return 0
@@ -1125,7 +1170,11 @@ def main() -> int:
     # the counts in the header describe the day that just finished, and BEFORE
     # save_state so the slot marker is persisted with everything else.
     slot = digest_slot(now, cfg, ob)
-    due = bool(args.digest) or digest_due(state, slot, today, ob)
+    # A --symbols run is a debug run over a SUBSET: its cache is partial by
+    # definition, so it must neither send nor spend the day's slot. An explicit
+    # --digest still sends, because that is the operator asking for it by name.
+    due = bool(args.digest) or (not args.symbols
+                                and digest_due(state, slot, today, ob))
     if due and slot == "post_close" and not args.digest:
         pending = post_close_pending(active_waiting(state), zones, today)
         if pending and not last_scan_of_day(now, cfg):

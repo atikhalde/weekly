@@ -240,6 +240,15 @@ a failed send is retried by the next run instead of being swallowed. An explicit
 `--digest` / `--digest-only` sends off-schedule and is marked `manual`, which
 cannot spend either of the day's real slots.
 
+Both digest paths harvest the waiting list from `state.json` first — three
+committed files, still no API calls — so pressing the dispatch button on a cold
+start, or a Monday morning after a weekend the scheduler skipped, prints the real
+list instead of an empty one. A `--symbols` debug run never sends or spends the
+day's slot: its cache is a subset by definition, and printing that as the recap
+would suppress the real one. And a malformed `digest_pre_open_at` disables the
+pre-open slot with a logged error rather than raising, because that knob is read
+on the scan path too — a typo in a tracking aid must not take the tap alerts down.
+
 ### Bar parity with the chart
 
 `bars_from_frame()` drops two kinds of row before the replay, because TradingView
