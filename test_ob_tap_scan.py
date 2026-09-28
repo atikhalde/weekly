@@ -1158,6 +1158,101 @@ def test_the_state_file_stays_small_enough_to_commit(ws):
 
 
 # --------------------------------------------------------------------------- #
+#  Integrity of the state files that are committed to the repo
+# --------------------------------------------------------------------------- #
+# These read the real committed files, not a throw-away workspace: the workflow
+# commits them, so a bad edit or a bad merge lands in git and is then replayed
+# by every subsequent run.
+REPO_ROOT = Path(__file__).resolve().parent
+COMMITTED_STATE = ("ob_precision_state.json", "state.json")
+
+
+def _duplicate_keys(raw: str) -> list[str]:
+    """Keys that appear more than once inside a single JSON object."""
+    found: list[str] = []
+
+    def hook(pairs):
+        seen: set[str] = set()
+        for key, _ in pairs:
+            if key in seen:
+                found.append(key)
+            seen.add(key)
+        return dict(pairs)
+
+    json.loads(raw, object_pairs_hook=hook)
+    return found
+
+
+@pytest.mark.parametrize("name", COMMITTED_STATE)
+def test_committed_state_has_no_duplicate_keys(name):
+    """
+    A repeated key is legal JSON that silently loses data: the parser keeps the
+    LAST occurrence and discards the earlier ones, so `json.load` succeeds, no
+    schema check trips, and nothing downstream complains.
+
+    PR #12's merge conflict was resolved by unioning both sides line by line,
+    which left three such objects in ob_precision_state.json. The damaging one
+    was ATHERENERG: the PR deliberately re-anchored it to its user-reported
+    20-Mar-2026 first breakout and marked it `expired`, but the merge also kept
+    the CI-side `tapped` lines immediately after, and last-wins meant the file
+    effectively said `tapped`.
+
+    That is not cosmetic. `harvest_waiting` re-arms only ("waiting", "expired")
+    and `expire_waiting_cycles` only ever visits "waiting", so a record
+    mislabelled `tapped` can neither be corrected by the sweep nor re-armed by a
+    fresh 26-week cycle - the symbol is lost to the pipeline for good, and the
+    next run that saves state bakes the wrong value in permanently.
+    """
+    assert _duplicate_keys((REPO_ROOT / name).read_text()) == []
+
+
+def test_committed_ob_state_round_trips_through_the_canonical_writer():
+    """
+    `save_state` writes `json.dumps(..., indent=2, sort_keys=True)`. A committed
+    file that does not reproduce itself through that same formatter was produced
+    by something other than a clean scanner run - a hand edit, or the line-union
+    merge that introduced the duplicate keys above.
+
+    state.json is excluded: state.py owns it and writes its own layout.
+    """
+    raw = (REPO_ROOT / "ob_precision_state.json").read_text()
+    assert raw == json.dumps(json.loads(raw), indent=2, sort_keys=True,
+                             default=str)
+
+
+def test_committed_waiting_list_already_agrees_with_the_cycle_rules():
+    """
+    The committed waiting list must be a fixed point of the scanner's own cycle
+    rules. If it is not, the file was written by something other than a clean
+    run, and the next live run will silently "correct" it mid-session.
+
+    Two invariants: nothing still `waiting` may be outside the 26-week lock (the
+    sweep would retire it), and every canonical cycle record inside the lock
+    must be represented (otherwise the backfill would resurrect a name that was
+    deliberately dropped).
+    """
+    data = json.loads((REPO_ROOT / "ob_precision_state.json").read_text())
+    weekly = json.loads((REPO_ROOT / "state.json").read_text())
+    today = as_date(str(data["updated_at"])[:10])
+    cooldown = 26                                   # breakout_cooldown_weeks
+
+    for sym, rec in (data.get("waiting") or {}).items():
+        if rec.get("status") != "waiting":
+            continue
+        first = as_date(rec.get("breakout_bar") or rec.get("added_at"))
+        assert first is not None, f"{sym} has no parseable breakout anchor"
+        assert today <= first + timedelta(weeks=cooldown), \
+            f"{sym} is still waiting {cooldown}+ weeks after its breakout"
+
+    probe = json.loads(json.dumps(data))
+    assert ob_tap_scan.expire_waiting_cycles(probe, str(today), cooldown) == []
+
+    seeded = ob_tap_scan._weekly_alerts_from_data(weekly, cooldown)
+    missing = sorted(set(seeded) - set(data.get("waiting") or {}))
+    assert missing == [], f"cycle records absent from the waiting list: {missing}"
+
+
+# --------------------------------------------------------------------------- #
 #  The daily waiting-list digest
 # --------------------------------------------------------------------------- #
 # Alerts only ever name the symbols that DID something. The user tracks the list

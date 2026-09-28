@@ -216,7 +216,6 @@
     "manual": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-28T12:00:00+05:30",
   "updated_at": "2026-09-28T13:15:36+05:30",
   "waiting": {
     "360ONE": {
@@ -567,9 +566,6 @@
       "resolved_reason": "first breakout cycle expired after 26 weeks",
       "security_id": "757645",
       "status": "expired",
-      "resolved_reason": "tap 1 on the precision OB",
-      "security_id": "757645",
-      "status": "tapped",
       "symbol": "ATHERENERG",
       "week": "2026-03-16"
     },
@@ -2063,7 +2059,6 @@
       "level_26w": null,
       "resolved_at": "2026-09-28",
       "resolved_reason": "OB 2026-08-26 tapped on/after breakout - sweep",
-      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "11956",
       "status": "tapped",
       "symbol": "MEDANTA",
