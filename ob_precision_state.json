@@ -21,6 +21,20 @@
       "session": "2026-09-24",
       "tap_number": 1
     },
+    "ATHERENERG|2026-08-28|1454.80|1430.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1466.4,
+      "sent_at": "2026-09-28T13:15:36+05:30",
+      "session": "2026-09-28",
+      "tap_number": 1
+    },
+    "ATHERENERG|2026-08-31|1454.80|1430.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1466.4,
+      "sent_at": "2026-09-28T13:15:36+05:30",
+      "session": "2026-09-28",
+      "tap_number": 1
+    },
     "BHAGERIA|2026-09-25|352.00|341.40|ob": {
       "kind": "ob",
       "price": 394.6000061035156,
@@ -119,6 +133,13 @@
       "session": "2026-09-23",
       "tap_number": 0
     },
+    "MEDANTA|2026-09-18|1425.00|1380.10|tap|tap1": {
+      "kind": "tap",
+      "price": 1435.0,
+      "sent_at": "2026-09-28T13:15:36+05:30",
+      "session": "2026-09-28",
+      "tap_number": 1
+    },
     "PAYTM|2026-09-09|1659.60|1642.00|tap|tap1": {
       "kind": "tap",
       "price": 1674.0,
@@ -195,7 +216,7 @@
     "manual": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-28T11:38:12+05:30",
+  "updated_at": "2026-09-28T13:15:36+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -541,10 +562,10 @@
       "breakout_price": 1582.9000244140625,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-09-28",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "757645",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ATHERENERG",
       "week": "2026-08-24"
     },
@@ -2036,10 +2057,10 @@
       "breakout_price": 1491.5999755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-09-28",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "11956",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MEDANTA",
       "week": "2026-08-24"
     },
