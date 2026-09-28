@@ -2352,6 +2352,13 @@
       "session": "2026-08-25",
       "tap_number": null
     },
+    "NITINSPIN|2026-08-25|588.45|575.25|tap|tap1": {
+      "kind": "tap",
+      "price": 596.0,
+      "sent_at": "2026-09-28T15:30:45+05:30",
+      "session": "2026-09-28",
+      "tap_number": 1
+    },
     "NOVARTIND|2026-05-20|1190.0|1165.0999755859375|ob": {
       "kind": "ob",
       "price": null,
@@ -4017,7 +4024,7 @@
     "manual": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-28T14:46:22+05:30",
+  "updated_at": "2026-09-28T15:30:45+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6105,10 +6112,10 @@
       "breakout_price": 602.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-09-28",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "13175",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "NITINSPIN",
       "week": "2026-08-17"
     },
