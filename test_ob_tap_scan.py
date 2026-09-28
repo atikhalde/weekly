@@ -229,16 +229,32 @@ def test_weekly_alerts_ignores_later_rows_in_the_same_breakout_cycle(ws):
     assert alerts[SYM]["breakout_price"] == 105.5
 
 
-def test_weekly_alerts_ignores_repeats_when_first_alert_is_pruned(ws):
+def test_weekly_alerts_uses_canonical_first_alert_after_week_row_is_pruned(ws):
     raw = json.loads((ws.dir / "state.json").read_text())
     raw["breakout_alerts"] = {
         SYM: {"bar_time": "2026-07-27T15:30+05:30"},
     }
     (ws.dir / "state.json").write_text(json.dumps(raw))
     alerts = weekly_alerts(ws.cfg, 6)
-    # The cycle's first row is outside the six-week history and cannot seed a
-    # new OB waiting-list entry. Its later same-cycle rows are not substitutes.
-    assert SYM not in alerts
+    # The first alert is the persistent cycle anchor even when its weekly row
+    # has been pruned. Later repeat rows must not replace it or make it vanish.
+    assert alerts[SYM] == {"week": "2026-07-27",
+                           "breakout_bar": "2026-07-27T15:30+05:30",
+                           "breakout_price": None}
+
+
+def test_cycle_anchor_backfill_covers_the_full_26_week_lock(ws, monkeypatch):
+    monkeypatch.setattr(ob_tap_scan, "_now", lambda: datetime(2026, 9, 28, 11, 0, tzinfo=IST))
+    raw = {
+        "breakout_alerts": {SYM: {"bar_time": "2026-07-27T15:30+05:30"}},
+        "weeks": {"2026-09-21": {SYM: {
+            "bar_time": "2026-09-21T13:55+05:30", "price": 561.7,
+        }}},
+    }
+    (ws.dir / "state.json").write_text(json.dumps(raw))
+    alerts = weekly_alerts(ws.cfg, 26)
+    assert alerts[SYM]["breakout_bar"] == "2026-07-27T15:30+05:30"
+    assert alerts[SYM]["breakout_price"] is None
 
 
 def test_harvest_reanchors_existing_waiter_when_first_alert_is_pruned(ws):
@@ -259,7 +275,7 @@ def test_harvest_reanchors_existing_waiter_when_first_alert_is_pruned(ws):
 
     added, source_ok = harvest_stage(ws.cfg, ws.cfg.ob_precision, state, "2026-09-28")
 
-    assert added == [] and not source_ok  # outside backfill; do not create a new waiter
+    assert added == [] and source_ok
     corrected = state["waiting"][SYM]
     assert corrected["status"] == "waiting"
     assert corrected["week"] == "2026-07-27"
@@ -368,6 +384,37 @@ def test_a_still_waiting_symbol_adopts_a_fresh_breakout(ws):
     harvest_waiting(state, newer, ids, {}, "2026-09-02")
     assert state["waiting"][SYM]["week"] == "2026-08-31"
     assert state["waiting"][SYM]["breakout_price"] == 120.0
+
+
+def test_waiter_expires_after_the_26_week_cycle():
+    from ob_tap_scan import expire_waiting_cycles
+
+    state = {"waiting": {"OAL": {
+        "status": "waiting", "breakout_bar": "2026-07-27T15:30+05:30",
+    }}}
+    assert expire_waiting_cycles(state, "2026-09-28", 26) == []
+    assert state["waiting"]["OAL"]["status"] == "waiting"
+
+    state["waiting"]["OAL"]["breakout_bar"] = "2026-03-20T15:30+05:30"
+    assert expire_waiting_cycles(state, "2026-09-28", 26) == ["OAL"]
+    assert state["waiting"]["OAL"]["status"] == "expired"
+
+
+def test_expired_waiter_reopens_only_on_newer_cycle(ws):
+    state = empty_state()
+    state["waiting"][SYM] = {
+        "status": "expired", "breakout_bar": "2026-03-20T15:30+05:30",
+        "breakout_price": None, "level_26w": None,
+    }
+    state["zones"][SYM] = {"zones": [{"born_session": "2026-04-01"}]}
+    added = harvest_waiting(state, {
+        SYM: {"week": "2026-09-21", "breakout_bar": "2026-09-23T10:00+05:30",
+              "breakout_price": 120.0},
+    }, ob_tap_scan.resolve_universe(ws.cfg), {}, "2026-09-23")
+    assert added == []
+    assert state["waiting"][SYM]["status"] == "waiting"
+    assert state["waiting"][SYM]["breakout_bar"] == "2026-09-23T10:00+05:30"
+    assert SYM not in state["zones"]
 
 
 def test_active_waiting_excludes_resolved_symbols(ws):
@@ -1571,6 +1618,21 @@ def test_sweep_retires_names_whose_first_post_breakout_ob_is_tapped():
     assert state["waiting"]["SMSPHARMA"]["status"] == "tapped"
     assert "sweep" in state["waiting"]["SMSPHARMA"]["resolved_reason"]
     assert state["waiting"]["PTCIL"]["status"] == "waiting"
+
+
+def test_sweep_retires_on_a_pre_breakout_zone_tapped_after_breakout():
+    from ob_tap_scan import sweep_waiting_list
+
+    state = {"waiting": {"X": {
+        "status": "waiting", "breakout_bar": "2026-08-27T12:00+05:30",
+    }}}
+    zones = {"X": {"zones": [{
+        "born_session": "2026-08-26", "tap_session": "2026-09-08",
+        "taps": 1, "signature": "2026-08-26|100|90",
+    }]}}
+    retired = sweep_waiting_list(state, zones, {}, "2026-09-28")
+    assert retired == ["X"]
+    assert state["waiting"]["X"]["status"] == "tapped"
 
 
 def test_sweep_does_not_retire_on_an_old_zone_tap():

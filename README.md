@@ -125,9 +125,13 @@ scan.py marks state.json  ──►  WAITING LIST  (this scanner's own state fil
 ```
 
 The waiting-list feed uses the weekly scanner's canonical first alert for each
-26-week breakout cycle; later weekly rows cannot refresh the same cycle's
-breakout anchor. This does **not** change the order-block, tap, or tap-deduping
-rules below.
+26-week breakout cycle, directly from its persistent cycle record. This remains
+available after `state.json` prunes weekly rows, so an active cycle cannot vanish
+or be re-anchored to a later weekly repeat. Later zones also cannot generate a
+fresh symbol-level Tap 1 after a zone already tapped on a prior session in that
+breakout cycle. Identical order blocks from the same origin are deduplicated even
+when front-running places their entries above the zone. This does **not** change
+the weekly scanner's original breakout trigger or filters.
 
 The zone logic is a **Pine-exact port of `precision.txt`** (*"Institutional OB —
 Precision Tap & Pre-Order"*, Pine v6). Every input of that indicator is a key in
@@ -151,11 +155,15 @@ a closed-bar touch.
 
 ### The waiting list outlives `state.json`
 
-`state.py` prunes to six weeks. A name stays on the waiting list **until tapped
-or invalidated**, with no calendar limit, so the list lives in this scanner's own
-`ob_precision_state.json` and keeps the 26-week level it broke — the weekly
-snapshot is overwritten every Monday, so that number is otherwise unrecoverable.
-`state.json` is **read-only** here; only `scan.py` writes it.
+`state.py` prunes weekly rows after six weeks. A name stays on the waiting list
+until tapped, invalidated, or its **26-week breakout cycle expires**. The list
+lives in this scanner's own `ob_precision_state.json` and keeps the level it
+broke — the weekly snapshot is overwritten every Monday, so that number is
+otherwise unrecoverable.
+The scanner seeds from first-alert cycle records across the full 26-week lock,
+not just the six weeks of weekly rows currently retained by `state.py`; this is
+what keeps names such as OAL from disappearing before the OB stage can track
+them. `state.json` is **read-only** here; only `scan.py` writes it.
 
 Once every order block a name produced has been invalidated or exhausted
 (5 touches, or a close below the structural stop), it is marked `invalid` and
