@@ -404,6 +404,13 @@ def harvest_waiting(state: dict[str, Any], alerts: dict[str, dict[str, Any]],
                 existing.update(status="waiting", resolved_at=None,
                                 resolved_reason=None, added_at=today)
                 (state.get("zones") or {}).pop(sym, None)
+                # ...and the previous cycle's derived 26W date with them. That
+                # date is bounded to the cooldown window, so carrying it into a
+                # new cycle would label the new setup with the old breakout -
+                # and because the correction pass keys off the field merely
+                # BEING present, it would never be re-derived. Dropping it puts
+                # the name back in line for the next refresh.
+                existing.pop("breakout_26w_session", None)
             # Otherwise this is a correction to the original cycle anchor.
             existing.update(week=rec["week"], breakout_bar=rec["breakout_bar"],
                             breakout_price=rec["breakout_price"])
@@ -686,6 +693,9 @@ def derive_26w_breakout(bars: list[Any], len_short: int = 26,
 
     WHY THIS IS DERIVED INSTEAD OF READ
     ------------------------------------
+    `bars` must be oldest first, as `bars_from_frame` returns them and as the
+    replay itself requires - a week's close is its LAST session's.
+
     The waiting list inherits its anchor from scan.py's `breakout_alerts` map.
     For every name that has not alerted since the cross-week lock was switched
     on, that map was seeded by `AlertState._migrate_weekly_alerts_to_breakout_
@@ -927,6 +937,8 @@ def _breakout_line(rec: dict[str, Any]) -> str:
         lvl, close = brk.get("level"), brk.get("close")
         if lvl is not None and close is not None:
             txt += f" · cleared <b>{_fmt(lvl)}</b>, closed <b>{_fmt(close)}</b>"
+            if lvl:
+                txt += f" (+{(close / lvl - 1.0) * 100.0:.2f}%)"
         return txt
     bar = str(rec.get("breakout_bar") or "")
     when = bar.replace("T", " ").replace("+05:30", " IST")
@@ -1140,11 +1152,19 @@ def _digest_row(sym: str, rec: dict[str, Any], ctx: dict[str, Any] | None) -> st
     day = _breakout_day(rec)
     brk = f"brk {_d(day)}" if day else "brk ?"
     derived = rec.get("breakout_26w_session") or {}
-    px = derived.get("close") if derived.get("session") else rec.get("breakout_price")
+    if derived.get("session"):
+        # The level printed must be the one THIS breakout cleared.
+        # `level_26w` is the snapshot's frozen level for whichever week the
+        # alert fired in - a different, later number - and the snapshot is
+        # overwritten every Monday, so pairing the two would invent a
+        # comparison that never happened.
+        px, lvl = derived.get("close"), derived.get("level")
+    else:
+        px, lvl = rec.get("breakout_price"), rec.get("level_26w")
     if px:
         brk += f" @{_fmt(px)}"
-        if rec.get("level_26w"):
-            brk += f" >{_fmt(rec.get('level_26w'))}"
+        if lvl:
+            brk += f" >{_fmt(lvl)}"
     live = [z for z in (ctx.get("zones") or []) if isinstance(z, dict)]
     if live:
         z = max(live, key=lambda z: str(z.get("born_session") or ""))

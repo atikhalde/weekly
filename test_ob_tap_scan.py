@@ -2048,3 +2048,66 @@ def test_the_digest_sorts_and_labels_on_the_derived_date():
     body = pages[0]
     assert body.index("NEWORD") < body.index("OLDONE")
     assert "brk 02-Feb" in body and "brk 04-May" in body
+
+
+def test_the_digest_never_pairs_the_derived_close_with_the_snapshot_level():
+    """
+    `level_26w` is the level frozen for whichever week the ALERT fired in; the
+    derived one cleared its own 26-week high weeks earlier. Printing the two
+    side by side would invent a comparison that never happened - and the
+    snapshot is overwritten every Monday, so `level_26w` is usually null here.
+    """
+    rec = {"breakout_bar": "2026-08-26T10:00+05:30", "breakout_price": 105.5,
+           "level_26w": 104.0,                       # the snapshot's, not this one's
+           "breakout_26w_session": {"session": "2026-05-04", "level": 94.0,
+                                    "close": 96.5}}
+    row = ob_tap_scan._digest_row("SYM", rec, None)
+    assert "brk 04-May" in row and "94.00" in row and "96.50" in row
+    assert "104.00" not in row and "105.50" not in row
+
+
+def test_the_fallback_digest_row_still_uses_the_snapshot_level():
+    """No derived date -> the old pairing is still the honest one."""
+    rec = {"breakout_bar": "2026-08-26T10:00+05:30", "breakout_price": 105.5,
+           "level_26w": 104.0, "breakout_26w_session": {}}
+    row = ob_tap_scan._digest_row("SYM", rec, None)
+    assert "brk 26-Aug" in row and "@105.50" in row and ">104.00" in row
+
+
+def test_the_breakout_line_keeps_the_clearance_percentage():
+    rec = {"breakout_bar": "2026-08-18T09:35+05:30",
+           "breakout_26w_session": {"session": "2026-05-04", "level": 305.0,
+                                    "close": 311.2}}
+    line = ob_tap_scan._breakout_line(rec)
+    assert "(+2.03%)" in line
+    # a zero level would divide by zero - it is a guard, not a real number
+    zero = dict(rec, breakout_26w_session={"session": "2026-05-04", "level": 0.0,
+                                           "close": 311.2})
+    assert "(+" not in ob_tap_scan._breakout_line(zero)
+
+
+def test_a_new_breakout_cycle_does_not_inherit_the_old_26w_date():
+    """
+    The derived date is bounded to the cooldown window, so carrying it into a
+    fresh post-lockout cycle would label the new setup with the old breakout -
+    and the correction pass keys off the field merely BEING present, so it
+    would never be re-derived. The zone cache is already dropped here; the
+    date has to go with it.
+    """
+    state = {"waiting": {SYM: {
+        "symbol": SYM, "security_id": SID, "exchange_segment": "NSE_EQ",
+        "week": "2026-08-24", "breakout_bar": "2026-08-26T10:00+05:30",
+        "breakout_price": 105.5, "level_26w": 104.0, "added_at": "2026-08-24",
+        "status": "waiting", "resolved_at": None, "resolved_reason": None,
+        "breakout_26w_session": {"session": "2026-08-20", "level": 100.0,
+                                 "close": 102.0}}},
+        "zones": {SYM: {"zones": [1]}}}
+    alerts = {SYM: {"week": "2027-03-01",
+                    "breakout_bar": "2027-03-01T10:00+05:30",
+                    "breakout_price": 140.0}}
+    harvest_waiting(state, alerts, {SYM: (SID, "NSE_EQ")}, {}, "2027-03-01")
+    rec = state["waiting"][SYM]
+    assert rec["status"] == "waiting"
+    assert "breakout_26w_session" not in rec
+    assert state["zones"] == {}
+    assert rec["breakout_bar"] == "2027-03-01T10:00+05:30"
