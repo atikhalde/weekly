@@ -160,7 +160,9 @@ if displacement and not na(rawTop) and rawTop > rawBot and array.size(boxes) > 0
     candidateEntry = candidateBase + f_front_buffer(candidateWidth, atr) + entryOffsetTicks * syminfo.mintick
     candidateEntry := entryMode == "Distal + 1 tick" ? rawBot + syminfo.mintick : candidateEntry
     for i = 0 to array.size(boxes) - 1
-        if array.get(states, i) >= 0 and candidateEntry <= array.get(tops, i) and candidateEntry >= array.get(bots, i)
+        sameOriginGeometry = box.get_left(array.get(boxes, i)) == bar_index - originOffset and math.abs(rawTop - array.get(tops, i)) <= syminfo.mintick * 0.5 and math.abs(rawBot - array.get(bots, i)) <= syminfo.mintick * 0.5
+        entryInside = candidateEntry <= array.get(tops, i) and candidateEntry >= array.get(bots, i)
+        if array.get(states, i) >= 0 and (entryInside or sameOriginGeometry)
             duplicate := true
 
 if displacement and not duplicate and not na(rawTop) and rawTop > rawBot

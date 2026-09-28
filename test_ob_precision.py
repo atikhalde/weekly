@@ -371,6 +371,17 @@ def test_a_second_zone_inside_an_existing_one_is_rejected():
     assert kinds(res) == ["ob"]                                 # no second "ob"
 
 
+def test_same_geometry_is_rejected_when_front_run_entry_is_above_zone():
+    # Exact same OB bounds, but Auto front-running puts candidate entry above
+    # top. The old entry-inside-zone-only predicate let this duplicate through.
+    # A bullish bar at idx 22 is not an origin candle, so the nearest bearish
+    # origin is still idx 19 (the first zone's origin).
+    bars = two_displacement_scenario(Bar(100.0, 103.0, 99.5, 102.5, 120.0, d(22)))
+    res = replay(bars, P)
+    assert len(res.zones) == 1
+    assert kinds(res) == ["ob"]
+
+
 def test_a_second_zone_outside_the_existing_one_is_kept():
     bars = two_displacement_scenario(Bar(105.0, 106.0, 103.5, 104.0, 120.0, d(22)))
     res = replay(bars, P)

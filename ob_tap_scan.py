@@ -254,26 +254,73 @@ def snapshot_levels(cfg) -> dict[str, tuple[str, float]]:
 # --------------------------------------------------------------------------- #
 def _weekly_alerts_from_data(data: dict[str, Any],
                              backfill_weeks: int) -> dict[str, dict[str, Any]]:
-    """Build the backfill feed from an already-loaded weekly scanner state."""
+    """Build the backfill feed, anchored to each symbol's FIRST cycle alert.
+
+    ``weeks`` is intentionally pruned to six weeks by scan.py. The persistent
+    ``breakout_alerts`` map is the authoritative cross-week record and can be
+    older than that; using only ``weeks`` silently drops a still-locked cycle
+    (OAL was lost this way after its July alert). Include cycle records within
+    the configured backfill horizon, then use retained weekly rows only as a
+    legacy fallback for state files predating breakout_alerts.
+    """
     weeks = data.get("weeks") or {}
     cycle_alerts = data.get("breakout_alerts") or {}
+    horizon = max(1, int(backfill_weeks))
+    cutoff = _now().date() - timedelta(weeks=horizon)
     out: dict[str, dict[str, Any]] = {}
-    for wk in sorted(weeks)[-max(1, backfill_weeks):]:
-        for sym, rec in (weeks.get(wk) or {}).items():
+
+    # Index retained rows so a canonical record missing price/level can recover
+    # those fields only from the exact same alert, never a later duplicate.
+    retained: dict[tuple[str, str], dict[str, Any]] = {}
+    for wk, rows in weeks.items():
+        for raw_sym, rec in (rows or {}).items():
+            if isinstance(rec, dict):
+                retained[(str(raw_sym).strip().upper(), str(rec.get("bar_time", "")))] = rec
+
+    for raw_sym, cycle in cycle_alerts.items():
+        sym = str(raw_sym).strip().upper()
+        if not sym or not isinstance(cycle, dict):
+            continue
+        bar = str(cycle.get("bar_time", ""))
+        day = as_date(bar)
+        if not day or day < cutoff:
+            continue
+        try:
+            week = (day - timedelta(days=day.weekday())).isoformat()
+        except Exception:  # noqa: BLE001
+            continue
+        exact = retained.get((sym, bar), {})
+        price = cycle.get("price", exact.get("price"))
+        try:
+            price = float(price) if price is not None else None
+        except (TypeError, ValueError):
+            price = None
+        out[sym] = {"week": week, "breakout_bar": bar,
+                    "breakout_price": price}
+
+    # Legacy fallback: only symbols without a canonical record use weekly rows.
+    # This preserves old state compatibility without letting duplicate rows
+    # refresh the anchor for symbols that do have a cycle record.
+    for wk in sorted(weeks)[-horizon:]:
+        for raw_sym, rec in (weeks.get(wk) or {}).items():
             if not isinstance(rec, dict):
                 continue
+            sym = str(raw_sym).strip().upper()
+            if sym in out or sym in cycle_alerts:
+                continue
             bar = str(rec.get("bar_time", ""))
-            sym = str(sym).strip().upper()
-            cycle = cycle_alerts.get(sym)
-            if isinstance(cycle, dict):
-                first_bar = str(cycle.get("bar_time", ""))
-                if first_bar and bar != first_bar:
-                    continue                   # ignore later rows in this cycle
+            day = as_date(bar)
+            if not day or day < cutoff:
+                continue
+            try:
+                price = float(rec.get("price")) if rec.get("price") is not None else None
+            except (TypeError, ValueError):
+                price = None
             prev = out.get(sym)
             if prev and str(prev.get("breakout_bar", "")) >= bar:
                 continue
             out[sym] = {"week": wk, "breakout_bar": bar,
-                        "breakout_price": float(rec.get("price") or 0.0)}
+                        "breakout_price": price}
     return out
 
 
@@ -303,9 +350,9 @@ def harvest_waiting(state: dict[str, Any], alerts: dict[str, dict[str, Any]],
     Fold the weekly scanner's alerts into the waiting list.
 
     A symbol is copied in ONCE and then lives independently of `state.json`.
-    That matters: `state.py.prune()` keeps only six weeks, so a name that stays
-    on the list "until tapped or invalidated" would otherwise silently vanish
-    the moment its week was pruned — and the user asked for no calendar limit.
+    That matters: `state.py.prune()` keeps only six weeks, while a breakout
+    cycle can remain eligible for the full 26-week lock. Its canonical first
+    alert must not vanish or be replaced by a later weekly repeat.
 
     The 26-week level is captured at first sight for the same reason: the
     snapshot is overwritten every Monday, so next week the level that this
@@ -341,12 +388,18 @@ def harvest_waiting(state: dict[str, Any], alerts: dict[str, dict[str, Any]],
                 "resolved_reason": None,
             }
             added.append(sym)
-        elif existing.get("status") == "waiting" and \
+        elif existing.get("status") in ("waiting", "expired") and \
                 rec["breakout_bar"] != str(existing.get("breakout_bar", "")):
-            # `weekly_alerts` returns the canonical first event in the active
-            # cycle. Reconcile in either direction: old state may have been
-            # refreshed by a later same-cycle duplicate before the lock existed,
-            # while a post-lockout new cycle naturally has a later timestamp.
+            old_date = as_date(existing.get("breakout_bar"))
+            new_date = as_date(rec.get("breakout_bar"))
+            if old_date is not None and new_date is not None and new_date > old_date:
+                # A later canonical record can only be a fresh post-lockout
+                # cycle, not a same-cycle weekly repeat. Start a new OB wait and
+                # discard the previous cycle's derived zone cache.
+                existing.update(status="waiting", resolved_at=None,
+                                resolved_reason=None, added_at=today)
+                (state.get("zones") or {}).pop(sym, None)
+            # Otherwise this is a correction to the original cycle anchor.
             existing.update(week=rec["week"], breakout_bar=rec["breakout_bar"],
                             breakout_price=rec["breakout_price"])
             lvl_week, lvl = levels.get(sym, ("", None))
@@ -385,6 +438,7 @@ def reconcile_waiting_cycles(state: dict[str, Any],
         existing["breakout_bar"] = first_bar
         existing["breakout_price"] = cycle.get("price")
         existing["level_26w"] = cycle.get("entry_level")
+        (state.get("zones") or {}).pop(sym, None)
         corrected.append(sym)
     return corrected
 
@@ -434,6 +488,31 @@ def active_waiting(state: dict[str, Any]) -> list[str]:
                   if r.get("status") == "waiting")
 
 
+def expire_waiting_cycles(state: dict[str, Any], today: str,
+                          cooldown_weeks: int) -> list[str]:
+    """Retire waiters whose canonical first-breakout cycle has fully expired."""
+    try:
+        weeks = max(1, int(cooldown_weeks))
+        today_date = as_date(today)
+    except (TypeError, ValueError):
+        return []
+    if today_date is None:
+        return []
+    expired: list[str] = []
+    for sym in active_waiting(state):
+        rec = state["waiting"][sym]
+        first = as_date(rec.get("breakout_bar") or rec.get("added_at"))
+        if first is None or today_date <= first + timedelta(weeks=weeks):
+            continue
+        rec.update(status="expired", resolved_at=today,
+                   resolved_reason=f"first breakout cycle expired after {weeks} weeks")
+        expired.append(sym)
+    if expired:
+        log.info("waiting-list sweep: expired %d breakout cycle(s) (%s)",
+                 len(expired), ", ".join(expired[:12]))
+    return expired
+
+
 def first_zone_after_breakout(rec: dict[str, Any],
                               ctx: dict[str, Any] | None) -> dict[str, Any] | None:
     """
@@ -442,9 +521,8 @@ def first_zone_after_breakout(rec: dict[str, Any],
     A weekly breakout is a level event (close > 26W high). The precision OB
     that matters is the one that forms AFTER that breakout, not an older
     zone that happened to be lying around from months before. Without this
-    filter a name that broke out, tapped an old zone, and then formed a fresh
-    zone would be retired on the old tap even though the new zone is still
-    armed and worth watching.
+    filter an old tap is considered here; breakout-cycle completion is handled
+    separately by sweep_waiting_list using the actual tap date.
 
     SMSPHARMA is the case that motivated the sweep: it broke out on
     2026-09-11, formed its first post-breakout OB on 2026-09-11 as well
@@ -489,29 +567,17 @@ def first_zone_after_breakout(rec: dict[str, Any],
 def sweep_waiting_list(state: dict[str, Any], zones: dict[str, Any],
                        alerts: dict[str, Any], today: str) -> list[str]:
     """
-    One-shot sweep: remove names whose FIRST post-breakout OB is already tapped.
+    Retire a breakout cycle after a zone has tapped on a prior session.
 
-    The waiting list is "until tapped or invalidated" with no calendar limit.
-    Without a sweep a name that tapped its first post-breakout zone stays on
-    the list forever as "waiting" with no live zone, because the zone is now
-    exhausted and the next refresh finds no armed zone - but the status is
-    still waiting. The user then sees "no live zone yet" for a name that has
-    already completed its trade.
+    A zone may have formed just before the weekly breakout; if it taps after
+    that breakout, the stock has already delivered the setup. A later zone's
+    own TAP 1 must not be presented as the stock's first tap. This sweep uses
+    persisted zone tap counters/session dates, with alert de-duplication keys as
+    a compatibility fallback for older state files.
 
-    The sweep looks at each waiting name, finds its first zone born after the
-    breakout (first_zone_after_breakout), and checks whether that zone's
-    signature has a tap in the alert de-dupe map. If it does, the name is
-    retired as "tapped" with today's date and a reason that names the zone.
-
-    This is deliberately conservative: only the FIRST post-breakout zone is
-    considered, and only when there is a recorded tap for its exact signature.
-    An older zone that was tapped before the breakout does not retire the
-    name, and a name with no zone yet is untouched.
-
-    SMSPHARMA: breakout 2026-09-11, first zone born 2026-09-11, tapped
-    2026-09-17 -> retired.
-
-    PTCIL: breakout, first zone born after breakout, never tapped -> stays.
+    A zone tapped BEFORE the breakout does not retire the new cycle. A tap on
+    today's session is left to normal event delivery so its alert can be sent;
+    the waiting record is resolved after successful delivery.
 
     Returns:
         List of symbols retired by this sweep.
@@ -520,26 +586,39 @@ def sweep_waiting_list(state: dict[str, Any], zones: dict[str, Any],
     waiting = state.get("waiting") or {}
     for sym in active_waiting(state):
         rec = waiting.get(sym)
-        ctx = zones.get(sym)
-        first = first_zone_after_breakout(rec, ctx)
-        if not first:
+        ctx = zones.get(sym) or {}
+        breakout_date = as_date(rec.get("breakout_bar") or rec.get("added_at"))
+        if breakout_date is None:
             continue
-        sig = first.get("signature")
-        if not sig:
-            # Fallback: construct signature from born_session + top/bottom
-            # the same way ob_precision.Zone.signature() does, but using the
-            # persisted dict shape.
-            try:
-                sig = f"{first.get('born_session')}|{first.get('top')}|{first.get('bottom')}"
-            except Exception:  # noqa: BLE001
+
+        # The trade is complete when ANY zone is tapped on/after the canonical
+        # breakout date, even if that zone was born just before the breakout.
+        # This prevents a later OB in the same breakout cycle from generating a
+        # fresh symbol-level TAP 1 after the stock already tapped its earlier OB.
+        tapped_zone = None
+        for z in ctx.get("zones") or []:
+            if not isinstance(z, dict) or int(z.get("taps") or 0) <= 0:
                 continue
-        # A tap is recorded as "{sym}|{signature}|tap|tapN"
-        tapped = any(k.startswith(f"{sym}|{sig}|tap") for k in (alerts or {}))
-        if tapped:
+            tap_day = as_date(z.get("tap_session"))
+            if tap_day is not None and breakout_date <= tap_day < as_date(today):
+                tapped_zone = z
+                break
+
+        # Backward-compatible path for old state where zone tap counters were
+        # not persisted but the first post-breakout zone's alert key was.
+        if tapped_zone is None:
+            first = first_zone_after_breakout(rec, ctx)
+            if first:
+                sig = first.get("signature") or (
+                    f"{first.get('born_session')}|{first.get('top')}|{first.get('bottom')}")
+                if any(k.startswith(f"{sym}|{sig}|tap") for k in (alerts or {})):
+                    tapped_zone = first
+
+        if tapped_zone:
             rec["status"] = "tapped"
             rec["resolved_at"] = today
             rec["resolved_reason"] = (
-                f"first post-breakout OB {first.get('born_session')} tapped - sweep")
+                f"OB {tapped_zone.get('born_session')} tapped on/after breakout - sweep")
             retired.append(sym)
     if retired:
         log.info("waiting-list sweep: retired %d (%s)", len(retired),
@@ -1114,6 +1193,7 @@ def main() -> int:
         if args.digest or args.digest_only or (not subset
                                                and digest_due(state, slot, today, ob)):
             added, _source_ok = harvest_stage(cfg, ob, state, today)
+            expire_waiting_cycles(state, today, cfg.runtime.breakout_cooldown_weeks)
             tg = build_telegram(cfg, dry_run=cfg.runtime.dry_run)
             # Off-schedule sends are labelled (and marked) "manual", so a forced
             # digest cannot spend the day's pre-open or post-close slot.
@@ -1128,6 +1208,7 @@ def main() -> int:
 
     # ---- stage 0: the waiting list, harvested from the weekly scanner -------
     added, source_ok = harvest_stage(cfg, ob, state, today)
+    expire_waiting_cycles(state, today, cfg.runtime.breakout_cooldown_weeks)
 
     want = None
     if args.symbols:
@@ -1333,25 +1414,26 @@ def main() -> int:
             rec["resolved_reason"] = f"all {seen} order block(s) invalidated/exhausted"
             resolved += 1
 
-    # ---- waiting-list sweep: first post-breakout OB already tapped ---------
-    # Same-evening sweep that retires names whose first zone after the weekly
-    # breakout is already tapped. Without it a name like SMSPHARMA stays on
-    # the list as "no live zone yet" after its first OB is tapped and
-    # exhausted, because the zone is gone but the waiting status remains.
-    # The sweep is conservative: only the FIRST zone born on or after the
-    # breakout date is checked, and only when its exact tap signature is in
-    # the de-dupe map. PTCIL stays because its first zone has never been
-    # tapped; SMSPHARMA is retired because its first zone was tapped on
-    # 2026-09-17.
-    #
-    # This runs on every pass (no extra flag) because it is a correctness
-    # fix, not a cosmetic one - a retired name must not be re-added by a later
-    # harvest, and the sweep ensures its status is final before save_state().
-    # It also runs BEFORE the send block so a name that just tapped on this
-    # run is retired in the same run that sent its tap, keeping the counts in
-    # the daily digest honest.
+    # ---- waiting-list sweep: prior tap closes the breakout cycle -----------
+    # If an earlier zone tapped after the canonical breakout date, don't emit
+    # another zone's TAP 1 for the same cycle. Today's first tap is not swept:
+    # it still needs normal Telegram delivery before resolution.
     swept = sweep_waiting_list(state, zones, alerts_seen, today)
     resolved += len(swept)
+    if swept:
+        # Events may have been collected above from a newer zone on the same
+        # symbol. If an earlier zone already tapped on a prior session, that
+        # breakout cycle is complete and the newly collected TAP 1 is stale.
+        retired = set(swept)
+        # A past TAP 1 closes the symbol-level breakout setup and must block a
+        # later zone's own TAP 1. Keep higher tap numbers from the same zone:
+        # they remain meaningful follow-up touches when explicitly enabled.
+        events = [item for item in events if not (
+            item[0] in retired and
+            (item[1].get("kind") == "ob" or
+             (item[1].get("kind") == "tap"
+              and int(item[1].get("tap_number") or 0) == 1))
+        )]
 
     # ---- send ---------------------------------------------------------------
     sent_ok = True

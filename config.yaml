@@ -229,8 +229,8 @@ ob_precision:
   max_refresh_per_run: 250      # per-symbol history calls in one run; the
                                 # backfill spreads over runs instead of blowing
                                 # the workflow's timeout
-  backfill_weeks: 6             # seed the waiting list from every week
-                                # state.json still retains (it prunes at 6)
+  backfill_weeks: 26            # seed every first-alert cycle still inside the
+                                # scanner's 26-week lock, even after weeks are pruned
   quote_batch: 1000             # Dhan OHLC limit per request
   alert_kinds: ["ob", "tap"]    # "approach"/"confirm"/"invalid" are computed
                                 # but not sent: too noisy for a live chat

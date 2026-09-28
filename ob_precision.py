@@ -516,7 +516,19 @@ def process_bar(zones: list[Zone], bar: Bar, i: int, *, confirmed: bool,
             top, bottom = zone_edges(ob, params)
             if top > bottom:
                 entry = pre_order_entry(top, bottom, atr, params)
-                duplicate = any(z.live and bottom <= entry <= z.top for z in zones)
+                duplicate = any(
+                    z.live and (
+                        bottom <= entry <= z.top
+                        # With front-running enabled, a repeated displacement
+                        # from the same price geometry often has its entry just
+                        # ABOVE the existing zone, so the Pine's entry-inside-
+                        # zone test misses it. Exact same bounds are still the
+                        # same order block, not a second trade setup.
+                        or (z.origin_session == ob.session
+                            and abs(top - z.top) <= params.mintick / 2
+                            and abs(bottom - z.bottom) <= params.mintick / 2)
+                    ) for z in zones
+                )
                 if not duplicate:
                     zones.append(Zone(
                         top=top, bottom=bottom, entry=entry,
