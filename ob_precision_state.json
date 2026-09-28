@@ -1,11 +1,270 @@
 {
   "alerts": {
+    "AARTIIND|2026-01-30|355.6000061035156|349.29998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-30",
+      "tap_number": null
+    },
+    "AARTIIND|2026-06-15|433.6499938964844|424.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-15",
+      "tap_number": null
+    },
+    "ACMESOLAR|2026-03-12|226.02000427246094|217.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-12",
+      "tap_number": null
+    },
+    "ACMESOLAR|2026-06-02|314.0|305.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-02",
+      "tap_number": null
+    },
+    "ACMESOLAR|2026-09-18|413.04998779296875|403.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-18",
+      "tap_number": null
+    },
+    "ACMESOLAR|2026-09-21|413.04998779296875|403.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-21",
+      "tap_number": null
+    },
+    "ADOR|2026-04-15|881.0999755859375|849.7000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-15",
+      "tap_number": null
+    },
+    "ADOR|2026-05-26|1089.300048828125|1073.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-26",
+      "tap_number": null
+    },
+    "ADOR|2026-06-19|1173.0999755859375|1170.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
+    "ADOR|2026-07-20|1344.9000244140625|1340.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-20",
+      "tap_number": null
+    },
+    "AEGISVOPAK|2026-06-12|197.6999969482422|193.41000366210938|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-12",
+      "tap_number": null
+    },
+    "AEGISVOPAK|2026-07-03|236.1999969482422|230.41000366210938|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-03",
+      "tap_number": null
+    },
+    "AEGISVOPAK|2026-07-06|236.1999969482422|230.41000366210938|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-06",
+      "tap_number": null
+    },
+    "AEGISVOPAK|2026-07-07|236.1999969482422|230.41000366210938|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-07",
+      "tap_number": null
+    },
+    "AEGISVOPAK|2026-09-02|267.8999938964844|260.70001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-02",
+      "tap_number": null
+    },
+    "AETHER|2026-01-01|830.0999755859375|829.6500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-01",
+      "tap_number": null
+    },
+    "AETHER|2026-01-02|830.0999755859375|829.6500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-02",
+      "tap_number": null
+    },
+    "AETHER|2026-03-12|1015.0|998.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-12",
+      "tap_number": null
+    },
+    "AETHER|2026-03-20|1039.199951171875|1001.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-20",
+      "tap_number": null
+    },
+    "AETHER|2026-06-22|1185.0|1150.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-22",
+      "tap_number": null
+    },
+    "AETHER|2026-06-24|1185.0|1150.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-24",
+      "tap_number": null
+    },
+    "AETHER|2026-07-08|1350.0|1305.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-08",
+      "tap_number": null
+    },
     "AETHER|2026-09-25|1648.00|1629.00|ob": {
       "kind": "ob",
       "price": 1767.0,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 0
+    },
+    "AETHER|2026-09-25|1648.0|1629.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-25",
+      "tap_number": null
+    },
+    "AKUMS|2026-02-09|446.0|440.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-09",
+      "tap_number": null
+    },
+    "AKUMS|2026-06-10|545.3499755859375|543.75|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-10",
+      "tap_number": null
+    },
+    "AKUMS|2026-07-07|630.0|620.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-07",
+      "tap_number": null
+    },
+    "AKUMS|2026-07-10|649.9000244140625|639.7000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-10",
+      "tap_number": null
+    },
+    "AKUMS|2026-08-07|670.0|656.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "AKUMS|2026-08-11|670.0|656.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "AKUMS|2026-09-21|768.0999755859375|763.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-21",
+      "tap_number": null
+    },
+    "ALIVUS|2026-06-23|1084.800048828125|1068.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-23",
+      "tap_number": null
+    },
+    "ALIVUS|2026-08-03|1119.5999755859375|1089.800048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-03",
+      "tap_number": null
+    },
+    "ALIVUS|2026-08-04|1119.5999755859375|1089.800048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-04",
+      "tap_number": null
+    },
+    "ALKYLAMINE|2026-05-06|1594.0|1524.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-06",
+      "tap_number": null
+    },
+    "ANANDRATHI|2026-04-06|1492.5|1485.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "ANANDRATHI|2026-06-29|1916.0|1875.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-29",
+      "tap_number": null
+    },
+    "ANANTRAJ|2026-07-03|523.0|513.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-03",
+      "tap_number": null
     },
     "ANTELOPUS|2026-09-25|1161.20|1119.10|ob": {
       "kind": "ob",
@@ -14,12 +273,103 @@
       "session": "2026-09-25",
       "tap_number": 0
     },
+    "ANTHEM|2026-02-05|608.7000122070312|599.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-05",
+      "tap_number": null
+    },
+    "ANTHEM|2026-03-27|650.0|642.2000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-27",
+      "tap_number": null
+    },
+    "ANTHEM|2026-04-09|669.4000244140625|657.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-09",
+      "tap_number": null
+    },
     "APARINDS|2026-09-18|17598.00|16490.00|tap|tap1": {
       "kind": "tap",
       "price": 17804.0,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-24",
       "tap_number": 1
+    },
+    "APLAPOLLO|2026-08-03|1908.0|1805.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-03",
+      "tap_number": null
+    },
+    "APOLLOPIPE|2026-02-06|266.54998779296875|263.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-06",
+      "tap_number": null
+    },
+    "APOLLOPIPE|2026-03-09|348.0|344.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-09",
+      "tap_number": null
+    },
+    "ARROWGREEN|2026-03-30|414.04998779296875|383.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-30",
+      "tap_number": null
+    },
+    "ARROWGREEN|2026-05-29|464.95001220703125|453.1499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-29",
+      "tap_number": null
+    },
+    "ARROWGREEN|2026-06-09|540.0999755859375|522.2000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-09",
+      "tap_number": null
+    },
+    "ASAHIINDIA|2026-08-14|903.1500244140625|879.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-14",
+      "tap_number": null
+    },
+    "ASIANENE|2026-08-17|399.0|366.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "ASIANENE|2026-08-18|399.0|366.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "ASIANHOTNR|2026-08-31|301.95001220703125|294.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-31",
+      "tap_number": null
     },
     "ATHERENERG|2026-08-28|1454.80|1430.00|tap|tap1": {
       "kind": "tap",
@@ -35,12 +385,250 @@
       "session": "2026-09-28",
       "tap_number": 1
     },
+    "AUBANK|2026-06-12|981.9000244140625|956.6500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-12",
+      "tap_number": null
+    },
+    "AVALON|2026-04-09|1012.1500244140625|975.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-09",
+      "tap_number": null
+    },
+    "AVALON|2026-05-04|1088.5|1031.699951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-04",
+      "tap_number": null
+    },
+    "AVALON|2026-05-08|1169.699951171875|1132.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-08",
+      "tap_number": null
+    },
+    "AVALON|2026-05-20|1315.199951171875|1277.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-20",
+      "tap_number": null
+    },
+    "AVALON|2026-08-07|1821.0|1750.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "AVALON|2026-08-17|1939.0999755859375|1921.699951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "AVALON|2026-09-18|2256.0|2204.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-18",
+      "tap_number": null
+    },
+    "AYMSYNTEX|2026-04-23|191.3699951171875|185.8000030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-23",
+      "tap_number": null
+    },
+    "AYMSYNTEX|2026-06-30|220.49000549316406|214.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-30",
+      "tap_number": null
+    },
+    "AYMSYNTEX|2026-09-02|253.89999389648438|249.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-02",
+      "tap_number": null
+    },
+    "BAJAJ-AUTO|2026-04-10|9365.0|9262.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "BAJAJ-AUTO|2026-04-30|9510.0|9496.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-30",
+      "tap_number": null
+    },
+    "BAJAJ-AUTO|2026-07-13|10177.5|10115.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-13",
+      "tap_number": null
+    },
+    "BAJAJ-AUTO|2026-07-22|10525.0|10342.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-22",
+      "tap_number": null
+    },
+    "BAJAJ-AUTO|2026-07-23|10525.0|10342.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-23",
+      "tap_number": null
+    },
+    "BALRAMCHIN|2026-03-04|465.0|458.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-04",
+      "tap_number": null
+    },
+    "BALRAMCHIN|2026-04-20|489.5|480.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-20",
+      "tap_number": null
+    },
+    "BALRAMCHIN|2026-08-03|592.4500122070312|582.1500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-03",
+      "tap_number": null
+    },
+    "BEML|2026-08-10|1700.199951171875|1668.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "BHAGERIA|2026-06-04|157.92999267578125|153.02000427246094|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-04",
+      "tap_number": null
+    },
+    "BHAGERIA|2026-08-28|223.89999389648438|216.8000030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-28",
+      "tap_number": null
+    },
+    "BHAGERIA|2026-09-04|273.0|253.0500030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-04",
+      "tap_number": null
+    },
     "BHAGERIA|2026-09-25|352.00|341.40|ob": {
       "kind": "ob",
       "price": 394.6000061035156,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 0
+    },
+    "BHAGERIA|2026-09-25|352.0|341.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-25",
+      "tap_number": null
+    },
+    "BIL|2026-09-09|947.0|907.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-09",
+      "tap_number": null
+    },
+    "BLISSGVS|2025-12-19|144.83999633789062|143.14999389648438|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-19",
+      "tap_number": null
+    },
+    "BLISSGVS|2026-02-09|185.0|177.3800048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-09",
+      "tap_number": null
+    },
+    "BLISSGVS|2026-04-22|259.7900085449219|252.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-22",
+      "tap_number": null
+    },
+    "BLISSGVS|2026-05-26|322.3500061035156|305.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-26",
+      "tap_number": null
+    },
+    "BLISSGVS|2026-08-18|522.0|513.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "BLSE|2026-04-27|178.30999755859375|176.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-27",
+      "tap_number": null
+    },
+    "BLSE|2026-05-26|210.8000030517578|207.66000366210938|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-26",
+      "tap_number": null
+    },
+    "BLSE|2026-07-01|234.6999969482422|230.2100067138672|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-01",
+      "tap_number": null
+    },
+    "BLSE|2026-07-24|268.5|258.1499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-24",
+      "tap_number": null
     },
     "BLUSPRING|2026-09-24|123.91|121.50|ob": {
       "kind": "ob",
@@ -49,12 +637,306 @@
       "session": "2026-09-24",
       "tap_number": 0
     },
+    "BOSCH-HCIL|2026-07-31|1328.0|1305.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-31",
+      "tap_number": null
+    },
+    "BOSCH-HCIL|2026-08-04|1398.0|1374.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-04",
+      "tap_number": null
+    },
+    "BOSCH-HCIL|2026-08-05|1398.0|1374.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "BOSCH-HCIL|2026-08-06|1398.0|1374.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "CARTRADE|2026-05-06|1655.0|1617.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-06",
+      "tap_number": null
+    },
+    "CARTRADE|2026-06-03|1735.699951171875|1711.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-03",
+      "tap_number": null
+    },
+    "CARTRADE|2026-06-08|1953.800048828125|1907.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-08",
+      "tap_number": null
+    },
+    "CARTRADE|2026-06-09|1953.800048828125|1907.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-09",
+      "tap_number": null
+    },
+    "CARTRADE|2026-06-10|1953.800048828125|1907.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-10",
+      "tap_number": null
+    },
+    "CARTRADE|2026-07-27|2689.800048828125|2635.60009765625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "CENTUM|2026-02-23|2351.10009765625|2288.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-23",
+      "tap_number": null
+    },
+    "CENTUM|2026-05-21|2954.10009765625|2879.89990234375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-21",
+      "tap_number": null
+    },
+    "CENTUM|2026-05-29|3181.0|3135.39990234375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-29",
+      "tap_number": null
+    },
+    "CENTUM|2026-09-03|3445.5|3405.89990234375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-03",
+      "tap_number": null
+    },
+    "CENTUM|2026-09-07|3445.5|3405.89990234375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "CENTUM|2026-09-21|4398.0|4300.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-21",
+      "tap_number": null
+    },
+    "CGCL|2026-06-30|217.50999450683594|215.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-30",
+      "tap_number": null
+    },
+    "CGCL|2026-08-26|225.11000061035156|217.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "CHENNPETRO|2025-10-28|785.7999877929688|746.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-10-28",
+      "tap_number": null
+    },
+    "CHENNPETRO|2026-01-14|794.5|775.1500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-14",
+      "tap_number": null
+    },
+    "CHENNPETRO|2026-06-02|1065.0|1045.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-02",
+      "tap_number": null
+    },
+    "CHENNPETRO|2026-07-10|1124.0|1108.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-10",
+      "tap_number": null
+    },
+    "CHENNPETRO|2026-08-11|1270.0|1235.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "COFORGE|2026-04-02|1150.0|1145.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-02",
+      "tap_number": null
+    },
+    "COFORGE|2026-05-08|1294.9000244140625|1277.699951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-08",
+      "tap_number": null
+    },
+    "COFORGE|2026-07-28|1472.0|1434.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-28",
+      "tap_number": null
+    },
+    "COMSYN|2026-01-01|141.0500030517578|138.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-01",
+      "tap_number": null
+    },
+    "COMSYN|2026-06-09|153.0|152.89999389648438|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-09",
+      "tap_number": null
+    },
+    "COMSYN|2026-07-02|161.2899932861328|153.1999969482422|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-02",
+      "tap_number": null
+    },
+    "COMSYN|2026-08-10|210.0|205.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "COSMOFIRST|2026-06-23|780.75|771.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-23",
+      "tap_number": null
+    },
+    "COSMOFIRST|2026-07-03|795.9500122070312|788.5499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-03",
+      "tap_number": null
+    },
+    "COSMOFIRST|2026-07-22|828.4000244140625|822.8499755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-22",
+      "tap_number": null
+    },
+    "CRAFTSMAN|2026-04-08|6848.0|6690.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-08",
+      "tap_number": null
+    },
+    "CRAFTSMAN|2026-05-07|7800.0|7691.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-07",
+      "tap_number": null
+    },
+    "CRAFTSMAN|2026-07-29|9311.0|9131.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "DALMIASUG|2026-03-30|314.0|296.54998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-30",
+      "tap_number": null
+    },
+    "DALMIASUG|2026-08-03|354.0|348.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-03",
+      "tap_number": null
+    },
+    "DALMIASUG|2026-09-25|402.75|396.95001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-25",
+      "tap_number": null
+    },
     "DALMIASUG|2026-09-25|402.75|396.95|ob": {
       "kind": "ob",
       "price": 428.75,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 0
+    },
+    "DATAPATTNS|2026-04-22|3530.0|3444.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-22",
+      "tap_number": null
+    },
+    "DATAPATTNS|2026-04-23|3530.0|3444.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-23",
+      "tap_number": null
+    },
+    "DATAPATTNS|2026-07-22|4072.0|3976.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-22",
+      "tap_number": null
     },
     "DCBBANK|2026-08-25|205.62|199.25|tap|tap1": {
       "kind": "tap",
@@ -70,12 +952,327 @@
       "session": "2026-09-25",
       "tap_number": 0
     },
+    "DIACABS|2026-04-20|151.8000030517578|148.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-20",
+      "tap_number": null
+    },
+    "DIACABS|2026-05-14|175.08999633789062|168.3000030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-14",
+      "tap_number": null
+    },
+    "DIACABS|2026-07-21|229.5|216.8000030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-21",
+      "tap_number": null
+    },
+    "DIFFNKG|2026-06-11|324.04998779296875|322.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-11",
+      "tap_number": null
+    },
+    "DIFFNKG|2026-08-31|390.79998779296875|387.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-31",
+      "tap_number": null
+    },
+    "DIXON|2026-06-16|11545.0|11389.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "DIXON|2026-06-17|11545.0|11389.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-17",
+      "tap_number": null
+    },
+    "DIXON|2026-07-06|12470.0|12325.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-06",
+      "tap_number": null
+    },
+    "DOLPHIN|2025-12-11|340.6000061035156|322.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-11",
+      "tap_number": null
+    },
+    "DOLPHIN|2026-08-11|419.0|410.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "DOLPHIN|2026-08-12|419.0|410.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-12",
+      "tap_number": null
+    },
+    "DOLPHIN|2026-08-17|502.0|475.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "DOLPHIN|2026-08-18|502.0|475.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "DYCL|2026-06-18|328.04998779296875|321.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-18",
+      "tap_number": null
+    },
+    "EBGNG|2026-04-10|376.3999938964844|366.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "EBGNG|2026-04-13|376.3999938964844|366.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-13",
+      "tap_number": null
+    },
+    "EBGNG|2026-06-19|457.8999938964844|445.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
+    "EBGNG|2026-06-22|457.8999938964844|445.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-22",
+      "tap_number": null
+    },
+    "EDELWEISS|2026-06-16|106.80000305175781|103.69999694824219|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "EDELWEISS|2026-08-13|119.37000274658203|117.41000366210938|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-13",
+      "tap_number": null
+    },
+    "EIMCOELECO|2026-04-09|1495.0|1405.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-09",
+      "tap_number": null
+    },
+    "EIMCOELECO|2026-08-14|1814.0|1782.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-14",
+      "tap_number": null
+    },
+    "EIMCOELECO|2026-08-17|1814.0|1782.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "EMCURE|2026-03-27|1468.199951171875|1443.800048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-27",
+      "tap_number": null
+    },
+    "EMIL|2026-07-02|119.79000091552734|115.80999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-02",
+      "tap_number": null
+    },
+    "EMIL|2026-08-05|132.89999389648438|131.6699981689453|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "EMIL|2026-08-12|149.0|147.52999877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-12",
+      "tap_number": null
+    },
+    "ENDURANCE|2026-05-07|2389.199951171875|2332.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-07",
+      "tap_number": null
+    },
+    "ENGINERSIN|2026-04-01|186.0|177.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-01",
+      "tap_number": null
+    },
+    "ENGINERSIN|2026-08-05|227.0500030517578|223.8000030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "ENGINERSIN|2026-08-24|237.49000549316406|235.33999633789062|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "ENGINERSIN|2026-08-31|250.75|243.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-31",
+      "tap_number": null
+    },
+    "ENGINERSIN|2026-09-22|261.3999938964844|253.60000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-22",
+      "tap_number": null
+    },
     "ENGINERSIN|2026-09-25|303.50|295.00|ob": {
       "kind": "ob",
       "price": 315.6499938964844,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 0
+    },
+    "ENGINERSIN|2026-09-25|303.5|295.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-25",
+      "tap_number": null
+    },
+    "ENTERO|2026-01-01|957.2999877929688|944.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-01",
+      "tap_number": null
+    },
+    "ENTERO|2026-08-11|1333.0|1300.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "ENTERO|2026-08-24|1420.0|1380.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "ENTERO|2026-08-27|1420.0|1380.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-27",
+      "tap_number": null
+    },
+    "ETERNAL|2026-07-01|260.0|257.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-01",
+      "tap_number": null
+    },
+    "FINCABLES|2026-02-06|747.0|737.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-06",
+      "tap_number": null
+    },
+    "FINCABLES|2026-02-10|747.0|737.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-10",
+      "tap_number": null
+    },
+    "FINCABLES|2026-08-06|999.0|989.1500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "FINCABLES|2026-08-10|1040.0|1017.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "FINCABLES|2026-08-11|1040.0|1017.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "FINCABLES|2026-09-10|1223.5|1211.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-10",
+      "tap_number": null
     },
     "FOSECOIND|2026-09-16|6277.50|6100.00|tap|tap1": {
       "kind": "tap",
@@ -84,12 +1281,187 @@
       "session": "2026-09-28",
       "tap_number": 1
     },
+    "GAEL|2025-12-19|118.51000213623047|114.2699966430664|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-19",
+      "tap_number": null
+    },
+    "GAEL|2025-12-29|126.5|125.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-29",
+      "tap_number": null
+    },
+    "GAEL|2025-12-31|126.5|125.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-31",
+      "tap_number": null
+    },
+    "GAEL|2026-04-06|129.10000610351562|127.16000366210938|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "GANESHBE|2026-02-09|69.12000274658203|68.4000015258789|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-09",
+      "tap_number": null
+    },
+    "GANESHBE|2026-04-10|83.9000015258789|80.87000274658203|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "GHCLTEXTIL|2026-07-02|98.61000061035156|96.41999816894531|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-02",
+      "tap_number": null
+    },
+    "GHCLTEXTIL|2026-07-06|98.61000061035156|96.41999816894531|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-06",
+      "tap_number": null
+    },
+    "GIPCL|2026-08-10|159.0|157.5500030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "GIPCL|2026-08-25|173.0|169.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-25",
+      "tap_number": null
+    },
+    "GIPCL|2026-08-26|173.0|169.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "GOKULAGRO|2026-03-17|159.99000549316406|154.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-17",
+      "tap_number": null
+    },
+    "GOKULAGRO|2026-07-29|210.83999633789062|210.2100067138672|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "GRAPHITE|2026-07-16|624.0499877929688|620.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-16",
+      "tap_number": null
+    },
+    "GRAPHITE|2026-08-04|657.0|654.3499755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-04",
+      "tap_number": null
+    },
+    "GUFICBIO|2026-05-25|286.1000061035156|284.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-25",
+      "tap_number": null
+    },
+    "GUFICBIO|2026-08-07|400.0|392.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "GUJTHEM|2026-08-24|376.0|364.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
     "HAPPYFORGE|2026-08-14|2040.00|1986.60|tap|tap1": {
       "kind": "tap",
       "price": 2084.800048828125,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-24",
       "tap_number": 1
+    },
+    "HATSUN|2026-08-24|985.3499755859375|921.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "HATSUN|2026-08-26|1055.050048828125|1025.550048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "HATSUN|2026-08-27|1055.050048828125|1025.550048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-27",
+      "tap_number": null
+    },
+    "HFCL|2026-04-10|75.5|74.63999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "HFCL|2026-04-17|87.9000015258789|87.51000213623047|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-17",
+      "tap_number": null
+    },
+    "HFCL|2026-04-30|107.69000244140625|104.61000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-30",
+      "tap_number": null
+    },
+    "HFCL|2026-05-06|107.69000244140625|104.61000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-06",
+      "tap_number": null
     },
     "ICIL|2026-09-23|446.00|433.20|ob": {
       "kind": "ob",
@@ -105,12 +1477,369 @@
       "session": "2026-09-28",
       "tap_number": 1
     },
+    "IFCI|2025-12-23|46.95000076293945|46.22999954223633|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-23",
+      "tap_number": null
+    },
+    "IFCI|2026-05-07|58.349998474121094|57.869998931884766|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-07",
+      "tap_number": null
+    },
+    "IFCI|2026-05-27|61.599998474121094|61.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-27",
+      "tap_number": null
+    },
+    "IFCI|2026-06-02|68.5999984741211|66.94999694824219|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-02",
+      "tap_number": null
+    },
+    "IFCI|2026-06-03|68.5999984741211|66.94999694824219|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-03",
+      "tap_number": null
+    },
+    "IGPL|2026-03-18|336.25|325.8999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-18",
+      "tap_number": null
+    },
+    "IGPL|2026-04-09|385.0|373.1499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-09",
+      "tap_number": null
+    },
+    "IGPL|2026-04-10|385.0|373.1499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "IGPL|2026-07-27|429.70001220703125|422.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "IGPL|2026-08-26|501.04998779296875|485.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "INDNIPPON|2026-09-04|1076.199951171875|1055.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-04",
+      "tap_number": null
+    },
+    "INDNIPPON|2026-09-09|1130.0999755859375|1092.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-09",
+      "tap_number": null
+    },
     "INDOBORAX|2026-08-20|437.10|422.25|tap|tap1": {
       "kind": "tap",
       "price": 442.3,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-28",
       "tap_number": 1
+    },
+    "INDOTECH|2026-04-13|1341.800048828125|1318.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-13",
+      "tap_number": null
+    },
+    "INDOTECH|2026-04-15|1341.800048828125|1318.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-15",
+      "tap_number": null
+    },
+    "INDOTECH|2026-04-17|1799.9000244140625|1651.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-17",
+      "tap_number": null
+    },
+    "INDOTECH|2026-04-22|1799.9000244140625|1651.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-22",
+      "tap_number": null
+    },
+    "INDOTECH|2026-04-23|1799.9000244140625|1651.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-23",
+      "tap_number": null
+    },
+    "INNOVACAP|2026-05-04|722.0|711.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-04",
+      "tap_number": null
+    },
+    "INNOVACAP|2026-08-11|959.7000122070312|937.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "IOLCP|2026-05-11|98.30000305175781|96.2699966430664|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-11",
+      "tap_number": null
+    },
+    "IOLCP|2026-05-20|109.44999694824219|108.01000213623047|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-20",
+      "tap_number": null
+    },
+    "IOLCP|2026-05-26|121.05000305175781|118.20999908447266|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-26",
+      "tap_number": null
+    },
+    "IOLCP|2026-06-29|133.39999389648438|130.3000030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-29",
+      "tap_number": null
+    },
+    "IOLCP|2026-08-26|170.69000244140625|167.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "JASH|2026-06-05|426.54998779296875|413.8999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-05",
+      "tap_number": null
+    },
+    "JINDALSAW|2026-01-19|161.25999450683594|154.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-19",
+      "tap_number": null
+    },
+    "JINDALSAW|2026-01-21|161.25999450683594|154.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-21",
+      "tap_number": null
+    },
+    "JINDALSAW|2026-03-11|165.0|159.05999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-11",
+      "tap_number": null
+    },
+    "JINDALSAW|2026-05-27|218.6999969482422|214.00999450683594|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-27",
+      "tap_number": null
+    },
+    "JYOTICNC|2026-08-18|838.7000122070312|822.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "JYOTICNC|2026-09-21|964.0|928.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-21",
+      "tap_number": null
+    },
+    "KABRAEXTRU|2026-08-05|419.04998779296875|410.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "KABRAEXTRU|2026-08-06|419.04998779296875|410.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "KABRAEXTRU|2026-08-10|472.0|439.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "KABRAEXTRU|2026-08-24|509.20001220703125|494.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "KABRAEXTRU|2026-09-07|570.0|561.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "KARURVYSYA|2026-07-21|311.29998779296875|296.1499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-21",
+      "tap_number": null
+    },
+    "KENNAMET|2026-08-07|2888.0|2851.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "KENNAMET|2026-08-12|3362.0|3230.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-12",
+      "tap_number": null
+    },
+    "KENNAMET|2026-08-21|3550.0|3480.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-21",
+      "tap_number": null
+    },
+    "KINGFA|2025-12-19|3763.0|3725.10009765625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-19",
+      "tap_number": null
+    },
+    "KINGFA|2025-12-22|3763.0|3725.10009765625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-22",
+      "tap_number": null
+    },
+    "KINGFA|2026-04-15|4300.0|4202.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-15",
+      "tap_number": null
+    },
+    "KINGFA|2026-08-07|5185.5|5149.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "KMEW|2025-11-03|1200.0|1166.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-11-03",
+      "tap_number": null
+    },
+    "KMEW|2026-06-22|2054.800048828125|1965.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-22",
+      "tap_number": null
+    },
+    "KOPRAN|2026-04-08|112.4000015258789|107.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-08",
+      "tap_number": null
+    },
+    "KOPRAN|2026-04-09|112.4000015258789|107.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-09",
+      "tap_number": null
+    },
+    "KOPRAN|2026-05-25|167.0|162.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-25",
+      "tap_number": null
+    },
+    "KRBL|2026-04-16|325.0|321.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-16",
+      "tap_number": null
+    },
+    "KRBL|2026-08-03|351.5|349.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-03",
+      "tap_number": null
     },
     "KROSS|2026-09-23|260.00|254.51|ob": {
       "kind": "ob",
@@ -126,12 +1855,271 @@
       "session": "2026-09-28",
       "tap_number": 1
     },
+    "LAURUSLABS|2026-05-04|1132.0|1085.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-04",
+      "tap_number": null
+    },
+    "LAURUSLABS|2026-06-23|1372.0|1352.699951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-23",
+      "tap_number": null
+    },
+    "LAURUSLABS|2026-07-27|1577.699951171875|1561.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "LAURUSLABS|2026-08-25|1800.0|1790.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-25",
+      "tap_number": null
+    },
+    "LAURUSLABS|2026-08-27|1800.0|1790.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-27",
+      "tap_number": null
+    },
+    "LOTUSDEV|2026-06-15|133.6199951171875|131.80999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-15",
+      "tap_number": null
+    },
+    "LOTUSDEV|2026-07-21|140.0|139.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-21",
+      "tap_number": null
+    },
+    "LOTUSDEV|2026-07-22|140.0|139.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-22",
+      "tap_number": null
+    },
+    "LOTUSDEV|2026-07-23|140.0|139.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-23",
+      "tap_number": null
+    },
+    "LOTUSDEV|2026-09-10|199.75|193.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-10",
+      "tap_number": null
+    },
+    "LTFOODS|2026-07-30|378.20001220703125|368.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-30",
+      "tap_number": null
+    },
+    "LUMAXIND|2026-08-03|5196.0|5095.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-03",
+      "tap_number": null
+    },
+    "LUMAXTECH|2025-11-10|1201.4000244140625|1145.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-11-10",
+      "tap_number": null
+    },
+    "LUMAXTECH|2026-08-05|1626.300048828125|1590.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "LUMAXTECH|2026-08-11|1742.0|1711.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "MACPOWER|2026-06-19|995.75|990.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
+    "MACPOWER|2026-06-29|1161.9000244140625|1150.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-29",
+      "tap_number": null
+    },
+    "MACPOWER|2026-07-29|1324.9000244140625|1290.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "MACPOWER|2026-08-07|1530.300048828125|1515.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "MACPOWER|2026-08-10|1530.300048828125|1515.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "MACPOWER|2026-08-18|1752.0|1725.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "MACPOWER|2026-09-18|1889.5999755859375|1831.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-18",
+      "tap_number": null
+    },
+    "MAHASTEEL|2026-07-29|770.9500122070312|718.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "MANGLMCEM|2025-12-03|691.2000122070312|679.3499755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-03",
+      "tap_number": null
+    },
+    "MANGLMCEM|2026-06-22|848.75|842.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-22",
+      "tap_number": null
+    },
+    "MANINDS|2026-02-03|321.79998779296875|302.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-03",
+      "tap_number": null
+    },
+    "MANINDS|2026-04-07|345.95001220703125|326.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-07",
+      "tap_number": null
+    },
+    "MANINDS|2026-04-08|345.95001220703125|326.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-08",
+      "tap_number": null
+    },
     "MANINDS|2026-09-23|870.50|840.15|ob": {
       "kind": "ob",
       "price": 986.7000122070312,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-23",
       "tap_number": 0
+    },
+    "MANINDS|2026-09-23|870.5|840.1500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-23",
+      "tap_number": null
+    },
+    "MARINE|2026-04-23|208.60000610351562|205.00999450683594|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-23",
+      "tap_number": null
+    },
+    "MARINE|2026-08-03|264.0|255.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-03",
+      "tap_number": null
+    },
+    "MARINE|2026-08-06|304.0|297.95001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "MAXESTATES|2026-08-17|442.79998779296875|435.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "MAXESTATES|2026-08-24|498.1000061035156|490.54998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "MBAPL|2026-04-01|92.83999633789062|91.80000305175781|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-01",
+      "tap_number": null
+    },
+    "MBAPL|2026-07-20|132.0|122.4000015258789|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-20",
+      "tap_number": null
+    },
+    "MBAPL|2026-07-27|143.1999969482422|136.6999969482422|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
     },
     "MEDANTA|2026-09-18|1425.00|1380.10|tap|tap1": {
       "kind": "tap",
@@ -140,12 +2128,404 @@
       "session": "2026-09-28",
       "tap_number": 1
     },
+    "MMFL|2026-01-02|366.0|356.3500061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-02",
+      "tap_number": null
+    },
+    "MMFL|2026-01-05|366.0|356.3500061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-05",
+      "tap_number": null
+    },
+    "MMFL|2026-08-06|555.0|550.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "MMFL|2026-08-10|555.0|550.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "MMP|2026-08-05|297.20001220703125|290.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "MMP|2026-08-10|330.25|321.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "MMP|2026-08-18|337.0|331.54998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "MMP|2026-09-07|399.8999938964844|383.3500061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "MMP|2026-09-08|399.8999938964844|383.3500061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-08",
+      "tap_number": null
+    },
+    "MODISONLTD|2026-04-28|147.22000122070312|142.39999389648438|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-28",
+      "tap_number": null
+    },
+    "MODISONLTD|2026-08-31|411.0|392.8999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-31",
+      "tap_number": null
+    },
+    "MOTHERSON|2026-08-07|155.3000030517578|151.61000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "MOTILALOFS|2026-06-15|843.7999877929688|829.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-15",
+      "tap_number": null
+    },
+    "MOTILALOFS|2026-08-17|901.0499877929688|891.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "MSTCLTD|2026-06-04|451.54998779296875|442.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-04",
+      "tap_number": null
+    },
+    "MSTCLTD|2026-06-16|568.0|560.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "MSTCLTD|2026-08-14|588.8499755859375|572.75|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-14",
+      "tap_number": null
+    },
+    "MSTCLTD|2026-08-17|588.8499755859375|572.75|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "MSTCLTD|2026-08-18|588.8499755859375|572.75|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "NAM-INDIA|2026-04-17|962.4500122070312|954.6500244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-17",
+      "tap_number": null
+    },
+    "NAVINFLUOR|2026-08-06|7690.0|7551.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "NELCO|2026-04-06|536.0|500.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "NELCO|2026-06-18|731.0|711.3499755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-18",
+      "tap_number": null
+    },
+    "NETWEB|2026-05-29|3840.0|3832.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-29",
+      "tap_number": null
+    },
+    "NEULANDLAB|2026-04-06|12500.0|12060.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "NEULANDLAB|2026-05-04|14640.0|14503.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-04",
+      "tap_number": null
+    },
+    "NIACL|2026-04-10|131.5|128.72999572753906|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "NIACL|2026-04-13|131.5|128.72999572753906|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-13",
+      "tap_number": null
+    },
+    "NIACL|2026-06-19|160.89999389648438|159.4600067138672|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
+    "NITINSPIN|2026-01-27|306.0|302.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-27",
+      "tap_number": null
+    },
+    "NITINSPIN|2026-08-18|553.0|545.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "NITINSPIN|2026-08-25|588.4500122070312|575.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-25",
+      "tap_number": null
+    },
+    "NOVARTIND|2026-05-20|1190.0|1165.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-20",
+      "tap_number": null
+    },
+    "NOVARTIND|2026-06-22|1375.800048828125|1320.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-22",
+      "tap_number": null
+    },
+    "NOVARTIND|2026-09-08|1661.199951171875|1602.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-08",
+      "tap_number": null
+    },
+    "NOVARTIND|2026-09-09|1661.199951171875|1602.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-09",
+      "tap_number": null
+    },
+    "NPST|2026-03-18|898.7999877929688|846.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-18",
+      "tap_number": null
+    },
+    "NPST|2026-06-02|1200.0|1150.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-02",
+      "tap_number": null
+    },
+    "OAL|2026-08-26|337.20001220703125|335.70001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "OAL|2026-08-27|337.20001220703125|335.70001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-27",
+      "tap_number": null
+    },
+    "OAL|2026-08-28|337.20001220703125|335.70001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-28",
+      "tap_number": null
+    },
+    "OFSS|2026-04-23|8130.0|7885.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-23",
+      "tap_number": null
+    },
+    "OFSS|2026-04-27|8130.0|7885.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-27",
+      "tap_number": null
+    },
+    "OFSS|2026-06-24|9700.0|9668.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-24",
+      "tap_number": null
+    },
+    "OFSS|2026-06-25|9700.0|9668.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-25",
+      "tap_number": null
+    },
+    "OMAXE|2025-12-23|64.33000183105469|63.099998474121094|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-23",
+      "tap_number": null
+    },
+    "OMAXE|2026-08-13|83.02999877929688|80.80000305175781|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-13",
+      "tap_number": null
+    },
+    "OMAXE|2026-08-26|101.69999694824219|97.86000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "OMAXE|2026-08-28|101.69999694824219|97.86000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-28",
+      "tap_number": null
+    },
+    "PARADEEP|2026-06-16|128.5|127.0999984741211|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "PARADEEP|2026-07-29|137.5|134.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "PARAS|2026-06-09|860.7000122070312|825.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-09",
+      "tap_number": null
+    },
+    "PARAS|2026-06-17|1108.5999755859375|1075.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-17",
+      "tap_number": null
+    },
+    "PARAS|2026-06-19|1108.5999755859375|1075.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
     "PAYTM|2026-09-09|1659.60|1642.00|tap|tap1": {
       "kind": "tap",
       "price": 1674.0,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 1
+    },
+    "PITTIENG|2026-06-12|910.7999877929688|905.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-12",
+      "tap_number": null
+    },
+    "PITTIENG|2026-08-12|972.9000244140625|937.7999877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-12",
+      "tap_number": null
     },
     "POLICYBZR|2026-08-11|1665.00|1578.40|tap|tap1": {
       "kind": "tap",
@@ -154,12 +2534,194 @@
       "session": "2026-09-24",
       "tap_number": 1
     },
+    "PPLPHARMA|2026-07-27|183.8699951171875|175.6300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "PRUDENT|2026-07-28|2920.89990234375|2833.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-28",
+      "tap_number": null
+    },
+    "PTCIL|2026-06-02|16755.0|15930.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-02",
+      "tap_number": null
+    },
+    "PTCIL|2026-07-17|17580.0|17407.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-17",
+      "tap_number": null
+    },
+    "PTCIL|2026-08-17|19235.0|18921.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "PTCIL|2026-08-24|19602.0|19134.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "PTCIL|2026-08-28|20801.0|20429.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-28",
+      "tap_number": null
+    },
+    "PVRINOX|2026-07-24|1002.5|990.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-24",
+      "tap_number": null
+    },
+    "PVRINOX|2026-07-27|1002.5|990.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "QUADFUTURE|2025-12-22|255.0|248.5500030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-22",
+      "tap_number": null
+    },
+    "QUADFUTURE|2026-06-15|335.0|331.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-15",
+      "tap_number": null
+    },
+    "QUADFUTURE|2026-08-21|343.79998779296875|336.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-21",
+      "tap_number": null
+    },
+    "QUESS|2026-06-30|251.0|245.50999450683594|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-30",
+      "tap_number": null
+    },
+    "RACLGEAR|2026-08-06|1265.0|1238.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "RACLGEAR|2026-09-09|1575.0|1527.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-09",
+      "tap_number": null
+    },
+    "RAMRAT|2026-07-29|414.54998779296875|405.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "RAMRAT|2026-08-12|456.5|446.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-12",
+      "tap_number": null
+    },
+    "RAMRAT|2026-08-26|488.5|475.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "RAMRAT|2026-08-27|488.5|475.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-27",
+      "tap_number": null
+    },
+    "RATNAVEER|2026-06-17|167.14999389648438|164.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-17",
+      "tap_number": null
+    },
+    "RATNAVEER|2026-07-27|176.0|173.00999450683594|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "RATNAVEER|2026-09-21|305.75|297.79998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-21",
+      "tap_number": null
+    },
     "RBLBANK|2026-09-22|408.00|401.10|tap|tap1": {
       "kind": "tap",
       "price": 415.04998779296875,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 1
+    },
+    "REDINGTON|2026-06-18|243.99000549316406|242.4199981689453|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-18",
+      "tap_number": null
+    },
+    "REDINGTON|2026-07-29|277.0|274.1499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "RGL|2026-06-16|106.0|104.12000274658203|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "RGL|2026-08-26|132.0|131.14999389648438|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
     },
     "RISHABH|2026-09-02|705.45|687.00|tap|tap1": {
       "kind": "tap",
@@ -168,12 +2730,201 @@
       "session": "2026-09-24",
       "tap_number": 1
     },
+    "RML|2026-06-16|930.0|925.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "RML|2026-06-19|983.4500122070312|968.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
+    "RML|2026-08-24|1092.4000244140625|1080.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "RML|2026-09-04|1111.199951171875|1100.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-04",
+      "tap_number": null
+    },
+    "RML|2026-09-07|1111.199951171875|1100.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
     "ROSSTECH|2026-09-22|1381.20|1310.10|tap|tap1": {
       "kind": "tap",
       "price": 1402.699951171875,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 1
+    },
+    "RRKABEL|2025-10-27|1252.0|1218.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-10-27",
+      "tap_number": null
+    },
+    "RRKABEL|2025-10-28|1252.0|1218.9000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-10-28",
+      "tap_number": null
+    },
+    "RRKABEL|2026-04-16|1390.0|1378.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-16",
+      "tap_number": null
+    },
+    "RRKABEL|2026-04-28|1431.0|1407.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-28",
+      "tap_number": null
+    },
+    "RRKABEL|2026-05-04|1618.0999755859375|1525.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-04",
+      "tap_number": null
+    },
+    "RRKABEL|2026-06-03|2025.0|1964.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-03",
+      "tap_number": null
+    },
+    "RUBYMILLS|2026-04-10|221.89999389648438|215.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "RUBYMILLS|2026-05-25|232.13999938964844|227.0500030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-25",
+      "tap_number": null
+    },
+    "RUBYMILLS|2026-06-04|261.79998779296875|247.85000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-04",
+      "tap_number": null
+    },
+    "SAILIFE|2026-09-02|1485.0|1453.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-02",
+      "tap_number": null
+    },
+    "SAKAR|2026-02-09|436.1499938964844|420.54998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-09",
+      "tap_number": null
+    },
+    "SAKAR|2026-05-15|607.9500122070312|595.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-15",
+      "tap_number": null
+    },
+    "SAKAR|2026-09-01|890.2999877929688|870.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-01",
+      "tap_number": null
+    },
+    "SAKAR|2026-09-07|1012.0|987.9500122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "SAMBHV|2026-04-01|93.0|90.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-01",
+      "tap_number": null
+    },
+    "SAMBHV|2026-08-20|124.0|122.19999694824219|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-20",
+      "tap_number": null
+    },
+    "SAMBHV|2026-09-18|129.5500030517578|123.75|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-18",
+      "tap_number": null
+    },
+    "SANSERA|2026-06-23|2879.89990234375|2855.39990234375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-23",
+      "tap_number": null
+    },
+    "SBCL|2026-08-07|782.75|761.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "SBCL|2026-08-10|782.75|761.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "SEAMECLTD|2026-01-29|1144.5999755859375|1116.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-29",
+      "tap_number": null
+    },
+    "SEAMECLTD|2026-08-20|1558.5|1535.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-20",
+      "tap_number": null
     },
     "SENORES|2026-08-10|1335.00|1324.00|tap|tap1": {
       "kind": "tap",
@@ -182,12 +2933,523 @@
       "session": "2026-09-25",
       "tap_number": 1
     },
+    "SETL|2026-06-05|136.80999755859375|135.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-05",
+      "tap_number": null
+    },
+    "SETL|2026-06-22|172.0|166.52999877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-22",
+      "tap_number": null
+    },
+    "SETL|2026-06-24|208.3300018310547|202.4600067138672|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-24",
+      "tap_number": null
+    },
+    "SETL|2026-08-26|312.0|300.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "SHAREINDIA|2026-07-07|137.85000610351562|136.80999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-07",
+      "tap_number": null
+    },
+    "SHAREINDIA|2026-09-09|171.74000549316406|168.6199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-09",
+      "tap_number": null
+    },
+    "SHAREINDIA|2026-09-17|197.8000030517578|188.0500030517578|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-17",
+      "tap_number": null
+    },
+    "SHILPAMED|2026-06-23|552.0|543.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-23",
+      "tap_number": null
+    },
+    "SHILPAMED|2026-08-05|606.9000244140625|601.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "SHILPAMED|2026-08-10|739.0999755859375|730.2999877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-10",
+      "tap_number": null
+    },
+    "SHREEJISPG|2025-11-12|271.1000061035156|269.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-11-12",
+      "tap_number": null
+    },
+    "SHREEJISPG|2025-11-17|299.0|295.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-11-17",
+      "tap_number": null
+    },
+    "SHREEJISPG|2026-02-03|307.45001220703125|303.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-03",
+      "tap_number": null
+    },
+    "SHREEJISPG|2026-04-17|366.75|354.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-17",
+      "tap_number": null
+    },
+    "SHREEJISPG|2026-05-04|403.1000061035156|397.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-04",
+      "tap_number": null
+    },
+    "SHREEPUSHK|2026-04-23|342.0|335.54998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-23",
+      "tap_number": null
+    },
+    "SHREEPUSHK|2026-06-15|353.79998779296875|349.54998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-15",
+      "tap_number": null
+    },
+    "SHREEPUSHK|2026-08-24|403.29998779296875|399.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "SHREEPUSHK|2026-08-25|403.29998779296875|399.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-25",
+      "tap_number": null
+    },
+    "SHRIPISTON|2026-02-04|2810.0|2679.10009765625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-04",
+      "tap_number": null
+    },
+    "SHRIPISTON|2026-04-10|3106.199951171875|3030.10009765625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "SHRIPISTON|2026-06-15|3571.5|3510.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-15",
+      "tap_number": null
+    },
+    "SIEMENS|2026-04-15|3340.0|3275.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-15",
+      "tap_number": null
+    },
+    "SKIPPER|2026-04-17|383.79998779296875|373.25|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-17",
+      "tap_number": null
+    },
+    "SKIPPER|2026-05-26|459.95001220703125|455.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-26",
+      "tap_number": null
+    },
+    "SKIPPER|2026-05-29|459.95001220703125|455.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-29",
+      "tap_number": null
+    },
+    "SKYGOLD|2026-02-09|316.1499938964844|310.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-09",
+      "tap_number": null
+    },
+    "SKYGOLD|2026-04-06|323.70001220703125|310.8500061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "SKYGOLD|2026-04-15|384.8500061035156|378.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-15",
+      "tap_number": null
+    },
+    "SKYGOLD|2026-07-09|560.0|552.2000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-09",
+      "tap_number": null
+    },
+    "SKYGOLD|2026-08-07|684.5499877929688|675.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "SMLMAH|2026-07-29|3907.699951171875|3771.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "SMLMAH|2026-07-30|3907.699951171875|3771.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-30",
+      "tap_number": null
+    },
+    "SMLMAH|2026-09-03|5400.0|5300.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-03",
+      "tap_number": null
+    },
+    "SMLMAH|2026-09-04|5400.0|5300.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-04",
+      "tap_number": null
+    },
+    "SOLARA|2026-08-18|515.75|509.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-18",
+      "tap_number": null
+    },
+    "SOLARA|2026-08-20|548.7000122070312|543.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-20",
+      "tap_number": null
+    },
+    "SOLARA|2026-09-07|643.5499877929688|625.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "SOMANYCERA|2026-05-19|475.0|435.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-19",
+      "tap_number": null
+    },
     "SOMANYCERA|2026-09-25|595.00|581.20|ob": {
       "kind": "ob",
       "price": 618.0499877929688,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 0
+    },
+    "SOMANYCERA|2026-09-25|595.0|581.2000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-25",
+      "tap_number": null
+    },
+    "SONACOMS|2026-01-22|443.04998779296875|437.70001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-22",
+      "tap_number": null
+    },
+    "SONACOMS|2026-01-27|470.04998779296875|447.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-27",
+      "tap_number": null
+    },
+    "SONACOMS|2026-04-10|532.25|519.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "SONACOMS|2026-04-13|532.25|519.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-13",
+      "tap_number": null
+    },
+    "SONACOMS|2026-07-02|623.0|615.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-02",
+      "tap_number": null
+    },
+    "SONACOMS|2026-07-17|675.0499877929688|663.2999877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-17",
+      "tap_number": null
+    },
+    "SONACOMS|2026-07-30|718.0|711.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-30",
+      "tap_number": null
+    },
+    "SPECTRUM|2026-01-22|1120.0|1079.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-22",
+      "tap_number": null
+    },
+    "SPECTRUM|2026-05-11|1245.0|1204.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-11",
+      "tap_number": null
+    },
+    "SPECTRUM|2026-07-21|1959.0999755859375|1882.699951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-21",
+      "tap_number": null
+    },
+    "SPLPETRO|2026-09-04|728.8499755859375|708.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-04",
+      "tap_number": null
+    },
+    "SPLPETRO|2026-09-07|728.8499755859375|708.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "SPLPETRO|2026-09-18|789.3499755859375|769.2999877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-18",
+      "tap_number": null
+    },
+    "SSWL|2026-07-01|230.0|227.30999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-01",
+      "tap_number": null
+    },
+    "SSWL|2026-09-01|293.0|289.3999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-01",
+      "tap_number": null
+    },
+    "STAR|2026-09-07|1053.9000244140625|1043.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "STEL|2026-06-02|451.0|435.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-02",
+      "tap_number": null
+    },
+    "STEL|2026-06-15|500.0|488.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-15",
+      "tap_number": null
+    },
+    "STLTECH|2026-01-28|88.5|84.5999984741211|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-28",
+      "tap_number": null
+    },
+    "STLTECH|2026-02-10|133.0|129.1300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-10",
+      "tap_number": null
+    },
+    "STOVEKRAFT|2026-05-27|561.0|552.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-27",
+      "tap_number": null
+    },
+    "STYLEBAAZA|2026-03-24|244.14999389648438|241.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-24",
+      "tap_number": null
+    },
+    "STYLEBAAZA|2026-08-14|352.0|345.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-14",
+      "tap_number": null
+    },
+    "SUDARSCHEM|2026-05-21|855.0999755859375|854.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-21",
+      "tap_number": null
+    },
+    "SUDARSCHEM|2026-07-10|915.2999877929688|906.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-10",
+      "tap_number": null
+    },
+    "SUDARSCHEM|2026-07-13|915.2999877929688|906.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-13",
+      "tap_number": null
+    },
+    "SUNDRMFAST|2026-06-25|892.0|870.2000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-25",
+      "tap_number": null
+    },
+    "SUNDRMFAST|2026-08-06|1039.0|1014.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-06",
+      "tap_number": null
+    },
+    "SUNFLAG|2026-04-06|200.07000732421875|192.14999389648438|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "SUNFLAG|2026-04-22|273.0|265.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-22",
+      "tap_number": null
+    },
+    "SUNFLAG|2026-05-04|292.5|285.510009765625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-04",
+      "tap_number": null
+    },
+    "SUNFLAG|2026-05-06|292.5|285.510009765625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-06",
+      "tap_number": null
+    },
+    "SUNFLAG|2026-09-23|355.45001220703125|352.70001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-23",
+      "tap_number": null
     },
     "SUNFLAG|2026-09-23|355.45|352.70|ob": {
       "kind": "ob",
@@ -196,6 +3458,272 @@
       "session": "2026-09-23",
       "tap_number": 0
     },
+    "SURAKSHA|2026-08-13|265.0|257.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-13",
+      "tap_number": null
+    },
+    "SUVEN|2026-05-18|209.77999877929688|204.60000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-18",
+      "tap_number": null
+    },
+    "SUVEN|2026-07-02|280.6499938964844|272.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-02",
+      "tap_number": null
+    },
+    "SUVEN|2026-07-03|280.6499938964844|272.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-03",
+      "tap_number": null
+    },
+    "TALBROAUTO|2026-04-27|279.54998779296875|275.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-27",
+      "tap_number": null
+    },
+    "TALBROAUTO|2026-04-28|279.54998779296875|275.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-28",
+      "tap_number": null
+    },
+    "TALBROAUTO|2026-09-18|419.8500061035156|410.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-18",
+      "tap_number": null
+    },
+    "TBOTEK|2026-06-12|1230.0|1195.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-12",
+      "tap_number": null
+    },
+    "TBZ|2026-05-29|139.82000732421875|136.10000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-29",
+      "tap_number": null
+    },
+    "TBZ|2026-07-09|197.80999755859375|196.2899932861328|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-09",
+      "tap_number": null
+    },
+    "TBZ|2026-07-14|227.83999633789062|223.1999969482422|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-14",
+      "tap_number": null
+    },
+    "TBZ|2026-08-26|285.0|269.79998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-26",
+      "tap_number": null
+    },
+    "TBZ|2026-09-01|309.8500061035156|292.6499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-01",
+      "tap_number": null
+    },
+    "TBZ|2026-09-02|309.8500061035156|292.6499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-02",
+      "tap_number": null
+    },
+    "TDPOWERSYS|2026-08-05|572.5|553.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "TEXINFRA|2026-03-25|88.5|86.70999908447266|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-03-25",
+      "tap_number": null
+    },
+    "TFCILTD|2026-07-24|81.81999969482422|81.05000305175781|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-24",
+      "tap_number": null
+    },
+    "TFCILTD|2026-07-27|81.81999969482422|81.05000305175781|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "THELEELA|2026-06-19|455.79998779296875|454.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
+    "TITAN|2025-11-04|3730.0|3667.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-11-04",
+      "tap_number": null
+    },
+    "TITAN|2025-12-16|3861.300048828125|3850.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-12-16",
+      "tap_number": null
+    },
+    "TMB|2025-10-29|450.0|444.04998779296875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2025-10-29",
+      "tap_number": null
+    },
+    "TMB|2026-01-29|566.5999755859375|545.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-01-29",
+      "tap_number": null
+    },
+    "TMB|2026-07-27|810.6500244140625|795.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-27",
+      "tap_number": null
+    },
+    "TNPETRO|2026-09-01|113.5|108.30000305175781|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-01",
+      "tap_number": null
+    },
+    "TVSSRICHAK|2026-05-27|3585.0|3580.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-27",
+      "tap_number": null
+    },
+    "TVSSRICHAK|2026-08-14|3951.10009765625|3853.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-14",
+      "tap_number": null
+    },
+    "TVSSRICHAK|2026-08-17|3951.10009765625|3853.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "UFBL|2026-02-02|178.1999969482422|172.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-02-02",
+      "tap_number": null
+    },
+    "UFBL|2026-04-08|207.0|201.7100067138672|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-08",
+      "tap_number": null
+    },
+    "UFBL|2026-04-10|207.0|201.7100067138672|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "UFBL|2026-05-20|358.0|295.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-20",
+      "tap_number": null
+    },
+    "UFBL|2026-05-21|358.0|295.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-21",
+      "tap_number": null
+    },
+    "UFLEX|2026-04-28|399.79998779296875|387.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-28",
+      "tap_number": null
+    },
+    "UFLEX|2026-08-17|494.1499938964844|482.20001220703125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-17",
+      "tap_number": null
+    },
+    "UNIPARTS|2026-04-07|479.5|462.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-07",
+      "tap_number": null
+    },
+    "UNIPARTS|2026-07-29|711.2000122070312|686.0499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-29",
+      "tap_number": null
+    },
+    "UNIPARTS|2026-08-28|806.2000122070312|801.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-28",
+      "tap_number": null
+    },
     "UNOMINDA|2026-09-18|1212.30|1159.70|tap|tap1": {
       "kind": "tap",
       "price": 1224.4000244140625,
@@ -203,12 +3731,285 @@
       "session": "2026-09-24",
       "tap_number": 1
     },
+    "USHAMART|2026-09-21|482.0|464.1499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-21",
+      "tap_number": null
+    },
     "UTTAMSUGAR|2026-09-25|265.50|258.45|ob": {
       "kind": "ob",
       "price": 293.1499938964844,
       "sent_at": "2026-09-28T09:15:44+05:30",
       "session": "2026-09-25",
       "tap_number": 0
+    },
+    "VARROC|2026-06-16|579.7999877929688|577.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "VARROC|2026-08-07|686.6500244140625|672.5499877929688|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-07",
+      "tap_number": null
+    },
+    "VENKEYS|2026-04-06|1210.0|1165.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "VENKEYS|2026-07-10|1410.0|1399.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-10",
+      "tap_number": null
+    },
+    "VENKEYS|2026-08-31|1583.0|1565.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-31",
+      "tap_number": null
+    },
+    "VENUSPIPES|2026-06-22|1442.0|1422.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-22",
+      "tap_number": null
+    },
+    "VENUSPIPES|2026-09-07|1606.0|1580.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-07",
+      "tap_number": null
+    },
+    "VENUSPIPES|2026-09-08|1606.0|1580.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-08",
+      "tap_number": null
+    },
+    "VENUSPIPES|2026-09-17|1935.0|1860.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-17",
+      "tap_number": null
+    },
+    "VENUSPIPES|2026-09-18|1935.0|1860.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-18",
+      "tap_number": null
+    },
+    "VINCOFE|2026-05-26|133.89999389648438|129.22000122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-26",
+      "tap_number": null
+    },
+    "VISHNU|2026-04-16|545.0|533.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-16",
+      "tap_number": null
+    },
+    "VMART|2026-04-06|496.0|457.8999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-06",
+      "tap_number": null
+    },
+    "VSSL|2026-07-13|270.75|268.6499938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-13",
+      "tap_number": null
+    },
+    "VSSL|2026-08-05|303.0|300.6000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-05",
+      "tap_number": null
+    },
+    "VSSL|2026-08-14|331.1499938964844|326.1000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-14",
+      "tap_number": null
+    },
+    "WABAG|2026-06-16|1620.4000244140625|1612.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-16",
+      "tap_number": null
+    },
+    "WABAG|2026-06-19|1769.9000244140625|1739.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-19",
+      "tap_number": null
+    },
+    "WELENT|2026-06-04|517.5|502.8999938964844|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-04",
+      "tap_number": null
+    },
+    "WELENT|2026-09-04|677.0|661.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-04",
+      "tap_number": null
+    },
+    "WELSPUNLIV|2026-05-15|134.5|132.60000610351562|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-15",
+      "tap_number": null
+    },
+    "WELSPUNLIV|2026-06-18|145.4499969482422|144.61000061035156|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-18",
+      "tap_number": null
+    },
+    "WELSPUNLIV|2026-08-20|170.0|162.83999633789062|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-20",
+      "tap_number": null
+    },
+    "WHEELS|2026-05-15|1336.0|1313.4000244140625|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-15",
+      "tap_number": null
+    },
+    "WHEELS|2026-09-03|1541.800048828125|1523.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-03",
+      "tap_number": null
+    },
+    "WHEELS|2026-09-08|1740.0|1713.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-08",
+      "tap_number": null
+    },
+    "WHEELS|2026-09-09|1740.0|1713.0999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-09",
+      "tap_number": null
+    },
+    "WINDLAS|2026-08-11|882.8499755859375|820.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-11",
+      "tap_number": null
+    },
+    "WINDLAS|2026-09-02|998.5499877929688|990.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-02",
+      "tap_number": null
+    },
+    "YASHO|2026-05-11|1555.699951171875|1545.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-11",
+      "tap_number": null
+    },
+    "YASHO|2026-05-20|1850.9000244140625|1802.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-20",
+      "tap_number": null
+    },
+    "YASHO|2026-06-12|2564.5|2451.199951171875|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-06-12",
+      "tap_number": null
+    },
+    "YASHO|2026-07-31|3273.0|3092.300048828125|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-07-31",
+      "tap_number": null
+    },
+    "YATHARTH|2026-04-10|705.0|701.4500122070312|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-10",
+      "tap_number": null
+    },
+    "YATHARTH|2026-08-24|849.5999755859375|844.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-08-24",
+      "tap_number": null
+    },
+    "YATHARTH|2026-09-17|988.0|960.5|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-09-17",
+      "tap_number": null
+    },
+    "ZENTEC|2026-04-17|1527.0|1503.0|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-04-17",
+      "tap_number": null
+    },
+    "ZYDUSLIFE|2026-05-14|960.0999755859375|928.5999755859375|ob": {
+      "kind": "ob",
+      "price": null,
+      "sent_at": "2026-09-28T14:46:17+05:30",
+      "session": "2026-05-14",
+      "tap_number": null
     }
   },
   "data_outage_on": null,
@@ -216,7 +4017,7 @@
     "manual": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-28T13:15:36+05:30",
+  "updated_at": "2026-09-28T14:46:22+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
