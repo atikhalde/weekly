@@ -192,10 +192,10 @@
   },
   "data_outage_on": null,
   "digest_on": {
-    "manual": "2026-09-27"
+    "manual": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-28T11:28:32+05:30",
+  "updated_at": "2026-09-28T11:38:12+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
