@@ -1799,3 +1799,252 @@ def test_same_evening_ob_alert_born_today_is_alerted_today(ws, monkeypatch):
     assert ws.run() == 0
     assert "PRECISION OB" in "\n".join(ws.tg.sent)
     assert ws.state()["zones"][SYM]["as_of"] == "2026-08-27"
+
+
+# --------------------------------------------------------------------------- #
+#  The 26-week breakout date
+# --------------------------------------------------------------------------- #
+def weekdays(start: date, end: date) -> list[date]:
+    """Weekdays in [start, end]. Close enough to a trade calendar for a test."""
+    out, d = [], start
+    while d <= end:
+        if d.weekday() < 5:
+            out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+def breakout_history(base_start: date, base_close: float, base_high: float,
+                     breakout_on: date, end: date, last_close: float,
+                     volume: float = 100.0) -> list[Bar]:
+    """
+    A flat base at `base_close`/`base_high`, then a ramp that first CLOSES above
+    `base_high` on `breakout_on` and ends at `last_close` on `end`.
+
+    This is NITINSPIN's real shape: a ~300 base, the 26-week high cleared on
+    Mon 04-May-2026, then a grind to 665 by September. `base_high` is therefore
+    the 26W level every week of the base froze, which is exactly the number the
+    derivation has to recover.
+
+    The ramp's bars are deliberately unremarkable - a 1.5% range on volume equal
+    to the base - so that prepending this to `scenario()` arms no order block
+    and leaves that series' own zone as the only live one.
+    """
+    bars = [Bar(base_close, base_high, base_close * 0.99, base_close, volume, d)
+            for d in weekdays(base_start, breakout_on - timedelta(days=1))]
+    ramp = weekdays(breakout_on, end)
+    for i, d in enumerate(ramp):
+        close = base_high * 1.02 + (last_close - base_high * 1.02) * (i + 1) / len(ramp)
+        prev = ramp[i - 1] if i else None
+        open_ = (base_high * 1.02 + (last_close - base_high * 1.02) * i / len(ramp)
+                 if prev is not None else base_close)
+        bars.append(Bar(open_, close * 1.005, close * 0.99, close, volume, d))
+    return bars
+
+
+# The real thing: base from Oct-2025, 26W high 305 cleared on Mon 04-May-2026,
+# then the grind that made the 18-Aug alert bar nonsense.
+NITIN_BREAKOUT = date(2026, 5, 4)
+NITIN_BARS = breakout_history(date(2025, 10, 1), 300.0, 305.0,
+                              NITIN_BREAKOUT, date(2026, 9, 25), 660.0)
+
+
+def scenario_scale_history(end: date) -> list[Bar]:
+    """
+    The same shape as NITIN_BARS, at scenario()'s price scale and ending where
+    that series starts - so the two can be joined and the end-to-end run still
+    arms exactly the one order block scenario() is built around.
+    """
+    return breakout_history(date(2025, 9, 1), 60.0, 62.0, NITIN_BREAKOUT,
+                            end, 98.0)
+
+
+def test_the_26w_date_comes_off_the_candles_not_the_alert_bar():
+    """
+    NITINSPIN, 28-Sep-2026. scan.py's cycle record said 18-Aug - but that is the
+    oldest weekly row state.py had not pruned yet, not a price event. The stock
+    cleared its 26-week high on Mon 04-May and the alert claimed otherwise.
+    """
+    got = ob_tap_scan.derive_26w_breakout(NITIN_BARS)
+    assert got["session"] == "2026-05-04"
+    assert got["level"] == pytest.approx(305.0)     # the 26W high of the base
+    assert got["close"] > 305.0
+
+
+def test_the_first_cross_in_the_window_wins_over_every_later_one():
+    """
+    NITINSPIN kept making new 26-week highs all summer. The setup is dated to
+    the cross that STARTED the move - the later ones are the same cycle, and
+    reporting the newest would move the date every week it grinds higher.
+    """
+    weeks = ob_tap_scan.derive_26w_breakout(NITIN_BARS)
+    assert weeks["session"] == "2026-05-04"
+    # ...and the same answer when a week is cut off at the right edge.
+    trimmed = [b for b in NITIN_BARS if as_date(b.time) <= date(2026, 6, 30)]
+    assert ob_tap_scan.derive_26w_breakout(trimmed)["session"] == "2026-05-04"
+
+
+def test_the_derived_level_is_the_weekly_scanner_own_definition():
+    """
+    Parity with `strategy.build_snapshot`: for week k the frozen level is
+    `max(high[k-len_short:k])` - the highest high of the len_short weeks that
+    closed BEFORE it, the last one included. Getting this wrong by a week is
+    what the reverted "Option B" shift did to live levels.
+    """
+    bars = breakout_history(date(2025, 1, 6), 100.0, 108.0, date(2026, 4, 6),
+                            date(2026, 9, 25), 150.0)
+    got = ob_tap_scan.derive_26w_breakout(bars)
+    highs = {}
+    for b in bars:
+        d = as_date(b.time)
+        wk = d - timedelta(days=d.weekday())
+        highs[wk] = max(highs.get(wk, 0.0), float(b.high))
+    starts = sorted(highs)
+    day = as_date(got["session"])
+    k = starts.index(day - timedelta(days=day.weekday()))
+    assert got["session"] == "2026-04-06"
+    assert got["level"] == pytest.approx(max(highs[s] for s in starts[k - 26:k]))
+    # 108 is the ceiling every one of those 26 base weeks froze...
+    assert got["level"] == pytest.approx(108.0)
+    # ...and `close` is the breakout SESSION's close, not the week's.
+    assert got["close"] == pytest.approx(
+        next(float(b.close) for b in bars if as_date(b.time) == day))
+
+
+def test_a_cross_older_than_the_lock_window_is_not_this_cycle():
+    """
+    A name that broke out two years ago and is only now revisiting that high is
+    dated from the current cycle. The 26-week cooldown is what bounds this, so
+    the two cannot drift apart.
+    """
+    bars = breakout_history(date(2024, 1, 1), 50.0, 55.0, date(2024, 6, 3),
+                            date(2026, 9, 25), 60.0)
+    assert ob_tap_scan.derive_26w_breakout(bars, lock_weeks=26) is None
+
+
+def test_too_little_history_answers_none_rather_than_guessing():
+    """
+    A name listed last month has no 26 weeks of candles. "No breakout in the
+    window" and "not enough history" must not look the same, so short history
+    returns None and the caller keeps the recorded alert bar.
+    """
+    assert ob_tap_scan.derive_26w_breakout([]) is None
+    assert ob_tap_scan.derive_26w_breakout(NITIN_BARS[:40]) is None
+    # A window with enough history but no cross in it is a real answer.
+    flat = [Bar(100.0, 101.0, 99.0, 100.0, 100.0, d)
+            for d in weekdays(date(2024, 1, 1), date(2026, 9, 25))]
+    assert ob_tap_scan.derive_26w_breakout(flat) is None
+
+
+def test_a_day_that_fell_back_under_the_level_is_not_the_breakout():
+    """
+    Daily close is a proxy for the 5-minute close the alert fired on, and it
+    can only ever be late. Monday takes the level out and closes back under it;
+    the weekly scanner would not have alerted that day either.
+    """
+    bars = [Bar(300.0, 305.0, 299.0, 300.0, 100.0, d)
+            for d in weekdays(date(2024, 6, 3), date(2026, 5, 1))]
+    bars += [Bar(300.0, 309.0, 299.0, 304.0, 100.0, date(2026, 5, 4))]   # no
+    bars += [Bar(304.0, 312.0, 303.0, 310.0, 100.0, date(2026, 5, 5))]   # yes
+    got = ob_tap_scan.derive_26w_breakout(bars)
+    assert got["session"] == "2026-05-05" and got["level"] == pytest.approx(305.0)
+
+
+def test_the_breakout_line_shows_the_derived_date():
+    rec = {"breakout_bar": "2026-08-18T09:35+05:30", "breakout_price": 602.0,
+           "level_26w": None,
+           "breakout_26w_session": {"session": "2026-05-04", "level": 305.0,
+                                    "close": 311.2}}
+    line = ob_tap_scan._breakout_line(rec)
+    assert "2026-05-04" in line and "18-Aug" not in line and "2026-08-18" not in line
+    assert "305.00" in line and "311.20" in line
+
+
+def test_the_breakout_line_falls_back_when_the_candles_could_not_answer():
+    """An empty block means "tried, too little history" - the alert still prints."""
+    rec = {"breakout_bar": "2026-08-18T09:35+05:30", "breakout_price": 602.0,
+           "level_26w": None, "breakout_26w_session": {}}
+    line = ob_tap_scan._breakout_line(rec)
+    assert "2026-08-18" in line and "09:35 IST" in line and "602.00" in line
+
+
+def test_the_tap_alert_reports_the_derived_date_and_leaves_the_anchor(ws):
+    """
+    End to end. The zone, its entry and its tap are unchanged - the user
+    confirmed those - and the 26W date on the alert is the one the candles
+    support. `breakout_bar` is still the recorded anchor, because that is what
+    decides which zone a name is armed on and it must not move underneath one.
+    """
+    # The prepended base moves the RMA seed, so the front-run entry lands a
+    # cent lower than scenario()'s own; the quote reaches well past either.
+    ws.arm(bars=scenario_scale_history(D0 - timedelta(days=1)) + scenario(),
+           quote=dict(TAP_QUOTE, low=99.0))
+    assert ws.run() == 0
+    txt = "\n".join(ws.tg.sent)
+    assert "TAP 1" in txt
+    assert "2026-05-04" in txt
+    assert "2026-08-26" not in txt            # the recorded alert bar is gone
+    rec = ws.state()["waiting"][SYM]
+    assert rec["breakout_bar"] == "2026-08-26T10:00+05:30"     # anchor unmoved
+    assert rec["breakout_26w_session"]["session"] == "2026-05-04"
+
+
+def test_the_zone_and_its_tap_are_untouched_by_the_new_date(ws):
+    """
+    The whole point of keeping the two dates apart: the zone, its geometry and
+    its tap are bit-for-bit what they were before the 26W date was derived.
+    """
+    ws.arm(quote=TAP_QUOTE)
+    assert ws.run() == 0
+    txt = "\n".join(ws.tg.sent)
+    assert "TAP 1" in txt
+    assert "100.60" in txt and "97.50" in txt          # entry / stop frozen
+    assert "100.00–98.00" in txt                       # zone top/bottom
+    # 23 candles cannot answer a 26-week question, so the alert still falls back
+    # to the recorded alert bar rather than losing the line.
+    assert "Weekly breakout 2026-08-26 10:00 IST" in txt
+
+
+def test_a_resolved_name_has_its_26w_date_corrected_exactly_once(ws):
+    """
+    A name that already left the active list carries the same wrong date, and
+    this state file is the audit trail - so it gets corrected too. One history
+    call, once: a record that already carries the field drops out of the pass,
+    and one the candles cannot date is marked answered rather than re-asked on
+    every five-minute run.
+    """
+    ws.client.frames[OLD] = frame(scenario_scale_history(date(2026, 8, 26)))
+    seeded = empty_state()
+    seeded["waiting"] = {OLD: {
+        "symbol": OLD, "security_id": OLD_SID, "exchange_segment": "NSE_EQ",
+        "week": "2026-08-17", "breakout_bar": "2026-08-18T09:45+05:30",
+        "breakout_price": 55.0, "level_26w": None, "added_at": "2026-08-27",
+        "status": "tapped", "resolved_at": "2026-08-27",
+        "resolved_reason": "tap 1 on the precision OB"}}
+    (ws.dir / "ob_precision_state.json").write_text(json.dumps(seeded))
+    assert ws.run() == 0
+    assert ws.client.history_calls.count(OLD) == 1
+    rec = ws.state()["waiting"][OLD]
+    assert rec["status"] == "tapped"                 # correction, not a re-arm
+    assert rec["breakout_26w_session"]["session"] == "2026-05-04"
+    assert ws.run() == 0
+    assert ws.client.history_calls.count(OLD) == 1    # and never asked again
+
+
+def test_the_digest_sorts_and_labels_on_the_derived_date():
+    """
+    "newest breakout first" has to mean the newest ACTUAL breakout. Sorting on
+    the recorded alert bar would order the list by when each retention artefact
+    was captured - a different date for every name.
+    """
+    waiting = {
+        "OLDONE": {"status": "waiting", "breakout_bar": "2026-08-18T09:35+05:30",
+                   "breakout_26w_session": {"session": "2026-02-02"}},
+        "NEWORD": {"status": "waiting", "breakout_bar": "2026-09-02T10:00+05:30",
+                   "breakout_26w_session": {"session": "2026-05-04"}},
+    }
+    ob = SimpleNamespace(digest_max_rows=0)
+    pages = format_digest({"waiting": waiting}, {}, FIXED, "manual", ob)
+    body = pages[0]
+    assert body.index("NEWORD") < body.index("OLDONE")
+    assert "brk 02-Feb" in body and "brk 04-May" in body
