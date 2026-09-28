@@ -24,8 +24,13 @@ scanner answers the follow-up question the user actually trades:
                               🟠 TAP 1  ──► Telegram
 
 The waiting-list feed uses scan.py's first alert for the active 26-week breakout
-cycle, not later weekly duplicate rows. The OB zone, tap, and event de-duplication
-rules below remain independent and unchanged.
+cycle, not later weekly duplicate rows. That record is only an ANCHOR - it
+decides which order block a name is armed on and when its cycle expires, and it
+is often a retention artefact of state.py's six-week prune rather than a price
+event. The 26W DATE the alerts print is therefore derived from the symbol's own
+daily candles (see derive_26w_breakout), which is free: the replay already
+holds them. The OB zone, tap, and event de-duplication rules below remain
+independent and unchanged.
 
 The order-block logic is a Pine-exact port of `precision.txt`
 ("Institutional OB — Precision Tap & Pre-Order", Pine v6). `ob_precision.py`
@@ -399,6 +404,13 @@ def harvest_waiting(state: dict[str, Any], alerts: dict[str, dict[str, Any]],
                 existing.update(status="waiting", resolved_at=None,
                                 resolved_reason=None, added_at=today)
                 (state.get("zones") or {}).pop(sym, None)
+                # ...and the previous cycle's derived 26W date with them. That
+                # date is bounded to the cooldown window, so carrying it into a
+                # new cycle would label the new setup with the old breakout -
+                # and because the correction pass keys off the field merely
+                # BEING present, it would never be re-derived. Dropping it puts
+                # the name back in line for the next refresh.
+                existing.pop("breakout_26w_session", None)
             # Otherwise this is a correction to the original cycle anchor.
             existing.update(week=rec["week"], breakout_bar=rec["breakout_bar"],
                             breakout_price=rec["breakout_price"])
@@ -523,6 +535,12 @@ def first_zone_after_breakout(rec: dict[str, Any],
     zone that happened to be lying around from months before. Without this
     filter an old tap is considered here; breakout-cycle completion is handled
     separately by sweep_waiting_list using the actual tap date.
+
+    Note this reads the RECORDED anchor (`breakout_bar`), not the 26W date the
+    alert prints. The two are deliberately different: the anchor is a cycle
+    boundary that decides which zone a name is armed on, and it must not move
+    under a symbol that is already armed, while the printed date is a fact about
+    the chart (see derive_26w_breakout).
 
     SMSPHARMA is the case that motivated the sweep: it broke out on
     2026-09-11, formed its first post-breakout OB on 2026-09-11 as well
@@ -666,6 +684,97 @@ def session_closed(now: datetime, cfg) -> bool:
 
 
 # --------------------------------------------------------------------------- #
+#  The 26-week breakout date
+# --------------------------------------------------------------------------- #
+def derive_26w_breakout(bars: list[Any], len_short: int = 26,
+                        lock_weeks: int = 26) -> dict[str, Any] | None:
+    """
+    When this name took out its 26-week high in the CURRENT breakout cycle.
+
+    WHY THIS IS DERIVED INSTEAD OF READ
+    ------------------------------------
+    `bars` must be oldest first, as `bars_from_frame` returns them and as the
+    replay itself requires - a week's close is its LAST session's.
+
+    The waiting list inherits its anchor from scan.py's `breakout_alerts` map.
+    For every name that has not alerted since the cross-week lock was switched
+    on, that map was seeded by `AlertState._migrate_weekly_alerts_to_breakout_
+    records`, which back-fills the EARLIEST WEEKLY ROW STILL IN state.json -
+    and `AlertState.prune` throws weekly rows away after six weeks. The anchor
+    is therefore "the oldest alert row that had not been pruned yet", and in
+    any state file that was ever rebuilt every name lands in the same handful
+    of days. It is a retention artefact, not a price event: NITINSPIN was
+    labelled 18-Aug-2026 when the stock had in fact cleared its 26-week high
+    on 4-May-2026, six weeks into the move - so the tap alert said it came
+    from a breakout that had not happened yet when its order block was born.
+
+    The definition is the weekly scanner's own, so the two stages cannot
+    disagree about what "26-week breakout" means. For week k,
+    `strategy.build_snapshot` freezes `entry_level = max(high[k-len_short:k])`
+    - the highest high of the len_short weeks that closed before it - and
+    condition c02 is `close_k > entry_level`. Rebuilding that level from the
+    daily candles the replay already holds costs no extra API call and needs no
+    intraday history.
+
+    DAILY close stands in for the 5-minute close the alert actually fired on,
+    and can only ever report the breakout a day LATE, never a day early: a
+    week's close is its last session's close, so the first session above the
+    level is at or before the session that confirmed the week. A day that took
+    the level out but closed back under it is not reported at all - the weekly
+    scanner would not have alerted it either.
+
+    `lock_weeks` bounds the search to the window the 26-week cooldown covers,
+    so a name that cleared its high two years ago and is only now revisiting
+    that high is dated from this cycle rather than the ancient one. It also
+    bounds the history needed: `len_short + lock_weeks` weekly bars.
+
+    Returns `{"session", "level", "close"}` - ISO date, the 26W high that was
+    cleared, and the close of the session that cleared it - or None when the
+    candles cannot answer.
+    """
+    try:
+        len_short = max(1, int(len_short))
+        lock_weeks = max(1, int(lock_weeks))
+    except (TypeError, ValueError):
+        return None
+
+    weeks: list[dict[str, Any]] = []
+    for b in bars or []:
+        day = as_date(getattr(b, "time", None))
+        if day is None:
+            continue
+        try:
+            high, close = float(b.high), float(b.close)
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not (high > 0.0 and close > 0.0):
+            continue
+        start = day - timedelta(days=day.weekday())
+        if weeks and weeks[-1]["start"] == start:
+            w = weeks[-1]
+            w["sessions"].append((day, close))
+            w["high"] = max(w["high"], high)
+            w["close"] = close                     # last session wins
+        else:
+            weeks.append({"start": start, "sessions": [(day, close)],
+                          "high": high, "close": close})
+
+    n = len(weeks)
+    if n < len_short + 1:
+        return None
+    for k in range(max(len_short, n - lock_weeks), n):
+        level = max(w["high"] for w in weeks[k - len_short:k])
+        if level <= 0.0:
+            continue
+        if weeks[k]["close"] > level:
+            for day, close in weeks[k]["sessions"]:
+                if close > level:
+                    return {"session": day.isoformat(),
+                            "level": level, "close": close}
+    return None
+
+
+# --------------------------------------------------------------------------- #
 #  Closed-bar replay (once per session per symbol)
 # --------------------------------------------------------------------------- #
 def event_dict(e) -> dict[str, Any]:
@@ -690,10 +799,16 @@ def event_dict(e) -> dict[str, Any]:
 
 
 def refresh_symbol(client: DhanClient, rec: dict[str, Any], params: OBParams,
-                   sessions: int, now: datetime, closed_today: bool) -> dict[str, Any] | None:
+                   sessions: int, now: datetime, closed_today: bool,
+                   len_short: int = 26, lock_weeks: int = 26) -> dict[str, Any] | None:
     """
     Pull daily history, replay the CLOSED bars, and return the context the
     intraday pass continues from.
+
+    `len_short` / `lock_weeks` are the weekly scanner's own two numbers
+    (strategy.len_short, runtime.breakout_cooldown_weeks); they only shape the
+    26W breakout date derived from the same candles, and default to the shipped
+    values so a direct call needs nothing new.
 
     Today's bar counts as closed only once the session is over, which is what
     lets a new order block be reported the same evening instead of next
@@ -702,7 +817,14 @@ def refresh_symbol(client: DhanClient, rec: dict[str, Any], params: OBParams,
     """
     today = now.date()
     to_d = today
-    from_d = today - timedelta(days=int(sessions * 1.7) + 20)
+    # The 26W breakout derivation tests the most recent `lock_weeks` weeks and
+    # needs `len_short` weeks of history in front of the first of them, i.e. two
+    # full lock windows. `sessions * 1.7` covers that only while `sessions` is
+    # near its 250 default - at a smaller setting the fetch would come back
+    # short and the derivation would answer "no breakout in the window" instead
+    # of "not enough history", which is the one answer that must never be
+    # invented. Same single call either way.
+    from_d = today - timedelta(days=max(int(sessions * 1.7) + 20, 2 * 7 * 26 + 14))
     # chunk_days=365 only matters on the Dhan fallback (yfinance answers the
     # whole window in one request), where a >1-year daily ask can come back
     # short - and where a symbol listed inside the window would otherwise raise
@@ -716,6 +838,10 @@ def refresh_symbol(client: DhanClient, rec: dict[str, Any], params: OBParams,
     bars = bars_from_frame(df)
     if not bars:
         return None
+    # Derived BEFORE the trim: the replay only needs `sessions` bars, but the
+    # breakout date needs a whole extra lock window of candles in front of
+    # them. Trimming first would quietly shorten the window it can see.
+    brk = derive_26w_breakout(bars, len_short, lock_weeks)
     # The fetch window is deliberately wider than `sessions` in CALENDAR days so
     # holidays cannot shorten the series; trim back to the configured number of
     # bars so the replay cost stays bounded. Trimming shifts every positional
@@ -751,6 +877,12 @@ def refresh_symbol(client: DhanClient, rec: dict[str, Any], params: OBParams,
     # returns its events too; the live pass can only ever add taps.
     ctx["closed_events"] = [event_dict(e) for e in res.events
                             if e.kind in ("ob", "tap", "invalid")]
+    # Always present, even when empty. An empty dict is the record that the
+    # derivation RAN and could not answer - too little history - and main() keys
+    # the one-time correction pass off that key rather than off its contents, so
+    # a name the candles cannot date is asked once and then left alone instead
+    # of costing a history call every five minutes.
+    ctx["breakout_26w_session"] = brk or {}
     return ctx
 
 
@@ -781,7 +913,33 @@ def prune_closed_events(ctx: dict[str, Any], kinds: list[str], tap_numbers: list
 # --------------------------------------------------------------------------- #
 #  Alert text
 # --------------------------------------------------------------------------- #
+def _breakout_day(rec: dict[str, Any]) -> date | None:
+    """
+    The 26W breakout date this record should be SHOWN with.
+
+    The derived one first: `breakout_26w_session` is the date the stock
+    actually took its 26-week high out, read off its own daily candles.
+    `breakout_bar` - the bar scan.py first alerted this name - is the fallback
+    for a record the derivation has not reached yet, and it can be a retention
+    artefact (see derive_26w_breakout). It stays the ANCHOR for zone selection
+    and cycle expiry either way: moving that would change which order block a
+    name is armed on, which is a different decision from labelling the alert.
+    """
+    return as_date((rec.get("breakout_26w_session") or {}).get("session")) \
+        or as_date(rec.get("breakout_bar"))
+
+
 def _breakout_line(rec: dict[str, Any]) -> str:
+    brk = rec.get("breakout_26w_session") or {}
+    day = _breakout_day(rec)
+    if brk.get("session") and day is not None:
+        txt = f"📅 26W breakout <b>{day.isoformat()}</b>"
+        lvl, close = brk.get("level"), brk.get("close")
+        if lvl is not None and close is not None:
+            txt += f" · cleared <b>{_fmt(lvl)}</b>, closed <b>{_fmt(close)}</b>"
+            if lvl:
+                txt += f" (+{(close / lvl - 1.0) * 100.0:.2f}%)"
+        return txt
     bar = str(rec.get("breakout_bar") or "")
     when = bar.replace("T", " ").replace("+05:30", " IST")
     px = rec.get("breakout_price")
@@ -991,11 +1149,22 @@ def _d(iso: Any) -> str:
 def _digest_row(sym: str, rec: dict[str, Any], ctx: dict[str, Any] | None) -> str:
     """One waiting name on one line: what it broke out on, and what is armed."""
     ctx = ctx or {}
-    brk = f"brk {_d(str(rec.get('breakout_bar') or '')[:10])}"
-    if rec.get("breakout_price"):
-        brk += f" @{_fmt(rec.get('breakout_price'))}"
-        if rec.get("level_26w"):
-            brk += f" >{_fmt(rec.get('level_26w'))}"
+    day = _breakout_day(rec)
+    brk = f"brk {_d(day)}" if day else "brk ?"
+    derived = rec.get("breakout_26w_session") or {}
+    if derived.get("session"):
+        # The level printed must be the one THIS breakout cleared.
+        # `level_26w` is the snapshot's frozen level for whichever week the
+        # alert fired in - a different, later number - and the snapshot is
+        # overwritten every Monday, so pairing the two would invent a
+        # comparison that never happened.
+        px, lvl = derived.get("close"), derived.get("level")
+    else:
+        px, lvl = rec.get("breakout_price"), rec.get("level_26w")
+    if px:
+        brk += f" @{_fmt(px)}"
+        if lvl:
+            brk += f" >{_fmt(lvl)}"
     live = [z for z in (ctx.get("zones") or []) if isinstance(z, dict)]
     if live:
         z = max(live, key=lambda z: str(z.get("born_session") or ""))
@@ -1034,7 +1203,10 @@ def format_digest(state: dict[str, Any], zones: dict[str, Any], now: datetime,
     waiting = state.get("waiting") or {}
     active = [s for s in active_waiting(state)]
     recs = sorted(((s, waiting[s]) for s in active), key=lambda x: x[0])
-    recs.sort(key=lambda x: str(x[1].get("breakout_bar") or ""), reverse=True)
+    # "newest breakout first" has to mean the newest ACTUAL breakout: sorting on
+    # the recorded alert bar would order the list by when the retention artefact
+    # happened to be captured, which is a different date for every name.
+    recs.sort(key=lambda x: _breakout_day(x[1]) or date.min, reverse=True)
 
     armed = sum(1 for s, _r in recs if (zones.get(s) or {}).get("zones"))
     today_iso = now.date().isoformat()
@@ -1242,13 +1414,27 @@ def main() -> int:
             needs.append(sym)
         elif closed_today and rec.get("post_close_done") != today:
             needs.append(sym)          # one post-close pass: today becomes a closed bar
+    # One-time correction for names that have already left the active list. Their
+    # 26W date is exactly as wrong as an active one's, and this state file is
+    # the audit trail - leaving a known-bad date in it is worse than one extra
+    # history call. Keyed off the PRESENCE of the field, not its contents, so a
+    # name the candles cannot date (listed last month, suspended) is asked once
+    # and then left alone rather than costing a call every five minutes.
+    queued = set(needs)
+    undated = [s for s, r in (state.get("waiting") or {}).items()
+               if s not in queued and "breakout_26w_session" not in r]
+    if undated:
+        log.info("deriving the 26W breakout date for %d undated name(s)", len(undated))
+    needs += undated
     needs = needs[:max(1, ob.max_refresh_per_run)]
     refreshed = 0
     if needs:
         log.info("refreshing daily history for %d symbol(s)", len(needs))
         with ThreadPoolExecutor(max_workers=cfg.runtime.max_workers) as pool:
             futs = {pool.submit(refresh_symbol, client, state["waiting"][s], params,
-                                ob.sessions, now, closed_today): s for s in needs}
+                                ob.sessions, now, closed_today,
+                                cfg.strategy.len_short,
+                                cfg.runtime.breakout_cooldown_weeks): s for s in needs}
             for fut in as_completed(futs):
                 sym = futs[fut]
                 try:
@@ -1274,9 +1460,19 @@ def main() -> int:
                         "post_close_done": today if closed_today else None,
                         "zones": [], "zones_seen": 0, "closed_events": [],
                     }
+                    # No candles means no 26W date can be derived, now or ever.
+                    # Mark it answered so the correction pass stops re-asking.
+                    state["waiting"][sym]["breakout_26w_session"] = {}
                     continue
                 prune_closed_events(ctx, ob.alert_kinds, ob.alert_taps, not_before)
                 zones[sym] = ctx
+                # The waiting record, not the zone cache, is what the alert
+                # formatters and the digest read, and the cache is rebuilt from
+                # scratch on every refresh. Copying the derived 26W date onto
+                # the record is what makes it survive a run that never refreshes
+                # this symbol (any run before the bell, for instance).
+                state["waiting"][sym]["breakout_26w_session"] = \
+                    ctx.get("breakout_26w_session") or {}
                 refreshed += 1
 
     # ---- stage 2: the live tap, from ONE bulk quote ------------------------

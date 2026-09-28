@@ -133,6 +133,37 @@ breakout cycle. Identical order blocks from the same origin are deduplicated eve
 when front-running places their entries above the zone. This does **not** change
 the weekly scanner's original breakout trigger or filters.
 
+#### The 26W date on the alert is derived, the anchor is not
+
+Those two are different numbers, and only one of them is a price event.
+
+`state.py`'s migration seeds `breakout_alerts` from the **earliest weekly row
+still in `state.json`**, and `prune()` throws weekly rows away after six weeks.
+So on a state file that was ever rebuilt, that anchor is "the oldest alert row
+that had not been pruned yet" — and in the committed file, 265 of 268 records
+landed in the same five days. It is a retention artefact. NITINSPIN's tap alert
+read `📅 Weekly breakout 2026-08-18` when the stock had in fact cleared its
+26-week high on **Mon 04-May-2026**, six weeks into the move — so the alert
+dated the setup to a breakout that had not happened yet when its own order block
+was born.
+
+`ob_tap_scan.py` therefore derives the date from the candles the zone replay
+already holds, at zero extra API cost, using the weekly scanner's own
+definition: for week *k* the frozen level is `max(high[k-26:k])` and condition
+`c02` is `close_k > level`. The answer is the **first** such cross inside the
+26-week cooldown window — the one that started the move, not the newest of the
+many new highs a grinding trend prints along the way. Daily close stands in for
+the 5-minute close the alert fired on, which can only ever be a day late.
+
+The anchor (`breakout_bar`) is deliberately left alone. It is a cycle boundary:
+it decides which order block a name is armed on and when its cycle expires, and
+moving it under a symbol that is already armed would change a live setup. So the
+alert header and the digest sort/label on the derived date, and everything that
+decides *what to trade* still reads the anchor. Records already resolved — a name
+that tapped, was invalidated or expired — are corrected too, once, on the next
+refresh; the pass is self-limiting and a name the candles cannot date is marked
+answered rather than re-asked every five minutes.
+
 The zone logic is a **Pine-exact port of `precision.txt`** (*"Institutional OB —
 Precision Tap & Pre-Order"*, Pine v6). Every input of that indicator is a key in
 the `ob_precision:` block of `config.yaml`, at the file's own defaults.
@@ -217,7 +248,8 @@ worth tracking by hand — so the whole active list goes out twice a session:
   half-stale levels — but never past the last run of the day, or one broken
   symbol would cost the list entirely.
 
-Newest breakout first, one line per name:
+Newest **actual** breakout first (the derived 26W date, not the recorded alert
+bar), one line per name:
 
 ```text
 📋 PRECISION WAITING LIST — post-close recap
