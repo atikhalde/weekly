@@ -1764,6 +1764,13 @@
       "session": "2026-07-21",
       "tap_number": null
     },
+    "KARURVYSYA|2026-07-21|311.30|296.15|tap|tap1": {
+      "kind": "tap",
+      "price": 313.65,
+      "sent_at": "2026-09-29T10:30:47+05:30",
+      "session": "2026-09-29",
+      "tap_number": 1
+    },
     "KENNAMET|2026-08-07|2888.0|2851.300048828125|ob": {
       "kind": "ob",
       "price": null,
@@ -4060,7 +4067,7 @@
     "post_close": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-29T09:30:42+05:30",
+  "updated_at": "2026-09-29T10:30:47+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6117,10 +6124,10 @@
       "breakout_price": 352.1499938964844,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-09-29",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "1838",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "KARURVYSYA",
       "week": "2026-08-24"
     },
