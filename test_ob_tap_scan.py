@@ -1220,16 +1220,60 @@ def test_committed_ob_state_round_trips_through_the_canonical_writer():
                              default=str)
 
 
+def _unrepresented_cycle_records(data, weekly, resolvable=None):
+    """
+    Cycle records a clean fold has already closed over but the waiting list
+    does not represent: state damaged AFTER the fold, not state in flight.
+
+    Two workflows write two files: scan.py commits weekly breakouts to
+    state.json, this job folds them into ob_precision_state.json on its NEXT
+    run (harvest_stage). Between those commits the two files are legitimately
+    out of step - that transient is the pipeline working, not corruption, and
+    it can span a whole session (it stays open for as long as this job itself
+    is red, since the fold is what would close it). A record therefore only
+    becomes "owed" once its BAR session is strictly older than the last fold
+    (`updated_at`): the fold of that day or any later one has already swept it
+    up if it was there to be swept. Anchoring on `updated_at` rather than the
+    wall clock is deliberate - while the job is wedged the stamp cannot move,
+    so in-flight records stay in flight and the first green run heals instead
+    of staying red forever. Known gap: a symbol backfilled into state.json
+    days after its bar (a long scanner outage) reads as owed-but-missing and
+    needs the fold committed by hand.
+
+    Unresolvable symbols are not owed either: harvest_waiting skips them
+    (there is no security id to scan), so their absence IS the fixed point.
+    """
+    cooldown = 26                                   # breakout_cooldown_weeks
+    folded_on = as_date(str(data.get("updated_at") or "")[:10])
+    waiting = data.get("waiting") or {}
+    missing = []
+    for sym, rec in sorted(
+            ob_tap_scan._weekly_alerts_from_data(weekly, cooldown).items()):
+        if sym in waiting:
+            continue
+        if resolvable is not None and sym not in resolvable:
+            continue
+        bar_day = as_date(rec.get("breakout_bar"))
+        if folded_on is not None and bar_day is not None \
+                and bar_day >= folded_on:
+            continue                    # still in flight to the next fold
+        missing.append(sym)
+    return missing
+
+
 def test_committed_waiting_list_already_agrees_with_the_cycle_rules():
     """
     The committed waiting list must be a fixed point of the scanner's own cycle
-    rules. If it is not, the file was written by something other than a clean
-    run, and the next live run will silently "correct" it mid-session.
+    rules as of its last fold. If it is not, the file was written by something
+    other than a clean run, and the next live run will silently "correct" it
+    mid-session.
 
     Two invariants: nothing still `waiting` may be outside the 26-week lock (the
-    sweep would retire it), and every canonical cycle record inside the lock
-    must be represented (otherwise the backfill would resurrect a name that was
-    deliberately dropped).
+    sweep would retire it), and every canonical cycle record the fold has
+    closed over must be represented (otherwise the backfill would resurrect a
+    name that was deliberately dropped). Records still in flight between
+    scan.py's state.json commit and this job's next fold are checked by
+    `_unrepresented_cycle_records` and the synthetic tests beside it.
     """
     data = json.loads((REPO_ROOT / "ob_precision_state.json").read_text())
     weekly = json.loads((REPO_ROOT / "state.json").read_text())
@@ -1247,9 +1291,59 @@ def test_committed_waiting_list_already_agrees_with_the_cycle_rules():
     probe = json.loads(json.dumps(data))
     assert ob_tap_scan.expire_waiting_cycles(probe, str(today), cooldown) == []
 
-    seeded = ob_tap_scan._weekly_alerts_from_data(weekly, cooldown)
-    missing = sorted(set(seeded) - set(data.get("waiting") or {}))
-    assert missing == [], f"cycle records absent from the waiting list: {missing}"
+    ids = ob_tap_scan.resolve_universe(SimpleNamespace(paths={
+        "universe": REPO_ROOT / "universe.csv",
+        "snapshot": REPO_ROOT / "weekly_snapshot.csv",
+    }))
+    missing = _unrepresented_cycle_records(data, weekly, resolvable=set(ids))
+    assert missing == [], \
+        f"cycle records absent from the waiting list: {missing}"
+
+
+def _cycle_state(waiting, updated_at):
+    return {"updated_at": updated_at, "waiting": dict(waiting)}
+
+
+def _cycle_weekly(**alerts):
+    return {"breakout_alerts": dict(alerts)}
+
+
+def test_a_breakout_still_in_flight_to_the_next_fold_is_not_owed():
+    """
+    The 29-Sep-2026 outage this guards: scan.py pushed AZAD at 06:45Z and
+    LLOYDSENGG at 07:01Z while the waiting-list fold last wrote at 05:00Z.
+    Both bars were same-day, both were owed to the NEXT fold, and the strict
+    fixed-point check red-boarded the job before its own harvest step could
+    run - a deadlock that delayed every tap on the list, not just theirs.
+    """
+    data = _cycle_state({}, "2026-09-29T10:30:47+05:30")
+    weekly = _cycle_weekly(
+        AZAD={"bar_time": "2026-09-29T12:05+05:30", "price": 2987.6},
+        LLOYDSENGG={"bar_time": "2026-09-29T12:20+05:30", "price": 101.04},
+    )
+    assert _unrepresented_cycle_records(data, weekly) == []
+
+
+def test_a_dropped_name_from_an_older_session_is_still_owed():
+    """The damage case the invariant exists for: a name the fold already
+    swallowed, hand-removed from the waiting list later. Backfill would
+    silently resurrect it - the gate must catch the edit instead."""
+    data = _cycle_state({}, "2026-09-29T10:30:47+05:30")
+    weekly = _cycle_weekly(
+        OLD={"bar_time": "2026-09-28T10:00+05:30", "price": 55.0},
+    )
+    assert _unrepresented_cycle_records(data, weekly) == ["OLD"]
+
+
+def test_an_unresolvable_cycle_record_is_never_owed():
+    """harvest_waiting skips a weekly alert with no security id (see GHOST in
+    STATE_JSON above); requiring its presence would redden the gate forever."""
+    data = _cycle_state({}, "2026-09-29T10:30:47+05:30")
+    weekly = _cycle_weekly(
+        GHOST={"bar_time": "2026-09-28T10:00+05:30", "price": 12.0},
+    )
+    assert _unrepresented_cycle_records(data, weekly, resolvable={"OTHER"}) == []
+    assert _unrepresented_cycle_records(data, weekly) == ["GHOST"]
 
 
 # --------------------------------------------------------------------------- #
