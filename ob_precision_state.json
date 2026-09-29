@@ -2359,6 +2359,13 @@
       "session": "2026-06-19",
       "tap_number": null
     },
+    "NIACL|2026-06-19|160.90|159.46|tap|tap1": {
+      "kind": "tap",
+      "price": 167.9,
+      "sent_at": "2026-09-29T15:30:59+05:30",
+      "session": "2026-09-29",
+      "tap_number": 1
+    },
     "NITINSPIN|2026-01-27|306.0|302.20001220703125|ob": {
       "kind": "ob",
       "price": null,
@@ -4067,7 +4074,7 @@
     "post_close": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-29T13:19:31+05:30",
+  "updated_at": "2026-09-29T15:30:59+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6918,10 +6925,10 @@
       "breakout_price": 219.25999450683594,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-09-29",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "399",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "NIACL",
       "week": "2026-08-31"
     },
