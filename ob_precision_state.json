@@ -4067,7 +4067,7 @@
     "post_close": "2026-09-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-29T10:30:47+05:30",
+  "updated_at": "2026-09-29T13:13:44+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -4610,6 +4610,19 @@
       "status": "waiting",
       "symbol": "AYMSYNTEX",
       "week": "2026-08-31"
+    },
+    "AZAD": {
+      "added_at": "2026-09-29",
+      "breakout_bar": "2026-09-29T12:05+05:30",
+      "breakout_price": 2987.60009765625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 2986.60009765625,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "20905",
+      "status": "waiting",
+      "symbol": "AZAD",
+      "week": "2026-09-28"
     },
     "BAJAJ-AUTO": {
       "added_at": "2026-09-27",
@@ -6306,6 +6319,19 @@
       "status": "waiting",
       "symbol": "LAURUSLABS",
       "week": "2026-08-24"
+    },
+    "LLOYDSENGG": {
+      "added_at": "2026-09-29",
+      "breakout_bar": "2026-09-29T12:20+05:30",
+      "breakout_price": 101.04000091552734,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 99.75,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "17801",
+      "status": "waiting",
+      "symbol": "LLOYDSENGG",
+      "week": "2026-09-28"
     },
     "LOTUSDEV": {
       "added_at": "2026-09-27",
