@@ -3850,6 +3850,13 @@
       "session": "2026-07-10",
       "tap_number": null
     },
+    "VENKEYS|2026-08-31|1583.00|1565.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1595.0,
+      "sent_at": "2026-09-30T15:07:16+05:30",
+      "session": "2026-09-30",
+      "tap_number": 1
+    },
     "VENKEYS|2026-08-31|1583.0|1565.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4095,7 +4102,7 @@
     "post_close": "2026-09-29"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-30T13:30:43+05:30",
+  "updated_at": "2026-09-30T15:07:16+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8698,10 +8705,10 @@
       "breakout_price": 1811.5999755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-09-30",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "3757",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "VENKEYS",
       "week": "2026-09-14"
     },
