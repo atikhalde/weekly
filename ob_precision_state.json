@@ -4095,7 +4095,7 @@
     "post_close": "2026-09-29"
   },
   "logic_version": 1,
-  "updated_at": "2026-09-30T09:45:37+05:30",
+  "updated_at": "2026-09-30T10:30:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -4620,6 +4620,24 @@
       "status": "tapped",
       "symbol": "AVALON",
       "week": "2026-08-17"
+    },
+    "AXISCADES": {
+      "added_at": "2026-09-30",
+      "breakout_26w_session": {
+        "close": 1797.4000244140625,
+        "level": 1751.9000244140625,
+        "session": "2026-04-16"
+      },
+      "breakout_bar": "2026-09-30T10:05+05:30",
+      "breakout_price": 2247.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 2211.0,
+      "resolved_at": "2026-09-30",
+      "resolved_reason": "all 1 order block(s) invalidated/exhausted",
+      "security_id": "9436",
+      "status": "invalid",
+      "symbol": "AXISCADES",
+      "week": "2026-09-28"
     },
     "AYMSYNTEX": {
       "added_at": "2026-09-27",
@@ -8601,6 +8619,24 @@
       "symbol": "UTTAMSUGAR",
       "week": "2026-08-17"
     },
+    "VALIANTORG": {
+      "added_at": "2026-09-30",
+      "breakout_26w_session": {
+        "close": 342.3999938964844,
+        "level": 341.54998779296875,
+        "session": "2026-09-08"
+      },
+      "breakout_bar": "2026-09-30T10:10+05:30",
+      "breakout_price": 462.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 442.1000061035156,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "330",
+      "status": "waiting",
+      "symbol": "VALIANTORG",
+      "week": "2026-09-28"
+    },
     "VARROC": {
       "added_at": "2026-09-27",
       "breakout_26w_session": {
@@ -12297,6 +12333,63 @@
         }
       ],
       "zones_seen": 7
+    },
+    "AXISCADES": {
+      "as_of": "2026-09-29",
+      "as_of_close": 2067.39990234375,
+      "as_of_high": 2067.39990234375,
+      "as_of_low": 1970.800048828125,
+      "atr": 90.84224250658202,
+      "breakout_26w_session": {
+        "close": 1797.4000244140625,
+        "level": 1751.9000244140625,
+        "session": "2026-04-16"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 2067.39990234375,
+      "prev_highs": [
+        1879.0,
+        1878.800048828125,
+        1908.0999755859375,
+        1985.0,
+        1959.0,
+        1966.0999755859375,
+        1943.300048828125,
+        2067.39990234375
+      ],
+      "prev_lows": [
+        1900.0,
+        1905.199951171875,
+        1885.0999755859375,
+        1861.0,
+        1970.800048828125
+      ],
+      "prev_volumes": [
+        290857.0,
+        204487.0,
+        168634.0,
+        192175.0,
+        309618.0,
+        347063.0,
+        144733.0,
+        131542.0,
+        176313.0,
+        158521.0,
+        443978.0,
+        286095.0,
+        160111.0,
+        183778.0,
+        291136.0,
+        118651.0,
+        130914.0,
+        278673.0,
+        793589.0
+      ],
+      "refreshed_on": "2026-09-30",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 1
     },
     "AYMSYNTEX": {
       "as_of": "2026-09-28",
@@ -37192,6 +37285,127 @@
         }
       ],
       "zones_seen": 8
+    },
+    "VALIANTORG": {
+      "as_of": "2026-09-28",
+      "as_of_close": 397.75,
+      "as_of_high": 419.3500061035156,
+      "as_of_low": 396.3999938964844,
+      "atr": 20.243564888711614,
+      "breakout_26w_session": {
+        "close": 342.3999938964844,
+        "level": 341.54998779296875,
+        "session": "2026-09-08"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 397.75,
+      "prev_highs": [
+        408.45001220703125,
+        428.8500061035156,
+        442.1000061035156,
+        425.0,
+        428.0,
+        420.0,
+        418.0,
+        419.3500061035156
+      ],
+      "prev_lows": [
+        391.1499938964844,
+        410.1000061035156,
+        406.5,
+        406.0,
+        396.3999938964844
+      ],
+      "prev_volumes": [
+        34066.0,
+        58968.0,
+        84153.0,
+        45087.0,
+        27827.0,
+        57724.0,
+        61630.0,
+        228476.0,
+        133752.0,
+        74859.0,
+        58340.0,
+        79412.0,
+        161458.0,
+        125042.0,
+        123062.0,
+        71996.0,
+        59473.0,
+        30685.0,
+        33242.0
+      ],
+      "refreshed_on": "2026-09-30",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 13.357123045305437,
+          "body_frac_at_birth": 0.9749576084431388,
+          "born_index": 118,
+          "born_session": "2026-03-18",
+          "bottom": 195.0,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 208.40428214815498,
+          "origin_index": 117,
+          "origin_session": "2026-03-17",
+          "range_atr_at_birth": 2.630805995457152,
+          "rvol_at_birth": 6.906595235089779,
+          "state": 0,
+          "stop": 192.99643154320418,
+          "tap_bar_index": 126,
+          "tap_session": "2026-04-01",
+          "taps": 2,
+          "top": 206.0,
+          "width": 11.0
+        },
+        {
+          "atr_at_birth": 10.236881689577686,
+          "body_frac_at_birth": 0.9333333333333333,
+          "born_index": 209,
+          "born_session": "2026-08-03",
+          "bottom": 263.1000061035156,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 272.842638704124,
+          "origin_index": 207,
+          "origin_session": "2026-07-30",
+          "range_atr_at_birth": 1.465289963766184,
+          "rvol_at_birth": 3.4505484305140857,
+          "state": 0,
+          "stop": 261.56447385007897,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 271.0,
+          "width": 7.899993896484375
+        },
+        {
+          "atr_at_birth": 17.390860686837012,
+          "body_frac_at_birth": 0.8567640180579964,
+          "born_index": 238,
+          "born_session": "2026-09-11",
+          "bottom": 345.0,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 379.13035492363065,
+          "origin_index": 237,
+          "origin_session": "2026-09-10",
+          "range_atr_at_birth": 2.1678042489287437,
+          "rvol_at_birth": 2.283104087506017,
+          "state": 0,
+          "stop": 342.3913708969744,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 376.0,
+          "width": 31.0
+        }
+      ],
+      "zones_seen": 6
     },
     "VARROC": {
       "as_of": "2026-09-28",
