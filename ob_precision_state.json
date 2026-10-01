@@ -3080,6 +3080,13 @@
       "session": "2026-01-29",
       "tap_number": null
     },
+    "SEAMECLTD|2026-08-20|1558.50|1535.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1565.1,
+      "sent_at": "2026-10-01T14:15:38+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "SEAMECLTD|2026-08-20|1558.5|1535.0|ob": {
       "kind": "ob",
       "price": null,
@@ -3142,6 +3149,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-09-17",
       "tap_number": null
+    },
+    "SHAREINDIA|2026-09-17|197.80|188.05|tap|tap1": {
+      "kind": "tap",
+      "price": 201.13,
+      "sent_at": "2026-10-01T14:15:38+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
     },
     "SHILPAMED|2026-06-23|552.0|543.5999755859375|ob": {
       "kind": "ob",
@@ -4235,7 +4249,7 @@
     "post_close": "2026-09-30"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-01T13:00:32+05:30",
+  "updated_at": "2026-10-01T14:15:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7888,10 +7902,10 @@
       "breakout_price": 1729.800048828125,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "2616",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SEAMECLTD",
       "week": "2026-08-31"
     },
@@ -7942,10 +7956,10 @@
       "breakout_price": 197.6699981689453,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "104",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SHAREINDIA",
       "week": "2026-09-07"
     },
