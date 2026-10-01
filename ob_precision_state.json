@@ -2338,6 +2338,13 @@
       "session": "2026-08-07",
       "tap_number": null
     },
+    "MOTHERSON|2026-08-07|155.30|151.61|tap|tap1": {
+      "kind": "tap",
+      "price": 156.47,
+      "sent_at": "2026-10-01T13:00:32+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "MOTILALOFS|2026-06-15|843.7999877929688|829.0|ob": {
       "kind": "ob",
       "price": null,
@@ -3367,6 +3374,13 @@
       "session": "2026-09-25",
       "tap_number": 0
     },
+    "SOMANYCERA|2026-09-25|595.00|581.20|tap|tap1": {
+      "kind": "tap",
+      "price": 601.0,
+      "sent_at": "2026-10-01T13:00:32+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "SOMANYCERA|2026-09-25|595.0|581.2000122070312|ob": {
       "kind": "ob",
       "price": null,
@@ -3913,6 +3927,13 @@
       "session": "2026-09-24",
       "tap_number": 1
     },
+    "USHAMART|2026-09-21|482.00|464.15|tap|tap1": {
+      "kind": "tap",
+      "price": 483.7,
+      "sent_at": "2026-10-01T13:00:32+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "USHAMART|2026-09-21|482.0|464.1499938964844|ob": {
       "kind": "ob",
       "price": null,
@@ -4214,7 +4235,7 @@
     "post_close": "2026-09-30"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-01T12:45:38+05:30",
+  "updated_at": "2026-10-01T13:00:32+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6957,10 +6978,10 @@
       "breakout_price": 172.5,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "4204",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MOTHERSON",
       "week": "2026-08-17"
     },
@@ -8173,10 +8194,10 @@
       "breakout_price": 557.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "3880",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SOMANYCERA",
       "week": "2026-08-24"
     },
@@ -8785,10 +8806,10 @@
       "breakout_price": 530.75,
       "exchange_segment": "NSE_EQ",
       "level_26w": 529.2999877929688,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "8840",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "USHAMART",
       "week": "2026-09-21"
     },
