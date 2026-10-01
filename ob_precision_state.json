@@ -161,6 +161,13 @@
       "session": "2026-09-25",
       "tap_number": 0
     },
+    "AETHER|2026-09-25|1648.00|1629.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1675.1,
+      "sent_at": "2026-10-01T09:30:44+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "AETHER|2026-09-25|1648.0|1629.0|ob": {
       "kind": "ob",
       "price": null,
@@ -959,6 +966,13 @@
       "session": "2026-09-25",
       "tap_number": 0
     },
+    "DALMIASUG|2026-09-25|402.75|396.95|tap|tap1": {
+      "kind": "tap",
+      "price": 404.55,
+      "sent_at": "2026-10-01T09:30:44+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "DATAPATTNS|2026-04-22|3530.0|3444.0|ob": {
       "kind": "ob",
       "price": null,
@@ -1476,6 +1490,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-08-07",
       "tap_number": null
+    },
+    "GUJTHEM|2026-08-24|376.00|364.00|tap|tap1": {
+      "kind": "tap",
+      "price": 379.3,
+      "sent_at": "2026-10-01T09:30:44+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
     },
     "GUJTHEM|2026-08-24|376.0|364.0|ob": {
       "kind": "ob",
@@ -2947,6 +2968,13 @@
       "session": "2026-06-04",
       "tap_number": null
     },
+    "SAILIFE|2026-09-02|1485.00|1453.20|tap|tap1": {
+      "kind": "tap",
+      "price": 1508.6,
+      "sent_at": "2026-10-01T09:30:44+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "SAILIFE|2026-09-02|1485.0|1453.199951171875|ob": {
       "kind": "ob",
       "price": null,
@@ -3633,6 +3661,13 @@
       "session": "2026-09-18",
       "tap_number": null
     },
+    "TALBROAUTO|2026-09-18|419.85|410.05|tap|tap1": {
+      "kind": "tap",
+      "price": 424.15,
+      "sent_at": "2026-10-01T09:30:44+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "TBOTEK|2026-06-12|1230.0|1195.0|ob": {
       "kind": "ob",
       "price": null,
@@ -3849,6 +3884,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-08-28",
       "tap_number": null
+    },
+    "UNIPARTS|2026-08-28|806.20|801.00|tap|tap1": {
+      "kind": "tap",
+      "price": 813.45,
+      "sent_at": "2026-10-01T09:30:44+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
     },
     "UNOMINDA|2026-09-18|1212.30|1159.70|tap|tap1": {
       "kind": "tap",
@@ -4158,7 +4200,7 @@
     "post_close": "2026-09-30"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-01T09:15:39+05:30",
+  "updated_at": "2026-10-01T09:30:44+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -4329,10 +4371,10 @@
       "breakout_price": 1709.9000244140625,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9810",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "AETHER",
       "week": "2026-08-24"
     },
@@ -5173,10 +5215,10 @@
       "breakout_price": 442.25,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "781",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "DALMIASUG",
       "week": "2026-08-17"
     },
@@ -5799,10 +5841,10 @@
       "breakout_price": 442.79998779296875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "29731",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "GUJTHEM",
       "week": "2026-09-07"
     },
@@ -7685,10 +7727,10 @@
       "breakout_price": 1488.4000244140625,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "27839",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SAILIFE",
       "week": "2026-08-24"
     },
@@ -8387,10 +8429,10 @@
       "breakout_price": 453.1000061035156,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "13648",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TALBROAUTO",
       "week": "2026-09-14"
     },
@@ -8639,10 +8681,10 @@
       "breakout_price": 841.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "13057",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "UNIPARTS",
       "week": "2026-08-24"
     },
