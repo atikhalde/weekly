@@ -4207,7 +4207,7 @@
     "post_close": "2026-09-30"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-01T10:00:38+05:30",
+  "updated_at": "2026-10-01T10:15:36+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5872,6 +5872,24 @@
       "status": "tapped",
       "symbol": "HAPPYFORGE",
       "week": "2026-08-31"
+    },
+    "HARSHA": {
+      "added_at": "2026-10-01",
+      "breakout_26w_session": {
+        "close": 438.75,
+        "level": 418.0,
+        "session": "2026-05-07"
+      },
+      "breakout_bar": "2026-10-01T09:45+05:30",
+      "breakout_price": 482.1499938964844,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 476.79998779296875,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "11162",
+      "status": "waiting",
+      "symbol": "HARSHA",
+      "week": "2026-09-28"
     },
     "HATSUN": {
       "added_at": "2026-09-27",
@@ -19954,6 +19972,85 @@
         }
       ],
       "zones_seen": 6
+    },
+    "HARSHA": {
+      "as_of": "2026-09-29",
+      "as_of_close": 465.04998779296875,
+      "as_of_high": 469.70001220703125,
+      "as_of_low": 455.0,
+      "atr": 16.477167261867155,
+      "breakout_26w_session": {
+        "close": 438.75,
+        "level": 418.0,
+        "session": "2026-05-07"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 465.04998779296875,
+      "prev_highs": [
+        451.0,
+        476.79998779296875,
+        475.0,
+        474.0,
+        473.6000061035156,
+        467.79998779296875,
+        474.8999938964844,
+        469.70001220703125
+      ],
+      "prev_lows": [
+        461.54998779296875,
+        454.3999938964844,
+        449.45001220703125,
+        463.1000061035156,
+        455.0
+      ],
+      "prev_volumes": [
+        241531.0,
+        91361.0,
+        132144.0,
+        135432.0,
+        211797.0,
+        175392.0,
+        86970.0,
+        107635.0,
+        103103.0,
+        189658.0,
+        45447.0,
+        92889.0,
+        776655.0,
+        187169.0,
+        97147.0,
+        311042.0,
+        150621.0,
+        196133.0,
+        89042.0
+      ],
+      "refreshed_on": "2026-10-01",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 16.177087283738373,
+          "body_frac_at_birth": 0.897032710803012,
+          "born_index": 134,
+          "born_session": "2026-04-16",
+          "bottom": 345.1499938964844,
+          "clv_at_birth": 0.904013941156984,
+          "departed": true,
+          "entry": 352.2900024414063,
+          "origin_index": 130,
+          "origin_session": "2026-04-09",
+          "range_atr_at_birth": 1.7710230150815895,
+          "rvol_at_birth": 4.986568036591308,
+          "state": 0,
+          "stop": 342.72343080392363,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 350.25,
+          "width": 5.100006103515625
+        }
+      ],
+      "zones_seen": 4
     },
     "HATSUN": {
       "as_of": "2026-09-29",
