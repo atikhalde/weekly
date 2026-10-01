@@ -2177,6 +2177,13 @@
       "session": "2026-09-23",
       "tap_number": 0
     },
+    "MANINDS|2026-09-23|870.50|840.15|tap|tap1": {
+      "kind": "tap",
+      "price": 882.1,
+      "sent_at": "2026-10-01T12:45:38+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "MANINDS|2026-09-23|870.5|840.1500244140625|ob": {
       "kind": "ob",
       "price": null,
@@ -4207,7 +4214,7 @@
     "post_close": "2026-09-30"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-01T10:15:36+05:30",
+  "updated_at": "2026-10-01T12:45:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6734,10 +6741,10 @@
       "breakout_price": 642.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "11884",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MANINDS",
       "week": "2026-08-17"
     },
