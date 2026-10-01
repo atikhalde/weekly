@@ -1428,6 +1428,13 @@
       "session": "2026-08-10",
       "tap_number": null
     },
+    "GIPCL|2026-08-25|173.00|169.50|tap|tap1": {
+      "kind": "tap",
+      "price": 174.25,
+      "sent_at": "2026-10-01T10:00:38+05:30",
+      "session": "2026-10-01",
+      "tap_number": 1
+    },
     "GIPCL|2026-08-25|173.0|169.5|ob": {
       "kind": "ob",
       "price": null,
@@ -4200,7 +4207,7 @@
     "post_close": "2026-09-30"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-01T09:45:40+05:30",
+  "updated_at": "2026-10-01T10:00:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5755,10 +5762,10 @@
       "breakout_price": 195.94000244140625,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-01",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "1145",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "GIPCL",
       "week": "2026-08-24"
     },
