@@ -3059,6 +3059,13 @@
       "session": "2026-09-01",
       "tap_number": null
     },
+    "SAKAR|2026-09-07|1012.00|987.95|tap|tap1": {
+      "kind": "tap",
+      "price": 1025.9,
+      "sent_at": "2026-10-05T10:30:50+05:30",
+      "session": "2026-10-05",
+      "tap_number": 1
+    },
     "SAKAR|2026-09-07|1012.0|987.9500122070312|ob": {
       "kind": "ob",
       "price": null,
@@ -4291,7 +4298,7 @@
     "post_close": "2026-10-02"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-05T09:15:38+05:30",
+  "updated_at": "2026-10-05T10:30:50+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7868,10 +7875,10 @@
       "breakout_price": 992.2999877929688,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-05",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9539",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SAKAR",
       "week": "2026-08-31"
     },
