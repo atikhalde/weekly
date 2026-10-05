@@ -3612,6 +3612,13 @@
       "session": "2026-03-24",
       "tap_number": null
     },
+    "STYLEBAAZA|2026-08-14|352.00|345.00|tap|tap1": {
+      "kind": "tap",
+      "price": 355.75,
+      "sent_at": "2026-10-05T12:45:47+05:30",
+      "session": "2026-10-05",
+      "tap_number": 1
+    },
     "STYLEBAAZA|2026-08-14|352.0|345.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4305,7 +4312,7 @@
     "post_close": "2026-10-02"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-05T10:45:36+05:30",
+  "updated_at": "2026-10-05T12:45:47+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8422,10 +8429,10 @@
       "breakout_price": 436.70001220703125,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-05",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "25114",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "STYLEBAAZA",
       "week": "2026-08-17"
     },
