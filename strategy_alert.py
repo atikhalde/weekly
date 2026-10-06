@@ -510,6 +510,34 @@ def _mark(st: dict, key: str) -> None:
     st["sent"][key] = datetime.now(IST).isoformat(timespec="seconds")
 
 
+def _send_alerts(tg, messages: list[str]) -> bool:
+    """Send every queued alert and report whether the primary confirmed all.
+
+    The caller persists the dedupe/trade state only after successful delivery.
+    This gives alerts at-least-once semantics: if a later message in the batch
+    fails, earlier messages may repeat on retry, but an undelivered signal or
+    exit is never silently marked as sent.
+    """
+    all_sent = True
+    for i, message in enumerate(messages, start=1):
+        try:
+            sent = tg.send(message)
+        except Exception as exc:
+            log.error("Telegram send %d/%d raised: %s", i, len(messages), exc)
+            all_sent = False
+            continue
+        if not sent:
+            log.error("Telegram did not confirm alert %d/%d", i, len(messages))
+            all_sent = False
+    return all_sent
+
+
+def _dry_run(cfg, args, tg) -> bool:
+    return bool(getattr(args, "dry_run", False)
+                or getattr(cfg.runtime, "dry_run", False)
+                or getattr(tg, "dry_run", False))
+
+
 def run_postclose(cfg, args, tg) -> int:
     today = args.today or datetime.now(IST).date().isoformat()
     st_in = load_json(STATE_IN)
@@ -637,8 +665,13 @@ def run_postclose(cfg, args, tg) -> int:
             still_open.append(trade)
     own["open"] = still_open
 
-    for m in msgs:
-        tg.send(m)
+    if not _send_alerts(tg, msgs):
+        log.error("strategy state not saved so failed alerts will retry; "
+                  "already-delivered messages may repeat")
+        return 1
+    if _dry_run(cfg, args, tg):
+        log.info("postclose dry-run complete: strategy state not saved")
+        return 0
     log.info("postclose done: %d alert(s), %d open trade(s)",
              len(msgs), len(own["open"]))
     save_state(own, STATE_OWN)
@@ -784,8 +817,13 @@ def run_intraday(cfg, args, tg) -> int:
             _mark(own, f"leg2f|{sym}|{today}")
             break
 
-    for m in msgs:
-        tg.send(m)
+    if not _send_alerts(tg, msgs):
+        log.error("strategy state not saved so failed forming alerts will "
+                  "retry; already-delivered messages may repeat")
+        return 1
+    if _dry_run(cfg, args, tg):
+        log.info("intraday dry-run complete: strategy state not saved")
+        return 0
     log.info("intraday done: %d forming alert(s)", len(msgs))
     own["last_run"] = f"intraday {datetime.now(IST).isoformat(timespec='seconds')}"
     save_state(own, STATE_OWN)
@@ -836,6 +874,11 @@ def main() -> int:
     if args.dry_run:
         cfg.runtime.dry_run = True
     tg = build_telegram(cfg, dry_run=cfg.runtime.dry_run)
+    if (args.mode != "digest" and getattr(tg, "dry_run", False)
+            and not cfg.runtime.dry_run):
+        log.error("Telegram is not configured for live delivery; refusing to "
+                  "run the alert pass. Set credentials or use --dry-run.")
+        return 2
 
     if args.mode == "intraday":
         return run_intraday(cfg, args, tg)

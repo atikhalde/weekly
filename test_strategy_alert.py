@@ -336,6 +336,13 @@ class FakeTG:
 
     def send(self, msg):
         self.sent.append(msg)
+        return True
+
+
+class FailedTG(FakeTG):
+    def send(self, msg):
+        super().send(msg)
+        return False
 
 
 class Args:
@@ -345,7 +352,7 @@ class Args:
         self.capital = 100000.0
         self.risk_pct = 1.0
         self.no_data = True
-        self.dry_run = True
+        self.dry_run = False
         for k, v in kw.items():
             setattr(self, k, v)
 
@@ -358,10 +365,10 @@ class FakeCfg:
     class runtime:
         data_rate_per_sec = 1
         quote_rate_per_sec = 1
-        dry_run = True
+        dry_run = False
 
 
-def run_pc(tmp_path, monkeypatch, st_in, own=None, cfg=None, **kw):
+def run_pc(tmp_path, monkeypatch, st_in, own=None, cfg=None, tg=None, **kw):
     p_in = tmp_path / "ob_precision_state.json"
     p_own = tmp_path / "strategy_alert_state.json"
     p_in.write_text(json.dumps(st_in))
@@ -369,7 +376,7 @@ def run_pc(tmp_path, monkeypatch, st_in, own=None, cfg=None, **kw):
         p_own.write_text(json.dumps(own))
     monkeypatch.setattr(sa, "STATE_IN", p_in)
     monkeypatch.setattr(sa, "STATE_OWN", p_own)
-    tg = FakeTG()
+    tg = tg or FakeTG()
     rc = sa.run_postclose(cfg or FakeCfg(), Args(**kw), tg)
     saved = json.loads(p_own.read_text()) if p_own.exists() else {}
     return rc, tg, saved
@@ -385,6 +392,31 @@ def test_leg1_trade_records_the_breakout_session(tmp_path, monkeypatch):
     assert len(saved["open"]) == 1
     assert saved["open"][0]["leg"] == 1
     assert saved["open"][0]["breakout_session"] == "2026-06-01"
+
+
+def test_postclose_does_not_persist_state_when_telegram_fails(tmp_path,
+                                                              monkeypatch):
+    st = synth_state(events=[ob_event("2026-10-07", price=110.0)],
+                     as_of="2026-10-07", as_of_close=110.0)
+    original = {"sent": {}, "open": [], "closed": [], "last_run": "before"}
+    rc, tg, saved = run_pc(tmp_path, monkeypatch, st, own=original,
+                           tg=FailedTG(), today="2026-10-07")
+    assert rc == 1
+    assert len(tg.sent) == 1
+    # The next scheduled pass must see the event as unsent and retry it.
+    assert saved == original
+
+
+def test_postclose_dry_run_does_not_persist_trade_or_dedupe(tmp_path,
+                                                            monkeypatch):
+    st = synth_state(events=[ob_event("2026-10-07", price=110.0)],
+                     as_of="2026-10-07", as_of_close=110.0)
+    original = {"sent": {}, "open": [], "closed": [], "last_run": "before"}
+    rc, tg, saved = run_pc(tmp_path, monkeypatch, st, own=original,
+                           today="2026-10-07", dry_run=True)
+    assert rc == 0
+    assert len(tg.sent) == 1
+    assert saved == original
 
 
 def test_one_malformed_trade_cannot_kill_the_postclose_run(tmp_path,
@@ -437,3 +469,36 @@ def test_postclose_reports_a_stop_filled_on_a_skipped_day(tmp_path,
     assert ex["session"] == "2026-10-09"
     assert ex["price"] == 90.0
     assert any("STOPPED OUT" in m for m in tg.sent)
+
+
+@pytest.mark.parametrize("tg_class,dry_run,expected_rc", [
+    (FailedTG, False, 1),
+    (FakeTG, True, 0),
+])
+def test_intraday_does_not_persist_dedupe_on_failure_or_dry_run(
+        tmp_path, monkeypatch, tg_class, dry_run, expected_rc):
+    today = "2026-10-07"
+    st = synth_state(refreshed_on=today)
+    p_in = tmp_path / "ob_precision_state.json"
+    p_own = tmp_path / "strategy_alert_state.json"
+    p_in.write_text(json.dumps(st))
+    monkeypatch.setattr(sa, "STATE_IN", p_in)
+    monkeypatch.setattr(sa, "STATE_OWN", p_own)
+
+    class QuoteClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ohlc(self, request):
+            return {"NSE_EQ": {"1": {
+                "open": 100.0, "high": 120.0, "low": 99.0,
+                "last_price": 119.0, "volume": 5000.0,
+            }}}
+
+    monkeypatch.setattr(sa, "DhanClient", QuoteClient)
+    tg = tg_class()
+    rc = sa.run_intraday(FakeCfg(), Args(today=today, dry_run=dry_run), tg)
+
+    assert rc == expected_rc
+    assert len(tg.sent) == 1
+    assert not p_own.exists()
