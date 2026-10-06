@@ -4340,7 +4340,7 @@
     "post_close": "2026-10-05"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-06T14:15:37+05:30",
+  "updated_at": "2026-10-06T15:13:42+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8139,6 +8139,24 @@
       "status": "waiting",
       "symbol": "SETL",
       "week": "2026-08-17"
+    },
+    "SHANTIGOLD": {
+      "added_at": "2026-10-06",
+      "breakout_26w_session": {
+        "close": 247.66000366210938,
+        "level": 242.77999877929688,
+        "session": "2026-08-14"
+      },
+      "breakout_bar": "2026-10-06T09:15+05:30",
+      "breakout_price": 333.1000061035156,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 333.0899963378906,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "758002",
+      "status": "waiting",
+      "symbol": "SHANTIGOLD",
+      "week": "2026-10-05"
     },
     "SHAREINDIA": {
       "added_at": "2026-09-27",
@@ -33358,6 +33376,127 @@
         }
       ],
       "zones_seen": 4
+    },
+    "SHANTIGOLD": {
+      "as_of": "2026-10-05",
+      "as_of_close": 316.6000061035156,
+      "as_of_high": 323.5,
+      "as_of_low": 308.5,
+      "atr": 17.83326855301271,
+      "breakout_26w_session": {
+        "close": 247.66000366210938,
+        "level": 242.77999877929688,
+        "session": "2026-08-14"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 316.6000061035156,
+      "prev_highs": [
+        293.70001220703125,
+        291.25,
+        333.0899963378906,
+        316.19000244140625,
+        314.989990234375,
+        321.0,
+        311.95001220703125,
+        323.5
+      ],
+      "prev_lows": [
+        302.4100036621094,
+        296.8500061035156,
+        306.1499938964844,
+        292.1000061035156,
+        308.5
+      ],
+      "prev_volumes": [
+        4067799.0,
+        1505201.0,
+        1281587.0,
+        1253608.0,
+        1074560.0,
+        888493.0,
+        1104713.0,
+        652411.0,
+        2818320.0,
+        1318969.0,
+        1083004.0,
+        12582362.0,
+        4189312.0,
+        36407266.0,
+        7374839.0,
+        3338239.0,
+        3315946.0,
+        2237991.0,
+        3136803.0
+      ],
+      "refreshed_on": "2026-10-06",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 9.912621607024075,
+          "body_frac_at_birth": 0.7826440925679458,
+          "born_index": 214,
+          "born_session": "2026-08-14",
+          "bottom": 224.5,
+          "clv_at_birth": 0.8260344741970744,
+          "departed": true,
+          "entry": 234.07780147725805,
+          "origin_index": 213,
+          "origin_session": "2026-08-13",
+          "range_atr_at_birth": 2.510940130309363,
+          "rvol_at_birth": 5.520982214673379,
+          "state": 0,
+          "stop": 223.01310675894638,
+          "tap_bar_index": 226,
+          "tap_session": "2026-09-01",
+          "taps": 1,
+          "top": 232.0,
+          "width": 7.5
+        },
+        {
+          "atr_at_birth": 15.118955150561348,
+          "body_frac_at_birth": 0.7724134134830988,
+          "born_index": 241,
+          "born_session": "2026-09-23",
+          "bottom": 256.1499938964844,
+          "clv_at_birth": 0.8506630488103005,
+          "departed": true,
+          "entry": 261.2599853515625,
+          "origin_index": 240,
+          "origin_session": "2026-09-22",
+          "range_atr_at_birth": 2.493559365154377,
+          "rvol_at_birth": 5.077974449345999,
+          "state": 0,
+          "stop": 253.88215062390017,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 259.79998779296875,
+          "width": 3.649993896484375
+        },
+        {
+          "atr_at_birth": 17.243027337699022,
+          "body_frac_at_birth": 0.8136054402938545,
+          "born_index": 243,
+          "born_session": "2026-09-25",
+          "bottom": 281.1000061035156,
+          "clv_at_birth": 0.8319727293298798,
+          "departed": true,
+          "entry": 289.83599243164065,
+          "origin_index": 242,
+          "origin_session": "2026-09-24",
+          "range_atr_at_birth": 2.5575558885241843,
+          "rvol_at_birth": 9.135729813624268,
+          "state": 0,
+          "stop": 278.51355200286076,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 287.3399963378906,
+          "width": 6.239990234375
+        }
+      ],
+      "zones_seen": 6
     },
     "SHAREINDIA": {
       "as_of": "2026-09-30",
