@@ -1,0 +1,140 @@
+name: Strategy Alert (two-leg)
+
+# The breakout-pullback strategy from STRATEGY_PLAN.md, run as a spectator of
+# the live scanner: this job READS ob_precision_state.json (committed by
+# ob_tap.yml) and never writes it, and keeps its own book in
+# strategy_alert_state.json. If this job dies, the scanner never notices.
+#
+# Two slots, both after the stage-2 scanner has done its work:
+#   09:42 UTC = 15:12 IST - INTRADAY: one bulk quote for the waiting list,
+#                               "forming" heads-ups while the entry window is
+#                               still open (Leg 1 displacement building, Leg 2
+#                               tap holding above the 26W level).
+#   10:35 UTC = 16:05 IST - POSTCLOSE: confirmations from the closed-bar
+#                               state the scanner refreshed at 15:30, with
+#                               the complete trade plan (entry, stop = the
+#                               26W level, target = the swing high since the
+#                               breakout, size, 90-session time stop), plus
+#                               exit checks on every open trade.
+#
+# Cost shape: the postclose pass makes NO market-data call unless a signal
+# fires (then one daily-history fetch for the target); the intraday pass is
+# one bulk quote. The 5-minute scanner remains the only heavy consumer.
+#
+# First-run safety: alerts fire only for events dated TODAY - deploying this
+# job never replays history into the chat.
+on:
+  schedule:
+    - cron: "42 9 * * 1-5"     # 15:12 IST - intraday forming alerts
+    - cron: "35 10 * * 1-5"    # 16:05 IST - postclose confirm + exits
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Which pass to run (blank = by time of day)"
+        type: choice
+        options: ["", "intraday", "postclose", "digest"]
+        default: ""
+      symbols:
+        description: "Comma-separated subset (blank = whole waiting list)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Print messages instead of sending them"
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [strategy_alert]
+
+concurrency:
+  group: strategy-alert
+  cancel-in-progress: false
+
+permissions:
+  contents: write                  # to commit strategy_alert_state.json
+
+jobs:
+  strategy-alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # The trade plan carries live price levels to a real chat: a wrong
+      # number is worse than no alert. Pure CPU, runs before anything else.
+      - name: Verify strategy alert logic
+        run: |
+          pip install "pytest>=8.0,<9.0"
+          python -m pytest test_strategy_alert.py -q
+
+      - name: Run strategy alert
+        env:
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STRATEGY_CAPITAL: "100000"
+          STRATEGY_RISK_PCT: "1.0"
+        run: |
+          MODE="${{ inputs.mode }}"
+          if [ -z "$MODE" ]; then
+            H=$(date -u +%H)
+            if [ "$H" -lt 10 ]; then MODE=intraday; else MODE=postclose; fi
+          fi
+          python strategy_alert.py \
+            --mode "$MODE" \
+            ${{ inputs.dry_run && '--dry-run' || '' }} \
+            ${{ inputs.symbols && format('--symbols {0}', inputs.symbols) || '' }}
+
+      # Own state only. ob_precision_state.json belongs to the stage-2
+      # scanner and is never touched here.
+      - name: Persist strategy state
+        if: always()
+        run: |
+          if [[ -z "$(git status --porcelain strategy_alert_state.json)" ]]; then
+            echo "no strategy state change"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add strategy_alert_state.json
+          git commit -m "chore: strategy alert state $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+
+          # Other workflows push meanwhile; retry rebase+push (the ob_tap
+          # pattern - losing this commit could re-alert or lose an exit).
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin "${{ github.ref_name }}" \
+               && git push; then
+              echo "strategy state pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push attempt $attempt failed - retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::warning::could not push strategy_alert_state.json"
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
+            echo "Telegram secrets not set - skipping failure notice"
+            exit 0
+          fi
+          MSG=$'⚠️ <b>Strategy alert failed</b>\n'"Check the log: ${RUN_URL}"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "text=${MSG}" > /dev/null

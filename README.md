@@ -90,6 +90,7 @@ well under a minute.
 | `precision.txt` | The Pine v6 order-block indicator this repo ports (source of truth) |
 | `ob_precision.py` | Pine-exact port of `precision.txt`: displacement → order block → tap |
 | `ob_tap_scan.py` | Stage-2 scanner (5-min cron): taps of the weekly-breakout waiting list |
+| `strategy_alert.py` | The two-leg breakout-pullback strategy alert (15:12 + 16:05 IST): complete trade plans + exit tracking; reads `ob_precision_state.json` read-only, own state in `strategy_alert_state.json` |
 
 **Flat layout:** every Python file is in the repo root; `.github/workflows/` is
 the only folder. Generated files (`weekly_snapshot.csv`, `state.json`,
