@@ -784,6 +784,13 @@
       "session": "2026-09-07",
       "tap_number": null
     },
+    "CENTUM|2026-09-21|4398.00|4300.00|tap|tap1": {
+      "kind": "tap",
+      "price": 4486.1,
+      "sent_at": "2026-10-06T09:45:41+05:30",
+      "session": "2026-10-06",
+      "tap_number": 1
+    },
     "CENTUM|2026-09-21|4398.0|4300.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4326,7 +4333,7 @@
     "post_close": "2026-10-05"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-06T09:15:44+05:30",
+  "updated_at": "2026-10-06T09:45:41+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5147,10 +5154,10 @@
       "breakout_price": 4265.60009765625,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-06",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "14982",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "CENTUM",
       "week": "2026-09-07"
     },
@@ -6181,6 +6188,24 @@
       "status": "waiting",
       "symbol": "INDNIPPON",
       "week": "2026-09-07"
+    },
+    "INDOAMIN": {
+      "added_at": "2026-10-06",
+      "breakout_26w_session": {
+        "close": 163.5,
+        "level": 152.64999389648438,
+        "session": "2026-10-06"
+      },
+      "breakout_bar": "2026-10-06T09:20+05:30",
+      "breakout_price": 155.47000122070312,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 152.64999389648438,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "9116",
+      "status": "waiting",
+      "symbol": "INDOAMIN",
+      "week": "2026-10-05"
     },
     "INDOBORAX": {
       "added_at": "2026-09-27",
@@ -7427,6 +7452,24 @@
       "status": "waiting",
       "symbol": "PARADEEP",
       "week": "2026-08-24"
+    },
+    "PARAGMILK": {
+      "added_at": "2026-10-06",
+      "breakout_26w_session": {
+        "close": 264.8500061035156,
+        "level": 263.79998779296875,
+        "session": "2026-09-10"
+      },
+      "breakout_bar": "2026-10-06T09:20+05:30",
+      "breakout_price": 286.25,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 286.20001220703125,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "17130",
+      "status": "waiting",
+      "symbol": "PARAGMILK",
+      "week": "2026-10-05"
     },
     "PARAS": {
       "added_at": "2026-09-27",
@@ -21158,6 +21201,85 @@
       ],
       "zones_seen": 2
     },
+    "INDOAMIN": {
+      "as_of": "2026-10-01",
+      "as_of_close": 136.52000427246094,
+      "as_of_high": 146.0,
+      "as_of_low": 133.4499969482422,
+      "atr": 7.111887592467015,
+      "breakout_26w_session": {
+        "close": 163.5,
+        "level": 152.64999389648438,
+        "session": "2026-10-06"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 136.52000427246094,
+      "prev_highs": [
+        138.64999389648438,
+        139.0,
+        137.0,
+        137.8000030517578,
+        152.64999389648438,
+        149.60000610351562,
+        148.0,
+        146.0
+      ],
+      "prev_lows": [
+        130.9499969482422,
+        136.89999389648438,
+        137.64999389648438,
+        138.35000610351562,
+        133.4499969482422
+      ],
+      "prev_volumes": [
+        50224.0,
+        83059.0,
+        62530.0,
+        67298.0,
+        26964.0,
+        30597.0,
+        29985.0,
+        31453.0,
+        26463.0,
+        36333.0,
+        118165.0,
+        96970.0,
+        69250.0,
+        40745.0,
+        67910.0,
+        1045793.0,
+        626536.0,
+        208080.0,
+        293231.0
+      ],
+      "refreshed_on": "2026-10-06",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 5.152384675497845,
+          "body_frac_at_birth": 0.9242975409858972,
+          "born_index": 240,
+          "born_session": "2026-09-21",
+          "bottom": 117.69999694824219,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 123.59742741053492,
+          "origin_index": 237,
+          "origin_session": "2026-09-16",
+          "range_atr_at_birth": 1.589554221554773,
+          "rvol_at_birth": 2.685046428478102,
+          "state": 0,
+          "stop": 116.9271392469175,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 122.66999816894531,
+          "width": 4.970001220703125
+        }
+      ],
+      "zones_seen": 2
+    },
     "INDOBORAX": {
       "as_of": "2026-09-28",
       "as_of_close": 477.54998779296875,
@@ -28704,6 +28826,127 @@
         }
       ],
       "zones_seen": 3
+    },
+    "PARAGMILK": {
+      "as_of": "2026-10-05",
+      "as_of_close": 281.0,
+      "as_of_high": 283.3999938964844,
+      "as_of_low": 267.0,
+      "atr": 14.173356543462024,
+      "breakout_26w_session": {
+        "close": 264.8500061035156,
+        "level": 263.79998779296875,
+        "session": "2026-09-10"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 281.0,
+      "prev_highs": [
+        286.20001220703125,
+        267.8999938964844,
+        274.3999938964844,
+        276.54998779296875,
+        280.5,
+        274.5,
+        271.45001220703125,
+        283.3999938964844
+      ],
+      "prev_lows": [
+        260.04998779296875,
+        265.1000061035156,
+        268.0,
+        258.0,
+        267.0
+      ],
+      "prev_volumes": [
+        1227989.0,
+        917296.0,
+        521490.0,
+        7361793.0,
+        2611943.0,
+        1542890.0,
+        2510039.0,
+        2697229.0,
+        1521408.0,
+        1706560.0,
+        3909827.0,
+        2858071.0,
+        1619666.0,
+        2825359.0,
+        2359330.0,
+        2258239.0,
+        893163.0,
+        916684.0,
+        2320736.0
+      ],
+      "refreshed_on": "2026-10-06",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 10.770317560671073,
+          "body_frac_at_birth": 0.6542516060336037,
+          "born_index": 130,
+          "born_session": "2026-04-15",
+          "bottom": 201.72000122070312,
+          "clv_at_birth": 0.8678843677251316,
+          "departed": true,
+          "entry": 206.29800720214843,
+          "origin_index": 128,
+          "origin_session": "2026-04-10",
+          "range_atr_at_birth": 1.3212234130868492,
+          "rvol_at_birth": 1.8186777782830148,
+          "state": 2,
+          "stop": 200.10445358660246,
+          "tap_bar_index": 218,
+          "tap_session": "2026-08-20",
+          "taps": 2,
+          "top": 204.99000549316406,
+          "width": 3.2700042724609375
+        },
+        {
+          "atr_at_birth": 8.745356937666894,
+          "body_frac_at_birth": 0.7939112045300398,
+          "born_index": 219,
+          "born_session": "2026-08-21",
+          "bottom": 206.0,
+          "clv_at_birth": 0.7939112045300398,
+          "departed": true,
+          "entry": 211.5641697419441,
+          "origin_index": 218,
+          "origin_session": "2026-08-20",
+          "range_atr_at_birth": 2.4412943916297554,
+          "rvol_at_birth": 5.089492356580014,
+          "state": 0,
+          "stop": 204.68819645934997,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 209.99000549316406,
+          "width": 3.9900054931640625
+        },
+        {
+          "atr_at_birth": 9.981944480402595,
+          "body_frac_at_birth": 0.8803150438820275,
+          "born_index": 225,
+          "born_session": "2026-08-31",
+          "bottom": 237.0,
+          "clv_at_birth": 0.8855639062814137,
+          "departed": true,
+          "entry": 244.49674695471467,
+          "origin_index": 224,
+          "origin_session": "2026-08-28",
+          "range_atr_at_birth": 1.9084461037785179,
+          "rvol_at_birth": 2.631278427190882,
+          "state": 0,
+          "stop": 235.50270832793962,
+          "tap_bar_index": 230,
+          "tap_session": "2026-09-07",
+          "taps": 1,
+          "top": 242.6999969482422,
+          "width": 5.6999969482421875
+        }
+      ],
+      "zones_seen": 6
     },
     "PARAS": {
       "as_of": "2026-10-01",
