@@ -4337,10 +4337,10 @@
   "data_outage_on": null,
   "digest_on": {
     "manual": "2026-09-28",
-    "post_close": "2026-10-05"
+    "post_close": "2026-10-06"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-06T15:13:42+05:30",
+  "updated_at": "2026-10-06T15:45:39+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8733,6 +8733,19 @@
       "status": "tapped",
       "symbol": "TALBROAUTO",
       "week": "2026-09-14"
+    },
+    "TATVA": {
+      "added_at": "2026-10-06",
+      "breakout_bar": "2026-10-06T15:25+05:30",
+      "breakout_price": 1895.300048828125,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 1880.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "5162",
+      "status": "waiting",
+      "symbol": "TATVA",
+      "week": "2026-10-05"
     },
     "TBOTEK": {
       "added_at": "2026-09-27",
