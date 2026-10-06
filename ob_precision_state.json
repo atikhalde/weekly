@@ -4263,6 +4263,13 @@
       "session": "2026-09-02",
       "tap_number": null
     },
+    "WINDLAS|2026-09-02|998.55|990.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1012.4,
+      "sent_at": "2026-10-06T10:00:40+05:30",
+      "session": "2026-10-06",
+      "tap_number": 1
+    },
     "YASHO|2026-05-11|1555.699951171875|1545.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4333,7 +4340,7 @@
     "post_close": "2026-10-05"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-06T09:45:41+05:30",
+  "updated_at": "2026-10-06T10:00:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9220,10 +9227,10 @@
       "breakout_price": 1039.6500244140625,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-06",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "5366",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "WINDLAS",
       "week": "2026-08-31"
     },
