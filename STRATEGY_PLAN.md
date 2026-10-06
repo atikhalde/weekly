@@ -116,6 +116,30 @@ target/stop, risk budget split. The pullback pays you for the second half.
   below, before real money.
 - Costs flat 0.22%; slippage on illiquid names not modelled.
 
+## 6b. Edge cases the live alert handles
+
+Normal days were never the problem; these are the days that are not normal.
+
+- **A skipped run (BUG 55).** GitHub's scheduler drops slots. Exits are
+  therefore bar-walked across every session between the last check and the
+  state's latest closed bar, so a stop that filled on a day nobody ran is
+  reported with *that day's* session and the stop price — not silently
+  carried until the next extreme. The walk costs one daily-history call, so
+  it is only taken when a run was actually missed or the target is still
+  unknown: a normal daily pass makes **zero** market-data calls.
+- **A market holiday.** A bulk quote carries no date, and on a weekday
+  holiday the feed re-serves the previous session's numbers unchanged —
+  which reads as a fat displacement candle forming. The intraday pass
+  applies the scanner's own three-way test (high, low and last all equal
+  the last closed bar) and skips the name, and additionally requires the
+  scanner to have refreshed that symbol's context today.
+- **A spent cycle.** Leg 2 is the cycle's **first** tap and nothing else —
+  that is the trade the 47% / +2.14% backtest measured. Once Tap 1 has
+  happened the cycle is spent, and the intraday pass no longer sends a
+  "forming" heads-up for a later tap on any zone in that cycle.
+- **A malformed record.** One bad trade in the book costs itself its exit
+  check, never the other open trades theirs.
+
 ## 7. Build sequence
 
 1. **Portfolio simulation of this exact plan** (both legs, 10–15 slots,

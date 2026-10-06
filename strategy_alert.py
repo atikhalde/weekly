@@ -52,9 +52,8 @@ import logging
 import math
 import os
 import sys
-import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -198,7 +197,7 @@ def plan_html(p: TradePlan, extra: str = "") -> str:
         f"🎯 Target {tgt} — the swing high since the breakout",
         f"⛔ Stop <b>{_fmt(p.stop)}</b> (−{p.risk_pct_price:.1f}%) — "
         "the 26W breakout level",
-        f"⏱ Time stop: 90 trading sessions from entry",
+        f"⏱ Time stop: {TIME_STOP_SESSIONS} trading sessions from entry",
         f"📊 Size: {size} · risk ₹{p.risk_amt:,.0f} "
         f"({p.risk_pct:.1f}% of ₹{p.capital:,.0f}) · R:R {rr_txt}",
     ]
@@ -281,6 +280,37 @@ def first_tap_after_breakout(rec: dict, ctx: dict) -> tuple[str, dict] | None:
     return best
 
 
+def cycle_is_spent(rec: dict, ctx: dict) -> bool:
+    """True once this breakout cycle's Tap 1 has already happened.
+
+    Leg 2 is the cycle's FIRST tap and nothing else - that is the trade the
+    47%/+2.14% backtest measured. A later tap, on the same zone or on another
+    zone born in the same cycle, is a different (unmeasured) trade, so a
+    "forming" heads-up for one is noise at best and a bad entry at worst.
+    """
+    return first_tap_after_breakout(rec, ctx) is not None
+
+
+def quote_is_stale(q: dict, ctx: dict) -> bool:
+    """The scanner's own market-holiday test, applied to our bulk quote.
+
+    A bulk quote carries no date. On a weekday market holiday the feed hands
+    back the PREVIOUS session's numbers unchanged, and treating them as a
+    developing candle fires a "forming" heads-up for a candle that is not
+    forming at all. Identical high/low/last against the last closed bar is
+    exactly that quote (ob_tap_scan.py uses the same three-way comparison).
+    """
+    def _f(v, default=-1.0) -> float:
+        try:
+            return float(default if v is None else v)
+        except (TypeError, ValueError):
+            return float(default)
+
+    return (_f(q.get("high"), 0.0) == _f(ctx.get("as_of_high"))
+            and _f(q.get("low"), 0.0) == _f(ctx.get("as_of_low"))
+            and _f(q.get("last_price"), 0.0) == _f(ctx.get("as_of_close")))
+
+
 def leg1_today(st: dict, sym: str, today: str) -> dict | None:
     """LEG 1 fires when the cycle's FIRST post-breakout OB is born today.
     Returns the birth info (zone/event dict) or None."""
@@ -356,18 +386,42 @@ def check_exit(trade: dict, ctx: dict) -> dict | None:
     return None
 
 
+def missed_sessions(trade: dict, ctx: dict) -> int:
+    """Sessions the exit check never saw: those strictly between the trade's
+    last check and the state's latest closed bar. 0 on a normal daily pass
+    (yesterday -> today is one session, the one we are checking now), >0 only
+    when a run was actually skipped."""
+    last = as_date(trade.get("last_checked") or trade.get("entry_session"))
+    now = as_date(ctx.get("as_of"))
+    if last is None or now is None:
+        return 0
+    return max(0, weekday_sessions(last, now) - 1)
+
+
 def exit_with_backfill(trade: dict, ctx: dict, client, rec: dict) -> dict | None:
     """check_exit, plus a bar-walk over any sessions a missed run skipped.
     A missed day is not hypothetical (the repo's BUG 55: GitHub cron skips
     slots), and a stop that filled on the missed day must not sit unnoticed
     until the next extreme. Also backfills a target that could not be
-    computed at entry (no client / failed fetch then)."""
+    computed at entry (no client / failed fetch then).
+
+    COST SHAPE: the bar-walk costs one daily-history call per trade, so it is
+    only taken when it can actually buy something - a run was missed, or the
+    target is still unknown. On a normal daily pass this function makes ZERO
+    market-data calls and is exactly check_exit, which is what the module
+    docstring promises."""
     as_of = ctx.get("as_of")
     if not as_of or as_of <= trade.get("last_checked", ""):
         return None
     stop = float(trade["stop"])
     target = trade.get("target")
-    if client is not None:
+    gap = missed_sessions(trade, ctx)
+    need_target = not target and trade.get("breakout_session")
+    if client is not None and (rec or {}).get("security_id") \
+            and (gap > 0 or need_target):
+        if gap > 0:
+            log.info("%s: %d session(s) skipped since %s - bar-walking",
+                     trade.get("symbol"), gap, trade.get("last_checked"))
         bars = fetch_bars(client, rec)
         if bars is not None:
             if not target and trade.get("breakout_session"):
@@ -414,7 +468,7 @@ def exit_html(trade: dict, ex: dict) -> str:
 # --------------------------------------------------------------------------- #
 #  Data fetch (only for symbols that fire)
 # --------------------------------------------------------------------------- #
-def fetch_bars(client, rec: dict, lookback_days: int = 400):
+def fetch_bars(client, rec: dict, lookback_days: int = 550):
     from_d = datetime.now(IST).date() - timedelta(days=lookback_days)
     try:
         df = client.daily_candles(rec["security_id"],
@@ -520,6 +574,7 @@ def run_postclose(cfg, args, tg) -> int:
                 own["open"].append({
                     "id": f"{sym}-L1-{ev1['born']}", "symbol": sym, "leg": 1,
                     "entry": entry, "stop": level, "target": target,
+                    "breakout_session": brk["session"],
                     "entry_session": today, "last_checked": today,
                     "sessions_held": 0})
             else:
@@ -555,18 +610,30 @@ def run_postclose(cfg, args, tg) -> int:
     # ---- exits ---------------------------------------------------------------
     still_open = []
     for trade in own["open"]:
-        ctx = (st_in.get("zones") or {}).get(trade["symbol"]) or {}
-        ex = check_exit(trade, ctx) if ctx else None
-        if ex:
-            msgs.append(exit_html(trade, ex))
-            trade["exit"] = ex
-            own["closed"].append(trade)
-            _mark(own, f"exit|{trade['id']}")
-        else:
-            if ctx.get("as_of"):
-                trade["last_checked"] = ctx["as_of"]
-                trade["sessions_held"] = weekday_sessions(
-                    as_date(trade["entry_session"]), as_date(ctx["as_of"]))
+        # One malformed record (a hand-edited state file, a half-written
+        # trade from an older schema) must not cost every OTHER trade its
+        # exit check - the book is the thing that has to survive.
+        try:
+            sym = trade["symbol"]
+            ctx = (st_in.get("zones") or {}).get(sym) or {}
+            # the full waiting list, not the status/--symbols-filtered view:
+            # a trade stays open after its symbol leaves the waiting list.
+            rec = (st_in.get("waiting") or {}).get(sym) or {}
+            ex = exit_with_backfill(trade, ctx, client, rec) if ctx else None
+            if ex:
+                msgs.append(exit_html(trade, ex))
+                trade["exit"] = ex
+                own["closed"].append(trade)
+                _mark(own, f"exit|{trade['id']}")
+            else:
+                if ctx.get("as_of"):
+                    trade["last_checked"] = ctx["as_of"]
+                    trade["sessions_held"] = weekday_sessions(
+                        as_date(trade["entry_session"]), as_date(ctx["as_of"]))
+                still_open.append(trade)
+        except Exception as exc:                    # degrade, never die
+            log.warning("exit check failed for %s: %s",
+                        (trade or {}).get("id", "?"), exc)
             still_open.append(trade)
     own["open"] = still_open
 
@@ -627,6 +694,21 @@ def run_intraday(cfg, args, tg) -> int:
         q = quotes.get((rec["exchange_segment"], str(rec["security_id"])))
         if not q:
             continue
+        # A weekday market holiday re-serves the last closed session's
+        # numbers, which would read as a fat displacement candle forming.
+        if quote_is_stale(q, ctx):
+            log.info("%s: quote identical to the last closed session - "
+                     "stale (holiday/dead feed), skipping", sym)
+            continue
+        # The forming tests compare against the scanner's closed-bar context
+        # (prev_highs, prev_volumes, atr). If the scanner has not refreshed
+        # this name today that context is an older session's, and the
+        # comparison is meaningless. The scanner runs */5 from 08:45 IST, so
+        # by this 15:12 pass a healthy name is always stamped with today.
+        if ctx.get("refreshed_on") != today:
+            log.info("%s: scanner context last refreshed %s, not today - "
+                     "skipping", sym, ctx.get("refreshed_on") or "never")
+            continue
         brk = breakout_of(rec, ctx)
         if not brk:
             continue
@@ -653,7 +735,6 @@ def run_intraday(cfg, args, tg) -> int:
                     and rvol >= MIN_RVOL and (not atr or rng >= atr * MIN_RANGE_ATR)
                     and c > level):
                 if not _sent(own, f"leg1f|{sym}|{today}"):
-                    gap_pct = (c / level - 1.0) * 100.0
                     msgs.append(
                         f"⚡ <b>LEG 1 FORMING — {_esc(sym)}</b>\n"
                         f"Displacement building: price <b>{_fmt(c)}</b> above "
@@ -670,7 +751,12 @@ def run_intraday(cfg, args, tg) -> int:
                         f"{LEG1_BACKTEST}</i>")
                     _mark(own, f"leg1f|{sym}|{today}")
 
-        # ---- LEG 2 FORMING: a tap in progress, holding above the level
+        # ---- LEG 2 FORMING: a tap in progress, holding above the level.
+        #      Only the CYCLE's first tap is the Leg-2 trade; once Tap 1 has
+        #      happened the cycle is spent and a second heads-up would point
+        #      at a trade the strategy does not take.
+        if cycle_is_spent(rec, ctx):
+            continue
         for z in ctx.get("zones") or []:
             if z.get("taps", 0) or not z.get("departed"):
                 continue
