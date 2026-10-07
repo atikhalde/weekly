@@ -536,13 +536,34 @@ def test_plan_html_says_stop_too_far_rather_than_sizing_nonsense():
     assert "stop too far" in html and p.qty == 0
 
 
-def test_exit_html_reports_net_from_both_entries():
+def test_exit_html_reports_net_from_a_and_never_quotes_a_stale_b():
+    """A resolves ON the born session - B buys that same close, so B has not
+    held a session and must not be given A's exit price as its own result."""
     ex = {"outcome": "win", "session": BORN, "price": 120.0, "fill": "order",
           "reason": "swing-high target filled", "sessions": 1}
-    html = pye.exit_html(trade(), ex, RuleSettings())
+    html = pye.exit_html(trade(born_session=BORN), ex, RuleSettings())
     assert "TARGET HIT" in html
     assert "+8.87%" in html         # from A: 120/110-1 = +9.09%, less 0.22
-    assert "-2.66%" in html         # from B: 120/123-1 = -2.44%, less 0.22
+    assert "from B" not in html
+    assert "B (displacement close) still open" in html
+
+
+def test_exit_html_quotes_b_from_b_s_own_walk():
+    ex = {"outcome": "win", "session": "2026-10-05", "price": 120.0,
+          "fill": "order", "reason": "swing-high target filled", "sessions": 4,
+          "b": {"outcome": "win", "session": "2026-10-05", "price": 120.0,
+                "sessions": 3}}
+    html = pye.exit_html(trade(born_session=BORN), ex, RuleSettings())
+    assert "+8.87%" in html and "-2.66%" in html   # B: 120/123 less 0.22
+
+
+def test_exit_html_dates_b_when_it_resolved_on_another_session():
+    ex = {"outcome": "loss", "session": "2026-10-05", "price": 100.0,
+          "fill": "order", "reason": "26W level stop filled", "sessions": 4,
+          "b": {"outcome": "loss", "session": "2026-10-06", "price": 100.0,
+                "sessions": 2}}
+    html = pye.exit_html(trade(born_session=BORN), ex, RuleSettings())
+    assert "from B -18.92% 2026-10-06" in html
 
 
 def test_late_html_is_a_notice_not_a_plan():
@@ -553,6 +574,31 @@ def test_late_html_is_a_notice_not_a_plan():
     html = pye.late_html(t, ex, RuleSettings())
     assert "MISSED" in html and "No action" in html
     assert "Entry A" not in html
+    assert "B (displacement close) still open" in html
+
+
+def test_b_walk_is_one_session_behind_a_and_reports_its_own_exit():
+    """A exits on the born session (the displacement gaps through the target);
+    B entered at that very close, so the same bars leave B still open until
+    its own session resolves."""
+    bars = cycle_bars() + [bar("2026-10-05", 121, 125, 120, 124)]
+    t = trade(born_session=BORN, origin_session=OB_CANDLE)
+    a = walk_bars(t, bars, through="2026-10-05", time_stop_sessions=90)
+    assert a is not None and a["session"] == BORN and a["outcome"] == "win"
+    assert pye.b_walk(t, a, bars, RuleSettings()) == {"open": True}   # to A
+    b = pye.b_walk(t, a, bars, RuleSettings(), through="2026-10-05")
+    assert b["outcome"] == "win" and b["session"] == "2026-10-05"
+    assert b["price"] == 121.0                    # gapped through, at the open
+    b_no_bars = pye.b_walk(t, a, None, RuleSettings())
+    assert b_no_bars is None                      # nothing to walk, nothing said
+    assert pye.b_walk(dict(t, entry_b=None), a, bars, RuleSettings()) is None
+
+
+def test_b_walk_leaves_b_open_when_it_has_not_resolved():
+    bars = cycle_bars() + [bar("2026-10-05", 119, 119, 115, 118)]
+    t = trade(born_session=BORN, origin_session=OB_CANDLE)
+    a = {"outcome": "win", "session": BORN, "price": 120.0, "fill": "order"}
+    assert pye.b_walk(t, a, bars, RuleSettings()) == {"open": True}
 
 
 # --------------------------------------------------------------------------- #
@@ -795,6 +841,30 @@ def test_postclose_bar_walks_a_slot_the_cron_skipped(tmp_path, monkeypatch):
     assert rc == 0 and len(saved["closed"]) == 1
     ex = saved["closed"][0]["exit"]
     assert ex["outcome"] == "loss" and ex["session"] == "2026-10-02"
+
+
+def test_postclose_exit_carries_b_s_own_result(tmp_path, monkeypatch):
+    """B is the fillable entry, so the book must state B's own outcome: A
+    resolved on the born session, B only one session later."""
+    bars = quiet_bars() + [bar("2026-10-05", 121, 125, 120, 124)]
+    st = state(as_of="2026-10-05", as_of_high=125.0, as_of_low=120.0,
+               as_of_close=124.0)
+    own = {"sent": {}, "closed": [], "excluded": {}, "open": [
+        {"id": "TEST-OBE-2026-09-30", "symbol": "TEST", "entry": 110.0,
+         "entry_a": 110.0, "entry_b": 123.0, "stop": LEVEL, "target": 120.0,
+         "entry_session": OB_CANDLE, "born_session": BORN,
+         "last_checked": "2026-10-02", "breakout_session": BREAKOUT},
+    ]}
+    rc, tg, saved = run_pc(tmp_path, monkeypatch, st, own=own, bars=bars,
+                           today="2026-10-05")
+    assert rc == 0 and len(saved["closed"]) == 1
+    ex = saved["closed"][0]["exit"]
+    assert ex["outcome"] == "win" and ex["session"] == "2026-10-05"
+    assert ex["b"]["outcome"] == "win" and ex["b"]["price"] == 121.0
+    msg = [m for m in tg.sent if "TARGET HIT" in m][0]
+    # B bought 123 and the target (120) is below B's own entry, so B's "win"
+    # is still a net loss - quoted from B's walk, not reused from A's price.
+    assert "from B -1.85%" in msg and "still open" not in msg
 
 
 def test_one_malformed_trade_cannot_kill_the_run(tmp_path, monkeypatch):

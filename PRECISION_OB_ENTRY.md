@@ -62,7 +62,10 @@ can be evaluated — the backtest's own hindsight check:
 
 This job does not paper over that. **Every alert carries both prices**, the
 plan and its R:R are computed from A (the rule), the fillable version is shown
-from B, and the exit report gives the net from each. Three alert moments cover
+from B, and the exit report gives the net from each. B is walked over its own
+sessions — it buys the displacement bar's close, so it starts one session later
+than A and is reported as still open while A has already resolved (a trade B
+never held must never be quoted A's exit price). Three alert moments cover
 the three ways to act:
 
 | slot | mode | what it says | what is fillable |

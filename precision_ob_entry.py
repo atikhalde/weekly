@@ -487,6 +487,31 @@ def walk_bars(trade: dict, bars: list, through: str | None,
     return None
 
 
+def b_walk(trade: dict, ex: dict, bars: list | None,
+           settings: RuleSettings, through: str | None = None) -> dict | None:
+    """Entry B's own exit, from the same bars.
+
+    B buys the displacement bar's close, so its first walkable session is the
+    one AFTER the born session - usually one session later than A. Reusing A's
+    exit price for B is therefore wrong whenever A resolves on or before the
+    born session (the MANINDS shape: the displacement bar itself gapped through
+    the target, A is a win, B has not held a single session). B is walked over
+    its own sessions and reported as still open when it has not resolved.
+
+    Returns B's exit dict, {"open": True} when it has not resolved by
+    `through` (A's own exit session unless the caller says otherwise), or None
+    when there is no B trade to walk at all."""
+    born, entry_b = trade.get("born_session"), trade.get("entry_b")
+    if not born or not entry_b or not bars:
+        return None
+    b_trade = {"entry": float(entry_b), "stop": float(trade["stop"]),
+               "target": float(trade["target"]) if trade.get("target") else None,
+               "entry_session": born}
+    res = walk_bars(b_trade, bars, through=through or str(ex.get("session") or ""),
+                    time_stop_sessions=settings.time_stop_sessions)
+    return res or {"open": True}
+
+
 def check_exit(trade: dict, ctx: dict, time_stop_sessions: int) -> dict | None:
     """One open trade against the scanner state's latest closed bar - zero
     market-data calls, the normal daily pass."""
@@ -522,6 +547,7 @@ def exit_with_backfill(trade: dict, ctx: dict, client, rec: dict,
     nobody ran must not sit unnoticed until the next extreme. The walk costs
     one daily-history call, so it is only taken when a run was actually missed
     or the state has no closed bar to judge the trade against at all."""
+    hist = None
     last = as_date(trade.get("last_checked") or trade.get("entry_session"))
     as_of = as_date(ctx.get("as_of"))
     missed = max(0, weekday_sessions(last, as_of) - 1) if last and as_of else 0
@@ -530,19 +556,19 @@ def exit_with_backfill(trade: dict, ctx: dict, client, rec: dict,
         if missed:
             log.info("%s: %d session(s) skipped since %s - bar-walking",
                      trade.get("symbol"), missed, trade.get("last_checked"))
-        bars = fetch_bars(client, rec, settings)
-        if bars:
+        hist = fetch_bars(client, rec, settings)
+        if hist:
             # Walk every session from the entry through the state's own latest
             # closed bar - a fill on a SKIPPED session must be reported with
             # that session, and check_exit only ever judges the newest one.
-            walk = walk_bars(trade, bars,
+            walk = walk_bars(trade, hist,
                              through=ctx.get("as_of")
                              or trade.get("last_checked"),
                              time_stop_sessions=settings.time_stop_sessions)
             if walk:
-                return walk
+                return _attach_b(trade, walk, hist, settings)
             if not ctx.get("as_of"):
-                b = bars[-1]
+                b = hist[-1]
                 ctx = dict(ctx, as_of=b.session, as_of_open=b.open,
                            as_of_high=b.high, as_of_low=b.low,
                            as_of_close=b.close)
@@ -552,25 +578,27 @@ def exit_with_backfill(trade: dict, ctx: dict, client, rec: dict,
     if ex is None or ex.get("fill") != "order" \
             or ctx.get("as_of_open") is not None or client is None \
             or not (rec or {}).get("security_id"):
-        return ex
+        return _attach_b(trade, ex, hist, settings)
     # Something resolved AT an order price on the state's newest bar, and the
     # state carries no open for that bar. Whether the order filled at its own
     # price or was gapped through is exactly what the backtest's fill policy
     # is about, so spend one history call - only when a trade resolves.
-    bars = fetch_bars(client, rec, settings)
-    if not bars:
+    if hist is None:
+        hist = fetch_bars(client, rec, settings)
+    if not hist:
         return ex
-    b = next((b for b in bars if b.session == ctx.get("as_of")), None)
+    b = next((b for b in hist if b.session == ctx.get("as_of")), None)
     if b is None:
-        return ex
+        return _attach_b(trade, ex, hist, settings)
     res = resolve_bar(float(trade["entry"]), float(trade["stop"]),
                       float(trade["target"]) if trade.get("target") else None,
                       b.open, b.high, b.low)
     if not res:
-        return ex
+        return _attach_b(trade, ex, hist, settings)
     outcome, price, reason, fill = res
-    return {"outcome": outcome, "session": b.session, "price": price,
-            "reason": reason, "fill": fill, "sessions": ex.get("sessions")}
+    return _attach_b(trade, dict(ex, outcome=outcome, session=b.session,
+                                 price=price, reason=reason, fill=fill),
+                     hist, settings)
 
 
 # --------------------------------------------------------------------------- #
@@ -698,6 +726,38 @@ def _net(entry: float | None, exit_px: float, cost_pct: float) -> float | None:
     return (exit_px / entry - 1.0) * 100.0 - cost_pct
 
 
+def b_note(trade: dict, ex: dict, cost_pct: float) -> str:
+    """The Entry-B line of an exit message - exact, never approximated.
+
+    B's number is quoted only when B's own walk produced it (`ex["b"]`, set by
+    exit_with_backfill). When B has not resolved it is said to be still open;
+    a trade whose born session is at/after A's exit session cannot have held a
+    session yet, and that is knowable without any bars."""
+    b = ex.get("b")
+    if b is None and trade.get("born_session") \
+            and str(trade["born_session"]) >= str(ex.get("session") or "~"):
+        b = {"open": True}
+    if b is None:
+        return ""
+    if b.get("outcome"):
+        net = _net(trade.get("entry_b"), float(b["price"]), cost_pct)
+        if net is None:
+            return ""
+        session = f" {_esc(b['session'])}" if str(b.get("session")) != str(ex.get("session")) else ""
+        return f" · from B {net:+.2f}%{session}"
+    return " · B (displacement close) still open"
+
+
+def _attach_b(trade: dict, ex: dict | None, bars: list | None,
+              settings: RuleSettings) -> dict | None:
+    """Only used by exit_with_backfill: it already holds the bars, so B's own
+    exit rides along with A's at no extra data cost."""
+    if ex is None:
+        return None
+    b = b_walk(trade, ex, bars, settings)
+    return dict(ex, b=b) if b else ex
+
+
 def exit_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
     sym = _esc(trade["symbol"])
     icon = {"win": "🎯", "loss": "🛑", "timeout": "⏱"}[ex["outcome"]]
@@ -705,17 +765,16 @@ def exit_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
             "timeout": "TIME STOP"}[ex["outcome"]]
     cost = settings.round_trip_cost_pct
     net_a = _net(trade.get("entry_a"), float(ex["price"]), cost)
-    net_b = _net(trade.get("entry_b"), float(ex["price"]), cost)
     held = ex.get("sessions")
     if held is None:
         held = weekday_sessions(as_date(trade.get("entry_session")),
                                 as_date(ex["session"]))
     fill = "gapped through, filled at the open" if ex.get("fill") == "gap-open" \
         else "filled at the order"
-    from_b = f" · from B {net_b:+.2f}%" if net_b is not None else ""
     return (f"{icon} <b>{word} — {sym} (Precision OB Entry)</b>\n"
             f"Exit <b>{_fmt(ex['price'])}</b> on {_esc(ex['session'])} "
-            f"({fill}) · net from A <b>{net_a:+.2f}%</b>{from_b}\n"
+            f"({fill}) · net from A <b>{net_a:+.2f}%</b>"
+            f"{b_note(trade, ex, cost)}\n"
             f"held ≈{held} session(s) · {_esc(ex['reason'])}")
 
 
@@ -724,7 +783,6 @@ def late_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
     resolved. No plan, no action - the honest version of "you missed it"."""
     cost = settings.round_trip_cost_pct
     net_a = _net(trade.get("entry_a"), float(ex["price"]), cost)
-    net_b = _net(trade.get("entry_b"), float(ex["price"]), cost)
     return (f"⏱ <b>MISSED — {_esc(trade['symbol'])} (Precision OB Entry)</b>\n"
             f"The cycle's first post-breakout OB was born "
             f"<b>{_esc(trade['born_session'])}</b> (OB candle "
@@ -733,7 +791,7 @@ def late_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
             f"The rule's own trade already resolved: "
             f"<b>{ex['outcome'].upper()}</b> at {_fmt(ex['price'])} on "
             f"{_esc(ex['session'])} — net from A {net_a:+.2f}%"
-            + (f", from B {net_b:+.2f}%" if net_b is not None else "")
+            + b_note(trade, ex, cost)
             + ".\nNo action — recorded in the book for the audit trail.")
 
 
@@ -888,6 +946,9 @@ def run_postclose(cfg, args, tg) -> int:
                 if late > 0 else None
             if ex:
                 ex["reason"] += " (the alert ran late)"
+                b = b_walk(trade, ex, bars, settings, through=today)
+                if b:
+                    ex["b"] = b
                 trade["exit"] = ex
                 own["closed"].append(trade)
                 msgs.append(late_html(trade, ex, settings))
@@ -1289,6 +1350,14 @@ def run_explain(cfg, args, tg) -> int:
                         bars, through=ctx.get("as_of"),
                         time_stop_sessions=settings.time_stop_sessions)
         print(f"  status: {res if res else 'open - neither order filled yet'}")
+        if rule.entry_b:
+            b_res = walk_bars({"entry": rule.entry_b, "stop": rule.stop,
+                               "target": rule.target,
+                               "entry_session": rule.born_session},
+                              bars, through=ctx.get("as_of"),
+                              time_stop_sessions=settings.time_stop_sessions)
+            print(f"  status B (entered at the {rule.born_session} close): "
+                  f"{b_res if b_res else 'open'}")
     return 0
 
 
