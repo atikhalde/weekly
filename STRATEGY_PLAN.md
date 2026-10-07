@@ -54,6 +54,21 @@ checklist holds:
 - Realistic expectation for a 15:15 entry: **between +1.3% and +2.1%** per
   trade. Where you land depends on how early in the bar you qualify it.
 
+#### The earlier entry — "buy the OB candle itself"
+
+The same event as Leg 1, priced one bar earlier: enter at the **OB candle's own
+close** (only when it sits above the 26W level), target the highest high printed
+between the breakout and that candle, stop the 26W level, 90-session time stop.
+Backtest 2021-26: **2,272 trades · 88.5% win · +5.77% net · +1.62R** — the same
+configuration as Tap 1 with an earlier entry.
+
+It carries one bar of hindsight (the OB only becomes knowable when the
+displacement bar after it closes), so the live job — `precision_ob_entry.py`,
+see `PRECISION_OB_ENTRY.md` — quotes entry A beside the fillable entry B
+(displacement close: 83% · +1.32% net · +0.60R) in every alert, and fires an
+intraday forming heads-up while B is still fillable. Do not treat A as a price
+you could have taken without foresight.
+
 ### Leg 2 — the Tap 1 entry (bigger, slower)
 
 **Trigger:** the scanner's Tap 1 alert (first tap of the first post-breakout

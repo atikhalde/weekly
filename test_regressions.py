@@ -93,7 +93,8 @@ VALID_TOP_LEVEL = {"name", "on", True, "concurrency", "permissions",
 
 
 @pytest.mark.parametrize(
-    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml"])
+    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml",
+              "precision_ob_entry.yml"])
 def test_workflow_has_no_stray_top_level_keys(name):
     """
     A run-block line at column 1 turns into a top-level key. GitHub rejects the
@@ -109,7 +110,8 @@ def test_workflow_has_no_stray_top_level_keys(name):
 
 
 @pytest.mark.parametrize(
-    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml"])
+    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml",
+              "precision_ob_entry.yml"])
 def test_workflow_has_required_structure(name):
     wf = load_workflow(name)
     assert "jobs" in wf and wf["jobs"], f"{name}: no jobs"
@@ -125,7 +127,8 @@ def test_workflow_has_required_structure(name):
 
 
 @pytest.mark.parametrize(
-    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml"])
+    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml",
+              "precision_ob_entry.yml"])
 def test_run_blocks_are_fully_indented(name):
     """
     Re-read the raw file and confirm every line of a `run: |` block is indented
@@ -156,7 +159,8 @@ def test_run_blocks_are_fully_indented(name):
 
 
 @pytest.mark.parametrize(
-    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml"])
+    "name", ["scan.yml", "snapshot.yml", "tests.yml", "ob_tap.yml",
+              "precision_ob_entry.yml"])
 def test_step_if_never_references_own_step_env(name):
     wf = load_workflow(name)
     for step in all_steps(wf):
@@ -187,7 +191,8 @@ def test_failure_notification_still_exists():
 #  `-d` does not URL-encode, so an & or + in a symbol name or message would
 #  truncate the Telegram alert. --data-urlencode handles it.
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("name", ["scan.yml", "snapshot.yml", "ob_tap.yml"])
+@pytest.mark.parametrize("name", ["scan.yml", "snapshot.yml", "ob_tap.yml",
+                                  "precision_ob_entry.yml"])
 def test_curl_urlencodes_telegram_payloads(name):
     body = (WORKFLOWS / name).read_text()
     if "api.telegram.org" not in body:
@@ -223,6 +228,7 @@ def test_requirements_pin_major_versions():
 @pytest.mark.parametrize("name,script", [
     ("scan.yml", "scan.py"),
     ("snapshot.yml", "build_snapshot.py"),
+    ("precision_ob_entry.yml", "precision_ob_entry.py"),
 ])
 def test_workflows_call_flat_layout_scripts(name, script):
     body = (WORKFLOWS / name).read_text()
@@ -230,7 +236,8 @@ def test_workflows_call_flat_layout_scripts(name, script):
     assert "python -m src." not in body, f"{name} still references the old src/ package"
 
 
-@pytest.mark.parametrize("name", ["scan.yml", "snapshot.yml", "ob_tap.yml"])
+@pytest.mark.parametrize("name", ["scan.yml", "snapshot.yml", "ob_tap.yml",
+                                  "precision_ob_entry.yml"])
 def test_write_workflows_declare_contents_write(name):
     wf = load_workflow(name)
     perms = wf.get("permissions") or {}
