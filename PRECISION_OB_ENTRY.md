@@ -124,6 +124,58 @@ The 5-minute `ob_tap_scan.py` remains the only heavy consumer. `--no-data`
 defers rule events instead of evaluating them (they are retried next run, never
 marked seen).
 
+## 5b. The backtest, reproduced
+
+`precision_ob_backtest.py` measures the shipped rule (`births_from_bars`,
+`evaluate_rule`, `walk_bars` — the alert's own functions) over split/bonus
+adjusted NSE daily candles from eod2 (through 2026-09-25, the report's data):
+
+```bash
+git clone --depth 1 https://github.com/BennyThadikaran/eod2_data
+python precision_ob_backtest.py --data-dir eod2_data/daily
+```
+
+| | this run | report |
+|---|---|---|
+| first post-breakout OBs | 7,430 | 7,357 |
+| .. OB candle on/after it | 3,903 | 3,907 |
+| .. OB close above the level | 2,284 | 2,278 |
+| excluded: OB candle predates | 3,527 | 3,450 |
+| excluded: close back below | 1,613 | 1,629 |
+| censored at the cutoff | **6** | **6** |
+| A trades | 2,284 | 2,272 |
+| win rate | 88.1% | 88.5% |
+| avg win / avg loss | +6.86% / −4.14% | +7.27% / −4.16% |
+| expectancy | +5.37% | +5.77% |
+| median R:R at entry | **0.9x** | **0.9x** |
+| best / worst | **+78.27% / −34.88%** | **+78.3% / −34.9%** |
+| median win completes | 1 session | 1 session |
+| B + 26W stop | 6,710 | 6,624 |
+| B + zone stop | 7,395 | 7,323 |
+
+Every row lands within ~2% of the report; several match exactly. The one row
+that does not is the raw cycle count (~9,300 vs 10,748): the report's
+accounting counts ~1,900 cycles that never produce an order block, and no
+combination of lock width, cross session or universe reproduced that number —
+while every row downstream of it does.
+
+## 5c. The live scanner's state, compared
+
+The same rule run against the scanner's own committed state and eod2 bars, for
+all 291 names on the waiting list:
+
+* **177** of 206 comparable names: the first post-breakout OB is the *same
+  session* as the state's earliest zone.
+* **28** of the other 29: the replay finds an *earlier* OB, and the state's
+  later one is present in the replay too — the state simply lost the earlier
+  zone. `ob_tap_scan.prune_closed_events` trims the persisted event list by
+  design ("a full replay emits an event for EVERY order block the window
+  contains... the next refresh recomputes them anyway"), so dead zones leave
+  no trace. This is exactly why this job recomputes the event from the bars
+  instead of trusting the state's zone list.
+* **1**: the state's birth is not in the eod2 bars at all (the CSV set ends
+  2026-09-25).
+
 ## 6. Running it
 
 ```bash
@@ -131,7 +183,7 @@ python precision_ob_entry.py --mode postclose --dry-run   # what would be sent
 python precision_ob_entry.py --mode digest                # the open book
 python precision_ob_entry.py --mode explain --symbols SMSPHARMA
 python precision_ob_entry.py --mode explain --symbols AARTIIND --no-data
-python -m pytest test_precision_ob_entry.py -q            # the rule's own tests
+python -m pytest test_precision_ob_entry.py test_precision_ob_backtest.py -q
 ```
 
 `explain` prints the funnel state for a name — cycle date, first OB, which
