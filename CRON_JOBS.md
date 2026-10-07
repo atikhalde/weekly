@@ -137,6 +137,37 @@ Three notes:
   once (at most once a day; see README → *Failure behaviour*). A single broken
   symbol never trips it: that run stays green and logs a warning.
 
+### 5. (New) Precision OB entry — 15:12 IST and 16:10 IST
+
+`precision_ob_entry.yml` is the *entry* alert for the precision OB strategy.
+`ob_tap.yml` (job 4) tells you the order block exists; this job tells you what
+the rule does with it — buy the OB candle's close, sell limit at the highest
+high printed between the breakout and that candle, stop at the 26W level,
+90-session time stop. `PRECISION_OB_ENTRY.md` is the full write-up.
+
+| # | Title | URL (append to `https://api.github.com/repos/atikhalde/weekly/actions/workflows/`) | Schedule |
+|---|---|---|---|
+| 5a | NSE precision OB entry — intraday | `precision_ob_entry.yml/dispatches` | **15:12 IST** (entry B is still fillable) |
+| 5b | NSE precision OB entry — postclose | `precision_ob_entry.yml/dispatches` | **16:10 IST** |
+
+Everything else identical to your existing scan job (POST, same headers,
+`{"ref":"main"}`). A plain body is enough on both jobs: the workflow picks the
+pass from the UTC hour (before 10:00 UTC is intraday, after is postclose), so
+15:12 IST arrives as 09:42 UTC and takes the intraday branch. If you would
+rather be explicit, the `workflow_dispatch` body may carry
+`{"inputs":{"mode":"intraday"}}` (or `"postclose"`, `"explain"`, `"digest"`).
+
+Two notes:
+
+- The **intraday slot is the one that matters for acting**: entry A is the OB
+  candle's close, which is already history when the rule can be evaluated, so
+  the fillable price is entry B — the displacement bar's close — and it stops
+  being fillable at 15:30 IST. A late intraday run still works (the workflow
+  says so in the log); it just cannot be traded.
+- The job is cheap: the postclose pass makes **no market-data call** unless a
+  rule event actually fires, then one daily-history fetch for that symbol. The
+  5-minute scanner stays the only heavy consumer.
+
 ### Why 15:18 and not 15:20
 
 The request is instant, but the GitHub runner needs ~45–60 s to boot and

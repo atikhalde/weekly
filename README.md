@@ -91,6 +91,8 @@ well under a minute.
 | `ob_precision.py` | Pine-exact port of `precision.txt`: displacement → order block → tap |
 | `ob_tap_scan.py` | Stage-2 scanner (5-min cron): taps of the weekly-breakout waiting list |
 | `strategy_alert.py` | The two-leg breakout-pullback strategy alert (15:12 + 16:05 IST): complete trade plans + exit tracking; exits bar-walk any session a skipped run missed, a market holiday's stale quote fires nothing, and a spent cycle gets no second heads-up; reads `ob_precision_state.json` read-only, own state in `strategy_alert_state.json` |
+| `precision_ob_entry.py` | The **Precision OB Entry** alert (15:14 + 16:10 IST): the "buy the OB candle itself" rule — the first precision OB born after the 26W breakout, entered at the OB candle's close when it sits above the 26W level, target the highest high between the breakout and that candle, 26W-level stop, 90-session time stop. Every alert shows entry A (the rule) beside entry B (the displacement close — the fillable price), and a late event is bar-walked and reported as MISSED rather than quoted as a plan. Reads `ob_precision_state.json` read-only, own state in `precision_ob_entry_state.json`; see `PRECISION_OB_ENTRY.md` |
+| `precision_ob_backtest.py` | The research tool behind the alert's numbers (read-only, no Telegram, no state): replays the shipped rule over eod2 daily candles with the scanner's own cycle/zone/exit code and prints the funnel and the A/B table; reproduces the 06-Oct-2026 report within ~2% on every row |
 
 **Flat layout:** every Python file is in the repo root; `.github/workflows/` is
 the only folder. Generated files (`weekly_snapshot.csv`, `state.json`,

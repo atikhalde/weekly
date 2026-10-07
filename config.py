@@ -356,6 +356,58 @@ class OBPrecision:
 
 
 @dataclass
+class PrecisionOBEntry:
+    """
+    Settings for `precision_ob_entry.py` - the "buy the OB candle itself"
+    rule (the accepted Tap 1 configuration with an earlier entry).
+
+    The rule's own numbers live here; the zone definition is NOT repeated.
+    `cfg.ob_precision.params()` supplies the displacement/origin thresholds, so
+    the OB this job trades can never drift from the OB the live scanner draws.
+
+    Like every spectator job in this repo, it reads `ob_precision_state.json`
+    read-only, keeps its own state file, and `enabled: false` turns it off
+    without touching anything else.
+    """
+
+    enabled: bool = True
+    # Its OWN state file - the stage-2 scanner's belongs to ob_tap_scan.py.
+    state_file: str = "precision_ob_entry_state.json"
+    # The rule as backtested: a 90-session time stop and a flat 0.22% round
+    # trip (the cost every number in the report is net of).
+    time_stop_sessions: int = 90
+    round_trip_cost_pct: float = 0.22
+    # A rule event is alertable for this many sessions. GitHub's cron skips
+    # slots (BUG 55) and entry A's price is history either way; a late alert
+    # walks the bars first and reports "already resolved" instead of quoting a
+    # plan nobody can take. Events older than this are marked seen silently,
+    # so deploying the job never replays history into the chat.
+    catchup_sessions: int = 3
+    # postclose ~16:05 IST: the rule event + the complete plan + exit tracking.
+    confirm_alerts: bool = True
+    # intraday ~15:12 IST: the OB forming on today's bar - entry B, the price
+    # that is actually fillable, with the OB candle already resolved from the
+    # closed bars. Off means the job only reports confirmed events.
+    forming_alerts: bool = True
+    # intraday: a heads-up on the OB candle's OWN close - the only moment
+    # entry A could ever be filled, but the order block does not exist until a
+    # displacement follows, and post-breakout red/neutral candles above the
+    # level are common. Off by default; the backtest's own caveat ("treat
+    # entry B as the tradable version") is why.
+    candidate_alerts: bool = False
+    # Daily bars fetched per evaluated symbol - must reach back past the
+    # breakout session (the cycle is up to 26 weeks old) to the OB candle.
+    lookback_days: int = 560
+
+    def settings(self):
+        """The rule's knobs, as the alert module's own settings object."""
+        from precision_ob_entry import RuleSettings   # local: keep import-light
+        known = set(RuleSettings.__dataclass_fields__)
+        return RuleSettings(**{k: getattr(self, k) for k in known
+                               if hasattr(self, k)})
+
+
+@dataclass
 class Config:
     strategy: Strategy
     universe: Universe
@@ -364,6 +416,8 @@ class Config:
     paths: dict[str, Path]
     # Last and defaulted, so every existing Config(...) construction keeps working.
     ob_precision: OBPrecision = field(default_factory=OBPrecision)
+    precision_ob_entry: PrecisionOBEntry = field(
+        default_factory=PrecisionOBEntry)
 
 
 def _section(raw: dict[str, Any], key: str) -> dict[str, Any]:
@@ -393,6 +447,10 @@ def load_config(path: str | Path | None = None) -> Config:
     # Optional: an absent section means "every default", so an older config.yaml
     # keeps working unchanged. Unknown keys inside it still raise, via _build.
     ob_precision = _build(OBPrecision, _section(raw, "ob_precision"))
+    # Also optional: an older config.yaml without the section gets the
+    # defaults, and a typo inside it still raises.
+    precision_ob_entry = _build(PrecisionOBEntry,
+                                _section(raw, "precision_ob_entry"))
 
     if strategy.gate_source not in ("live", "closed"):
         raise ValueError("strategy.gate_source must be 'live' or 'closed'")
@@ -422,4 +480,5 @@ def load_config(path: str | Path | None = None) -> Config:
         "ob_state": base / ob_precision.state_file,
     }
     return Config(strategy=strategy, universe=universe, runtime=runtime,
-                  secrets=secrets, paths=paths, ob_precision=ob_precision)
+                  secrets=secrets, paths=paths, ob_precision=ob_precision,
+                  precision_ob_entry=precision_ob_entry)

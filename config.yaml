@@ -291,3 +291,60 @@ ob_precision:
   mintick: 0.05                       # NSE equity tick size
   live_atr_from_closed: true          # NON-REPAINT: freeze the developing bar's
                                       # thresholds at the last closed ATR
+
+# ---------------------------------------------------------------------------
+# Precision OB Entry alert (precision_ob_entry.py) - "buy the OB candle
+# itself".
+#
+# The same breakout-pullback study as the section above, with the entry moved
+# one bar earlier: the FIRST precision OB born after the 26W breakout, entered
+# at the OB candle's (the origin candle's) close - taken only when that close
+# is above the 26W breakout level - targeting the highest high printed between
+# the breakout and the OB candle, stopped at the 26W level, 90-session time
+# stop.
+#
+# Backtest 2021-26 (precision_ob_backtest.py, 06-Oct-2026): 2,272 trades,
+# 88.5% win, avg win +7.27%, avg loss -4.16%, +5.77% net/trade, +1.62R,
+# median win completes in 1 session, 0.22% round-trip cost.
+#
+# THE CAVEAT THIS SECTION EXISTS FOR: the OB candle only becomes knowable when
+# the displacement bar AFTER it closes, so entry A (the OB candle's close)
+# carries one bar of hindsight. Every alert therefore quotes both prices -
+# entry A (the rule) and entry B (the displacement close, the first fillable
+# price) - and never presents A as a fill you could have taken.
+#
+# The zone definition is NOT configured here: this job calls
+# cfg.ob_precision.params(), so the OB it trades is exactly the OB the live
+# scanner draws. Nothing else in the repo reads this section, and
+# `enabled: false` switches the whole job off.
+# ---------------------------------------------------------------------------
+precision_ob_entry:
+  enabled: true
+  state_file: "precision_ob_entry_state.json"   # its OWN state, never state.json
+  # The rule as backtested.
+  time_stop_sessions: 90
+  round_trip_cost_pct: 0.22
+  # How many sessions late a rule event may still be alerted. GitHub cron
+  # skips slots (BUG 55); a late alert walks the bars first and reports
+  # "already resolved" rather than quoting a plan nobody can take. Anything
+  # older is marked seen silently, so deploying this job cannot replay history
+  # into the chat.
+  catchup_sessions: 3
+  # postclose ~16:05 IST: the confirmed rule event, the complete plan (both
+  # entries, stop, target, size, time stop) and exit tracking on the book.
+  confirm_alerts: true
+  # intraday ~15:12 IST: the OB forming on today's bar - entry B, the price
+  # that is actually fillable before the close, with the OB candle already
+  # resolved from the closed bars by the scanner's own find_origin.
+  forming_alerts: true
+  # intraday: a heads-up on the OB candle's OWN close - the only moment entry
+  # A could ever be filled, at the cost of acting before a displacement
+  # exists. The backtest's funnel filters ~3,900 OB candles out of 5 years of
+  # the whole universe, roughly 1.5/day, while post-breakout red/neutral
+  # candles above the level are common - so expect many more alerts than
+  # trades. Off by default; turn on only if that noise is acceptable.
+  candidate_alerts: false
+  # Daily bars fetched for each symbol whose rule event is being evaluated -
+  # must reach back past the breakout session (a cycle can be 26 weeks old) to
+  # the OB candle. Only firing symbols cost a call.
+  lookback_days: 560

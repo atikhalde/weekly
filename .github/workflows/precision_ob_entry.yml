@@ -1,0 +1,160 @@
+name: Precision OB Entry (OB candle)
+
+# The "buy the OB candle itself" rule from precision_ob_backtest.py, run as a
+# spectator of the live scanner - exactly like the two-leg strategy alert.
+#
+#   Event   the FIRST precision OB born on/after the 26W breakout, with the OB
+#           candle (the origin) on/after the breakout session too
+#   Entry   the OB candle's close, taken only when it closes above the 26W level
+#   Target  the highest high printed between the breakout and the OB candle
+#   Stop    the 26W breakout level
+#   Time    90 trading sessions
+#
+# Backtest 2021-26: 2,272 trades, 88.5% win, +5.77% net/trade, +1.62R.
+#
+# The OB candle only becomes knowable when the displacement bar AFTER it
+# closes, so entry A carries one bar of hindsight. Every alert therefore shows
+# entry A (the rule) beside entry B (the displacement close - the first price
+# that can actually be filled), and the intraday slot exists to catch entry B
+# BEFORE the close.
+#
+# Two slots, both reading ob_precision_state.json (committed by ob_tap.yml):
+#   09:44 UTC = 15:14 IST - INTRADAY: one bulk quote for the waiting list; a
+#                               name whose live bar is displacing and whose OB
+#                               candle (resolved with the scanner's own
+#                               find_origin) passes the rule's rows gets the
+#                               forming heads-up while entry B is still open.
+#   10:40 UTC = 16:10 IST - POSTCLOSE: the confirmed rule event with the full
+#                               plan, plus target/stop/time-stop checks on the
+#                               book. A late event is bar-walked first: if the
+#                               trade already resolved, the alert says so
+#                               instead of quoting a plan nobody can take.
+#
+# Cost shape: the postclose pass makes NO market-data call unless a rule event
+# fires (then one daily-history fetch for the OB candle and the target); the
+# intraday pass is one bulk quote plus a fetch per firing name. The 5-minute
+# scanner remains the only heavy consumer.
+#
+# First-run safety: a rule event older than catchup_sessions (3) is marked seen
+# without an alert, so deploying this job never replays history into the chat.
+#
+# This job READS ob_precision_state.json and never writes it; its own book is
+# precision_ob_entry_state.json. If it dies, the scanner never notices.
+on:
+  schedule:
+    - cron: "44 9 * * 1-5"      # 15:14 IST - intraday forming (entry B)
+    - cron: "40 10 * * 1-5"     # 16:10 IST - postclose confirm + exits
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Which pass to run (blank = by time of day)"
+        type: choice
+        options: ["", "intraday", "postclose", "explain", "digest"]
+        default: ""
+      symbols:
+        description: "Comma-separated subset (blank = whole waiting list)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Print messages instead of sending them"
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [precision_ob_entry]
+
+concurrency:
+  group: precision-ob-entry
+  cancel-in-progress: false
+
+permissions:
+  contents: write                   # to commit precision_ob_entry_state.json
+
+jobs:
+  precision-ob-entry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # The plan carries live price levels to a real chat: a wrong number is
+      # worse than no alert. Pure CPU, runs before anything else. The backtest
+      # test rides along because it guards the same functions the job calls.
+      - name: Verify the rule logic
+        run: |
+          pip install "pytest>=8.0,<9.0"
+          python -m pytest test_precision_ob_entry.py test_precision_ob_backtest.py -q
+
+      - name: Run the precision OB entry alert
+        env:
+          DHAN_CLIENT_ID: ${{ secrets.DHAN_CLIENT_ID }}
+          DHAN_ACCESS_TOKEN: ${{ secrets.DHAN_ACCESS_TOKEN }}
+          HTTPS_PROXY: ${{ secrets.HTTPS_PROXY }}
+          HTTP_PROXY: ${{ secrets.HTTPS_PROXY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STRATEGY_CAPITAL: "100000"
+          STRATEGY_RISK_PCT: "1.0"
+        run: |
+          MODE="${{ inputs.mode }}"
+          if [ -z "$MODE" ]; then
+            H=$(date -u +%H)
+            if [ "$H" -lt 10 ]; then MODE=intraday; else MODE=postclose; fi
+          fi
+          python precision_ob_entry.py \
+            --mode "$MODE" \
+            ${{ inputs.dry_run && '--dry-run' || '' }} \
+            ${{ inputs.symbols && format('--symbols {0}', inputs.symbols) || '' }}
+
+      # Own state only. ob_precision_state.json belongs to the stage-2 scanner
+      # and is never touched here.
+      - name: Persist the alert state
+        if: always()
+        run: |
+          if [[ -z "$(git status --porcelain precision_ob_entry_state.json)" ]]; then
+            echo "no precision OB entry state change"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add precision_ob_entry_state.json
+          git commit -m "chore: precision ob entry state $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+
+          # Other workflows push meanwhile; retry rebase+push (the ob_tap
+          # pattern - losing this commit could re-alert or lose an exit).
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin "${{ github.ref_name }}" \
+               && git push; then
+              echo "precision OB entry state pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push attempt $attempt failed - retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::warning::could not push precision_ob_entry_state.json"
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${TELEGRAM_CHAT_ID}" ]]; then
+            echo "Telegram secrets not set - skipping failure notice"
+            exit 0
+          fi
+          MSG=$'⚠️ <b>Precision OB entry alert failed</b>\n'"Check the log: ${RUN_URL}"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "text=${MSG}" > /dev/null
