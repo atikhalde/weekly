@@ -477,13 +477,21 @@ def walk_bars(trade: dict, bars: list, through: str | None,
         held = sessions_between(bars, d0, d)
         if res:
             outcome, price, reason, fill = res
-            return {"outcome": outcome, "session": b.session, "price": price,
-                    "reason": reason, "fill": fill, "sessions": held}
+            r_dict = {"outcome": outcome, "session": b.session, "price": price,
+                      "reason": reason, "fill": fill, "sessions": held}
+            if trade.get("born_session") and b.session < trade["born_session"]:
+                r_dict["pre_confirmation"] = True
+                r_dict["never_live"] = True
+            return r_dict
         if time_stop_sessions and held >= time_stop_sessions:
-            return {"outcome": "timeout", "session": b.session,
-                    "price": b.close, "fill": "close", "sessions": held,
-                    "reason": f"{time_stop_sessions}-session time stop - exit "
-                              "at the close"}
+            r_dict = {"outcome": "timeout", "session": b.session,
+                      "price": b.close, "fill": "close", "sessions": held,
+                      "reason": f"{time_stop_sessions}-session time stop - exit "
+                                "at the close"}
+            if trade.get("born_session") and b.session < trade["born_session"]:
+                r_dict["pre_confirmation"] = True
+                r_dict["never_live"] = True
+            return r_dict
     return None
 
 
@@ -526,16 +534,24 @@ def check_exit(trade: dict, ctx: dict, time_stop_sessions: int) -> dict | None:
                       ctx.get("as_of_open"), float(h), float(l))
     if res:
         outcome, price, reason, fill = res
-        return {"outcome": outcome, "session": as_of, "price": price,
-                "reason": reason, "fill": fill}
+        ex = {"outcome": outcome, "session": as_of, "price": price,
+              "reason": reason, "fill": fill}
+        if trade.get("born_session") and as_of < trade["born_session"]:
+            ex["pre_confirmation"] = True
+            ex["never_live"] = True
+        return ex
     held = weekday_sessions(as_date(trade["entry_session"]), as_date(as_of))
     if time_stop_sessions and held >= time_stop_sessions:
-        return {"outcome": "timeout", "session": as_of,
-                "price": float(ctx.get("as_of_close") or trade["entry"]),
-                "fill": "close",
-                "reason": f"{time_stop_sessions}-session time stop - exit at "
-                          "the close (weekday count; NSE holidays not "
-                          "modelled)"}
+        ex = {"outcome": "timeout", "session": as_of,
+              "price": float(ctx.get("as_of_close") or trade["entry"]),
+              "fill": "close",
+              "reason": f"{time_stop_sessions}-session time stop - exit at "
+                        "the close (weekday count; NSE holidays not "
+                        "modelled)"}
+        if trade.get("born_session") and as_of < trade["born_session"]:
+            ex["pre_confirmation"] = True
+            ex["never_live"] = True
+        return ex
     return None
 
 
@@ -659,9 +675,26 @@ class TradePlan:
         return None
 
     @property
-    def qty(self) -> int:
+    def risk_qty(self) -> int:
         return int(math.floor(self.risk_amt / self.risk_gap)) \
             if self.risk_gap > 0 else 0
+
+    @property
+    def cap_qty(self) -> int:
+        return int(math.floor(self.capital / self.entry_a)) \
+            if self.entry_a > 0 else 0
+
+    @property
+    def is_capped(self) -> bool:
+        return self.risk_gap > 0 and self.risk_qty > self.cap_qty > 0
+
+    @property
+    def qty(self) -> int:
+        if self.risk_gap <= 0:
+            return 0
+        rq = self.risk_qty
+        cq = self.cap_qty
+        return min(rq, cq) if cq > 0 else rq
 
     @property
     def value(self) -> float:
@@ -672,15 +705,21 @@ def plan_html(p: TradePlan, extra: str = "") -> str:
     """The complete plan, one Telegram block - the rule's numbers first."""
     tgt = (f"<b>{_fmt(p.target)}</b> ({p.rew_pct:+.1f}% from A)"
            if p.rew_pct is not None else "set from the chart")
-    size = (f"{p.qty:,} shares ≈ ₹{p.value:,.0f}"
-            if p.qty > 0 else
-            f"stop too far for a ₹{p.risk_amt:,.0f} risk budget")
+    if p.qty <= 0:
+        size = f"stop too far for a ₹{p.risk_amt:,.0f} risk budget"
+    elif p.is_capped:
+        size = (f"{p.qty:,} shares ≈ ₹{p.value:,.0f} "
+                f"(capped by capital; risk-sized was {p.risk_qty:,} shares)")
+    else:
+        size = f"{p.qty:,} shares ≈ ₹{p.value:,.0f}"
+    age_str = f"{p.late_sessions} session(s) old" if p.late_sessions \
+        else "today's OB candle"
     lines = [
         f"🎯 <b>PRECISION OB ENTRY — {_esc(p.symbol)}</b>",
-        f"First precision OB of the 26W breakout cycle · born "
-        f"<b>{_esc(p.born_session)}</b> (displacement bar)",
-        f"Breakout {_esc(p.breakout_session)} · 26W level "
-        f"<b>{_fmt(p.stop)}</b> · OB candle <b>{_esc(p.origin_session)}</b>",
+        f"OB candle <b>{_esc(p.origin_session)}</b> ({age_str}) · "
+        f"born <b>{_esc(p.born_session)}</b> (displacement bar)",
+        f"First precision OB of the 26W breakout cycle · breakout "
+        f"{_esc(p.breakout_session)} · 26W level <b>{_fmt(p.stop)}</b>",
         "",
         "<b>THE RULE — exactly as backtested</b>",
         f"▶ Entry A: the OB candle's close <b>{_fmt(p.entry_a)}</b>"
@@ -760,9 +799,16 @@ def _attach_b(trade: dict, ex: dict | None, bars: list | None,
 
 def exit_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
     sym = _esc(trade["symbol"])
-    icon = {"win": "🎯", "loss": "🛑", "timeout": "⏱"}[ex["outcome"]]
-    word = {"win": "TARGET HIT", "loss": "STOPPED OUT",
-            "timeout": "TIME STOP"}[ex["outcome"]]
+    pre = bool(ex.get("pre_confirmation") or (ex.get("session") and trade.get("born_session")
+               and ex["session"] < trade["born_session"]))
+    if pre:
+        icon, word = "📖", "BOOK RECORD"
+    elif ex.get("outcome") == "win":
+        icon, word = "🎯", "TARGET HIT"
+    elif ex.get("outcome") == "timeout":
+        icon, word = "⏱", "TIME STOP"
+    else:
+        icon, word = "🛑", "STOPPED OUT"
     cost = settings.round_trip_cost_pct
     net_a = _net(trade.get("entry_a"), float(ex["price"]), cost)
     held = ex.get("sessions")
@@ -771,11 +817,12 @@ def exit_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
                                 as_date(ex["session"]))
     fill = "gapped through, filled at the open" if ex.get("fill") == "gap-open" \
         else "filled at the order"
+    pre_note = " · no position was ever live" if pre else ""
     return (f"{icon} <b>{word} — {sym} (Precision OB Entry)</b>\n"
             f"Exit <b>{_fmt(ex['price'])}</b> on {_esc(ex['session'])} "
             f"({fill}) · net from A <b>{net_a:+.2f}%</b>"
             f"{b_note(trade, ex, cost)}\n"
-            f"held ≈{held} session(s) · {_esc(ex['reason'])}")
+            f"held ≈{held} session(s) · {_esc(ex['reason'])}{pre_note}")
 
 
 def late_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
@@ -783,16 +830,24 @@ def late_html(trade: dict, ex: dict, settings: RuleSettings) -> str:
     resolved. No plan, no action - the honest version of "you missed it"."""
     cost = settings.round_trip_cost_pct
     net_a = _net(trade.get("entry_a"), float(ex["price"]), cost)
+    late_s = trade.get('late_sessions', 0)
+    age_str = f"{late_s} session(s) old" if late_s else "today's OB candle"
+    pre = bool(ex.get("pre_confirmation") or (ex.get("session") and trade.get("born_session")
+               and ex["session"] < trade["born_session"]))
+    outcome_str = "BOOK RECORD" if pre else str(ex.get('outcome', '')).upper()
+    never_live = " (no position was ever live)" if pre else ""
+    trail_note = (".\nNo action — no position was ever live; recorded in the book for the audit trail."
+                  if pre else
+                  ".\nNo action — recorded in the book for the audit trail.")
     return (f"⏱ <b>MISSED — {_esc(trade['symbol'])} (Precision OB Entry)</b>\n"
-            f"The cycle's first post-breakout OB was born "
-            f"<b>{_esc(trade['born_session'])}</b> (OB candle "
-            f"{_esc(trade['origin_session'])}); this alert is "
-            f"{trade.get('late_sessions', 0)} session(s) late.\n"
-            f"The rule's own trade already resolved: "
-            f"<b>{ex['outcome'].upper()}</b> at {_fmt(ex['price'])} on "
+            f"OB candle <b>{_esc(trade['origin_session'])}</b> ({age_str}) · "
+            f"born <b>{_esc(trade['born_session'])}</b> (displacement bar) · "
+            f"first post-breakout OB of the cycle.\n"
+            f"The rule's own trade already resolved{never_live}: "
+            f"<b>{outcome_str}</b> at {_fmt(ex['price'])} on "
             f"{_esc(ex['session'])} — net from A {net_a:+.2f}%"
             + b_note(trade, ex, cost)
-            + ".\nNo action — recorded in the book for the audit trail.")
+            + trail_note)
 
 
 # --------------------------------------------------------------------------- #
@@ -874,6 +929,12 @@ def run_postclose(cfg, args, tg) -> int:
 
     msgs: list[str] = []
     seen_history: list[str] = []
+    events_total = 0
+    events_handled = 0
+    events_deferred = 0
+    events_stale_ob = 0
+    events_excluded = 0
+    events_alerted = 0
     for sym, rec in sorted(waiting.items()):
         # One name's bad record must cost itself its check, never the others.
         try:
@@ -886,28 +947,36 @@ def run_postclose(cfg, args, tg) -> int:
             first = first_ob_after_breakout(rec, ctx)
             if not first:
                 continue                        # no post-breakout OB yet
+            events_total += 1
             born, z = first
-            if _sent(own, f"rule|{sym}|{born}") or not settings.confirm_alerts:
+            key = f"rule|{sym}|{born}"
+            if _sent(own, key) or not settings.confirm_alerts:
                 # Already handled (the bar-derived key below is the one that
                 # actually gates the alert), or confirmation alerts are off.
                 if not settings.confirm_alerts:
-                    _mark(own, f"rule|{sym}|{born}")
+                    _mark(own, key)
+                events_handled += 1
                 continue
-            # Cheap gate before any market-data call: a birth this old cannot
-            # be inside the window, whatever the port says about it.
-            if weekday_sessions(as_date(born), as_date(today)) \
+            # Cheap gate before any market-data call: an OB candle this old
+            # cannot be inside the window, whatever the port says about it.
+            origin_hint = z.get("origin_session") or (z.get("detail") or {}).get("origin_session")
+            gate_session = origin_hint or born
+            if weekday_sessions(as_date(gate_session), as_date(today)) \
                     > settings.catchup_sessions + 1:
-                _mark(own, f"rule|{sym}|{born}")
-                seen_history.append(f"{sym}({born})")
+                _mark(own, key)
+                seen_history.append(f"{sym}({gate_session})")
+                events_stale_ob += 1
                 continue
             if client is None:
                 log.warning("%s: no market data - rule event %s deferred "
                             "(retried next run)", sym, born)
+                events_deferred += 1
                 continue                        # NOT marked: retry next run
             bars = fetch_bars(client, rec, settings)
             if not bars:
                 log.warning("%s: no daily bars - rule event %s deferred "
                             "(retried next run)", sym, born)
+                events_deferred += 1
                 continue
             # The state said where to look; the port says what the event is.
             bar_births = births_from_bars(bars, brk, params)
@@ -915,19 +984,29 @@ def run_postclose(cfg, args, tg) -> int:
                 born, z = bar_births[0]
             key = f"rule|{sym}|{born}"
             if _sent(own, key):
-                continue
-            late = weekday_sessions(as_date(born), as_date(today))
-            if late < 0 or late > settings.catchup_sessions:
-                _mark(own, key)                 # history: never replayed
-                seen_history.append(f"{sym}({born}, {late}s)")
+                events_handled += 1
                 continue
             rule = evaluate_rule(bars, brk, born, params)
             if not rule.ok:
                 _mark(own, key)
                 own["excluded"][f"{sym}|{born}"] = rule.reason
+                events_excluded += 1
                 log.info("%s: rule event %s excluded - %s", sym, born,
                          rule.reason)
                 continue
+
+            # Window = the OB candle's age, not the confirmation bar's
+            late = weekday_sessions(as_date(born), as_date(today))
+            ob_age = weekday_sessions(as_date(rule.origin_session), as_date(today))
+            if ob_age < 0 or ob_age > settings.catchup_sessions or late < 0 or late > settings.catchup_sessions:
+                _mark(own, key)                 # history: never replayed
+                events_stale_ob += 1
+                seen_history.append(f"{sym}({rule.origin_session}, {ob_age}s)")
+                log.info("%s: OB candle %s is %d session(s) old (> %d) — "
+                         "stale OB candle, suppressed",
+                         sym, rule.origin_session, ob_age, settings.catchup_sessions)
+                continue
+
             cap, rpct = args.capital, args.risk_pct
             plan = TradePlan(sym, entry_a=float(rule.entry_a),
                              entry_b=float(rule.entry_b) if rule.entry_b else None,
@@ -964,6 +1043,7 @@ def run_postclose(cfg, args, tg) -> int:
                     detail += f" · displacement rvol {_fmt(rvol)}"
                 msgs.append(plan_html(plan, detail))
                 own["open"].append(trade)
+            events_alerted += 1
             _mark(own, key)
         except Exception as exc:                # noqa: BLE001 - degrade
             log.warning("rule check failed for %s: %s", sym, exc)
@@ -975,6 +1055,12 @@ def run_postclose(cfg, args, tg) -> int:
                  "seen (first-run safety): %s%s", len(seen_history),
                  settings.catchup_sessions, ", ".join(seen_history[:8]),
                  " ..." if len(seen_history) > 8 else "")
+
+    summary = (f"events: {events_total} total ({events_handled} already handled, "
+               f"{events_deferred} deferred, {events_stale_ob} stale OB candle, "
+               f"{events_excluded} excluded, {events_alerted} alerted)")
+    log.info("postclose done: %d alert(s), %d open trade(s) — %s",
+             len(msgs), len(own["open"]), summary)
 
     # ---- exits -------------------------------------------------------------
     still_open = []
@@ -1346,14 +1432,16 @@ def run_explain(cfg, args, tg) -> int:
               f"{_rr_txt(rule.target, rule.entry_a, rule.stop)}")
         res = walk_bars({"entry": rule.entry_a, "stop": rule.stop,
                          "target": rule.target,
-                         "entry_session": rule.origin_session},
+                         "entry_session": rule.origin_session,
+                         "born_session": rule.born_session},
                         bars, through=ctx.get("as_of"),
                         time_stop_sessions=settings.time_stop_sessions)
         print(f"  status: {res if res else 'open - neither order filled yet'}")
         if rule.entry_b:
             b_res = walk_bars({"entry": rule.entry_b, "stop": rule.stop,
                                "target": rule.target,
-                               "entry_session": rule.born_session},
+                               "entry_session": rule.born_session,
+                               "born_session": rule.born_session},
                               bars, through=ctx.get("as_of"),
                               time_stop_sessions=settings.time_stop_sessions)
             print(f"  status B (entered at the {rule.born_session} close): "
