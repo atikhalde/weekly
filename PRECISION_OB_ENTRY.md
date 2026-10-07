@@ -82,9 +82,15 @@ displacement comes.
 
 ## 4. Alert behaviour you can rely on
 
-- **First-run safety.** A rule event older than `catchup_sessions` (default 3)
-  is marked seen silently. Deploying the job cannot dump weeks of history into
-  the chat.
+- **First-run safety & OB candle window.** A rule event whose OB candle is older
+  than `catchup_sessions` (default 3) is marked seen silently. The window is
+  measured by the OB candle's age, not the confirmation bar's, suppressing stale
+  OB candles.
+- **Pre-confirmation resolutions are book records.** If a trade hits stop or target
+  before the confirmation bar confirmed the zone, no position was ever live; it is
+  recorded in the book for the audit trail, never reported as an active stop-out.
+- **Position size is capped by capital.** Share count is capped by account capital
+  (`floor(capital / entry)`), so tight stop gaps cannot risk-size beyond the account.
 - **The event is recomputed, not inherited.** The committed state is a
   trigger, not the truth: its zone lists are pruned, and a cycle whose first
   OB has since died would otherwise look like it starts at a *later* order
@@ -280,3 +286,18 @@ from the report on faith.
    `--universe` (today's `universe.csv`) is **survivorship-biased** — the live
    option, off by default precisely because 2021-era delistings are missing
    from it.
+5. **Window, pre-confirmation resolutions, and size capping audit.**
+   - **Window = OB candle's age:** PARAGMILK (born 10-06, OB candle 10-01) and
+     STLTECH (born 10-05, same candle) are suppressed, logged, and counted as
+     stale OB candles. Gap distribution measured over 2,293 backtested events:
+     1 bar 60.4%, 2 bars 26.7%, 3 bars 9.6%, 4+ bars 3.3%.
+   - **Pre-confirmation resolution:** A resolution before the confirmation bar
+     is a book record, never an active stop-out; both the exit report and the
+     MISSED notice state "no position was ever live".
+   - **Size capped by capital:** The 0.076% stop gap was risk-sizing 4,999
+     shares ≈ ₹13.2 lakh on a ₹1 lakh account; now capped to 378 shares with the
+     reason printed.
+   - **Quiet run breakdown:** The postclose log explains quiet runs with an
+     events breakdown: `events: 208 total (206 already handled, 2 deferred, ...)`.
+   - **Message structure:** Messages lead with the OB candle and its age; `explain`
+     prints B's own status alongside A.

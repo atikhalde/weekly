@@ -377,11 +377,12 @@ class PrecisionOBEntry:
     # trip (the cost every number in the report is net of).
     time_stop_sessions: int = 90
     round_trip_cost_pct: float = 0.22
-    # A rule event is alertable for this many sessions. GitHub's cron skips
-    # slots (BUG 55) and entry A's price is history either way; a late alert
-    # walks the bars first and reports "already resolved" instead of quoting a
-    # plan nobody can take. Events older than this are marked seen silently,
-    # so deploying the job never replays history into the chat.
+    # A rule event is alertable for this many sessions (measured by the OB
+    # candle's age, not the confirmation bar's). GitHub's cron skips slots
+    # (BUG 55) and entry A's price is history either way; a late alert walks
+    # the bars first and reports "already resolved" instead of quoting a plan
+    # nobody can take. Events older than this are marked seen silently, so
+    # deploying the job never replays history into the chat.
     catchup_sessions: int = 3
     # postclose ~16:05 IST: the rule event + the complete plan + exit tracking.
     confirm_alerts: bool = True

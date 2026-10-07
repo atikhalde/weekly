@@ -1085,3 +1085,176 @@ def test_backtest_rows_are_quoted_verbatim():
         assert token in STATS_A
     for token in ("6,624", "83%", "+1.32%", "+0.60R"):
         assert token in STATS_B
+
+
+# --------------------------------------------------------------------------- #
+#  Window, pre-confirmation resolution, size capping, quiet run audit tests
+# --------------------------------------------------------------------------- #
+def test_window_is_ob_candle_age_suppresses_stale_candle(tmp_path, monkeypatch):
+    """Window = the OB candle's age, not the confirmation bar's: a zone born
+    yesterday whose OB candle was 4 sessions ago (> catchup_sessions 3) is
+    suppressed as stale, not alerted."""
+    bars = cycle_bars()
+    st = state(events=[ob_event(born="2026-10-06", origin="2026-10-01")],
+               as_of="2026-10-06", as_of_high=119.0, as_of_low=111.0, as_of_close=118.0)
+    rc, tg, saved = run_pc(tmp_path, monkeypatch, st, bars=bars, today="2026-10-07")
+    assert rc == 0 and tg.sent == []
+    assert "rule|TEST|2026-10-06" in saved["sent"]
+
+
+def test_stale_ob_candle_counted_in_postclose_summary(tmp_path, monkeypatch, caplog):
+    """A stale OB candle is counted under 'stale OB candle' in the run summary."""
+    import logging
+    # cycle_bars has origin OB_CANDLE = "2026-09-30" and born BORN = "2026-10-01".
+    # As of today = "2026-10-08", OB_CANDLE is 6 sessions old (> 3).
+    st = state(events=[ob_event(born=BORN, origin=OB_CANDLE)],
+               as_of=BORN, as_of_high=119.0, as_of_low=111.0, as_of_close=118.0)
+    with caplog.at_level(logging.INFO):
+        rc, tg, _saved = run_pc(tmp_path, monkeypatch, st, bars=cycle_bars(), today="2026-10-08")
+    assert rc == 0 and tg.sent == []
+    assert "1 stale OB candle" in caplog.text
+
+
+def test_cheap_gate_skips_stale_ob_candle_before_data_fetch(tmp_path, monkeypatch):
+    """The cheap gate checks origin_session if present, skipping data fetch for very old candles."""
+    st = state(events=[ob_event(born="2026-09-20", origin="2026-09-15")],
+               as_of="2026-09-20", as_of_high=119.0, as_of_low=111.0, as_of_close=118.0)
+    rc, tg, saved = run_pc(tmp_path, monkeypatch, st, today="2026-10-07")
+    assert rc == 0 and tg.sent == []
+    assert "rule|TEST|2026-09-20" in saved["sent"]
+
+
+def test_walk_bars_flags_pre_confirmation_resolution():
+    """A stop or target hit before the confirmation bar is flagged pre_confirmation."""
+    t = trade(born_session="2026-10-06", origin_session="2026-10-01", entry_session="2026-10-01")
+    t["stop"] = 263.80
+    t["target"] = 280.00
+    t["entry"] = 264.00
+    bars = [
+        bar("2026-10-01", 263.0, 265.0, 262.5, 264.0),
+        bar("2026-10-02", 264.0, 266.0, 263.9, 265.0),
+        bar("2026-10-05", 265.0, 265.5, 262.0, 263.5),
+        bar("2026-10-06", 263.5, 270.0, 263.0, 269.0),
+    ]
+    res = pye.walk_bars(t, bars, through="2026-10-06", time_stop_sessions=90)
+    assert res is not None
+    assert res["session"] == "2026-10-05"
+    assert res.get("pre_confirmation") is True
+    assert res.get("never_live") is True
+
+
+def test_pre_confirmation_resolution_in_exit_html_is_book_record():
+    """A resolution before the confirmation bar is reported as BOOK RECORD with 'no position was ever live'."""
+    t = trade(born_session="2026-10-06", origin_session="2026-10-01")
+    ex = {"outcome": "loss", "session": "2026-10-05", "price": 263.80, "fill": "order",
+          "reason": "26W level stop filled", "pre_confirmation": True}
+    html = pye.exit_html(t, ex, RuleSettings())
+    assert "BOOK RECORD" in html
+    assert "STOPPED OUT" not in html
+    assert "no position was ever live" in html
+
+
+def test_pre_confirmation_resolution_in_missed_notice():
+    """A missed notice for a pre-confirmation resolution states 'no position was ever live'."""
+    t = trade(born_session="2026-10-06", origin_session="2026-10-01")
+    ex = {"outcome": "loss", "session": "2026-10-05", "price": 263.80, "fill": "order",
+          "reason": "26W level stop filled", "pre_confirmation": True}
+    html = pye.late_html(t, ex, RuleSettings())
+    assert "MISSED" in html
+    assert "BOOK RECORD" in html
+    assert "no position was ever live" in html
+
+
+def test_position_size_capped_by_capital():
+    """Tight stop gap (e.g. 0.076%) risk-sizes 4,999 shares but is capped by capital to 378 shares."""
+    p = pye.TradePlan(
+        symbol="TEST",
+        entry_a=264.0,
+        entry_b=None,
+        stop=263.80,
+        target=280.0,
+        breakout_session="2026-09-10",
+        born_session="2026-10-06",
+        origin_session="2026-10-01",
+        capital=100000.0,
+        risk_pct=1.0,
+    )
+    assert p.risk_qty == 5000
+    assert p.cap_qty == 378
+    assert p.is_capped is True
+    assert p.qty == 378
+    assert p.value <= 100000.0
+
+
+def test_plan_html_prints_size_capped_reason():
+    """plan_html prints '(capped by capital...' when size is capped."""
+    p = pye.TradePlan(
+        symbol="TEST",
+        entry_a=264.0,
+        entry_b=None,
+        stop=263.80,
+        target=280.0,
+        breakout_session="2026-09-10",
+        born_session="2026-10-06",
+        origin_session="2026-10-01",
+        capital=100000.0,
+        risk_pct=1.0,
+    )
+    html = pye.plan_html(p)
+    assert "capped by capital" in html
+    assert "378 shares" in html
+
+
+def test_messages_lead_with_ob_candle_and_age():
+    """Messages lead with the OB candle and its age."""
+    p = plan(late_sessions=2)
+    html = pye.plan_html(p)
+    lines = html.splitlines()
+    assert "OB candle" in lines[1]
+    assert "2 session(s) old" in lines[1]
+    assert "displacement bar" in lines[1]
+
+    t = trade(born_session=BORN, origin_session=OB_CANDLE, late_sessions=1)
+    ex = {"outcome": "win", "session": BORN, "price": 120.0, "fill": "order",
+          "reason": "swing-high target filled"}
+    m_html = pye.late_html(t, ex, RuleSettings())
+    assert f"OB candle <b>{OB_CANDLE}</b> (1 session(s) old)" in m_html
+
+
+def test_quiet_run_summary_breakdown(tmp_path, monkeypatch, caplog):
+    """A quiet run logs why: events breakdown with total, handled, deferred, etc."""
+    import logging
+    st = state(events=[ob_event(born="2026-09-10")], as_of=BORN)
+    with caplog.at_level(logging.INFO):
+        rc, tg, _saved = run_pc(tmp_path, monkeypatch, st, today=BORN)
+    assert rc == 0
+    assert "events: 1 total" in caplog.text
+    assert "already handled" in caplog.text
+
+
+def test_paragmilk_and_stltech_shapes_end_to_end(tmp_path, monkeypatch):
+    """End-to-end audit: PARAGMILK and STLTECH shapes with older OB candles are suppressed;
+    pre-confirmation stops are treated as book records stating 'no position was ever live'."""
+    st_stl = state(sym="STLTECH", events=[ob_event(born="2026-10-05", origin="2026-10-01")],
+                   as_of="2026-10-05", as_of_high=1003.0, as_of_low=932.0, as_of_close=1001.0)
+    rc, tg, saved = run_pc(tmp_path, monkeypatch, st_stl, bars=cycle_bars(), today="2026-10-07")
+    assert rc == 0 and tg.sent == []
+    assert "rule|STLTECH|2026-10-05" in saved["sent"]
+
+    t = {"id": "PARAGMILK-OBE-2026-10-06", "symbol": "PARAGMILK", "strategy": "precision_ob_entry",
+         "entry": 264.0, "entry_a": 264.0, "stop": 263.80, "target": 286.0,
+         "born_session": "2026-10-06", "origin_session": "2026-10-01",
+         "entry_session": "2026-10-01", "sessions_held": 0, "late_sessions": 1}
+    p_bars = [
+        bar("2026-10-01", 263.0, 265.0, 262.5, 264.0),
+        bar("2026-10-02", 264.0, 266.0, 263.9, 265.0),
+        bar("2026-10-05", 265.0, 265.5, 262.0, 263.5),
+        bar("2026-10-06", 263.5, 270.0, 263.0, 269.0),
+    ]
+    ex = pye.walk_bars(t, p_bars, through="2026-10-06", time_stop_sessions=90)
+    assert ex is not None
+    assert ex["session"] == "2026-10-05"
+    assert ex.get("pre_confirmation") is True
+    exit_msg = pye.exit_html(t, ex, RuleSettings())
+    assert "BOOK RECORD" in exit_msg
+    assert "no position was ever live" in exit_msg

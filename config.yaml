@@ -324,11 +324,11 @@ precision_ob_entry:
   # The rule as backtested.
   time_stop_sessions: 90
   round_trip_cost_pct: 0.22
-  # How many sessions late a rule event may still be alerted. GitHub cron
-  # skips slots (BUG 55); a late alert walks the bars first and reports
-  # "already resolved" rather than quoting a plan nobody can take. Anything
-  # older is marked seen silently, so deploying this job cannot replay history
-  # into the chat.
+  # How many sessions late a rule event may still be alerted (measured by the
+  # OB candle's age, not the confirmation bar's). GitHub cron skips slots
+  # (BUG 55); a late alert walks the bars first and reports "already resolved"
+  # rather than quoting a plan nobody can take. Anything older is marked seen
+  # silently, so deploying this job cannot replay history into the chat.
   catchup_sessions: 3
   # postclose ~16:05 IST: the confirmed rule event, the complete plan (both
   # entries, stop, target, size, time stop) and exit tracking on the book.
