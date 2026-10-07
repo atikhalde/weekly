@@ -86,11 +86,12 @@ jobs:
       - run: pip install -r requirements.txt
 
       # The plan carries live price levels to a real chat: a wrong number is
-      # worse than no alert. Pure CPU, runs before anything else.
+      # worse than no alert. Pure CPU, runs before anything else. The backtest
+      # test rides along because it guards the same functions the job calls.
       - name: Verify the rule logic
         run: |
           pip install "pytest>=8.0,<9.0"
-          python -m pytest test_precision_ob_entry.py -q
+          python -m pytest test_precision_ob_entry.py test_precision_ob_backtest.py -q
 
       - name: Run the precision OB entry alert
         env:

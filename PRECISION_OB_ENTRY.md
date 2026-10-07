@@ -205,6 +205,12 @@ alert can be explained rather than guessed at.
 - The 26W level used as a stop is **close-based** in the live scanner's zone
   invalidation and order-based here (any low at/below the level stops the
   trade), exactly as the backtest states.
+- The backtested sample is a **superset of the live feed**: the waiting list
+  carries the stage-2 weekly momentum gates, so a name can fail those and never
+  alert even though the replay would have counted its trade.
+- The replay's default universe is every symbol in the eod2 set — not today's
+  `universe.csv`, which is survivorship-biased and available only through
+  `--universe` for comparison.
 
 ## 8. Verification
 
@@ -226,3 +232,51 @@ edit that drifts from the backtest fails the suite:
 - the intraday forming path: the OB candle resolved with `find_origin`, and
   the four reasons it stays silent (level, pre-breakout origin, cycle already
   has its OB, stale/holiday quote).
+
+## 9. The audit — every clause of the description, and what it found
+
+The description was checked clause by clause against the shipped code, the
+reproduced backtest and the live scanner's own state. Nothing below is taken
+from the report on faith.
+
+| clause of the description | where it lives | how it was verified |
+|---|---|---|
+| event = the **first** precision OB born after the 26W breakout, per breakout cycle | `births_from_bars()` + `first_ob_after_breakout()` | 7,430 first post-breakout OBs replayed (report 7,357); 177/206 waiting-list names birth on the *same session* as the scanner's own earliest zone (§5c) |
+| zones are the **live** `ob_precision` port with `config.yaml` defaults — not a re-derived rule | `cfg.ob_precision.params()` → `ob_precision.replay()` | the job passes the config's own object; `test_precision_ob_entry.py` fails if the params or the rule call change |
+| the live scanner's `first_zone_after_breakout` semantics | `first_ob_after_breakout()` (state path), `births_from_bars()` (bar path) | `--check-live` in the backtest agrees with `ob_tap_scan.derive_26w_breakout` on the loaded data; the state comparison explains all 29 disagreements (§5c) |
+| exclusion: OB candle **predates** the breakout (the SMSPHARMA shape) | `evaluate_rule()` row 1, `find_origin()` re-resolves the candle | 3,527 excluded (report 3,450); a test is named for the shape |
+| exclusion: OB close back **below** the 26W level | `evaluate_rule()` row 2 (`origin.close <= level`) | 1,613 excluded (report 1,629) |
+| entry = the OB candle's **close** (entry A) | `Rule.entry_a = origin.close` | test: entry equals the OB candle close on a synthetic cycle |
+| target = the highest high **between the breakout and the entry session**, sell limit | `Rule.target = max(high[session ∈ [breakout, origin]])` | target window excludes the displacement bar; test pins it |
+| stop = the **26W breakout level**, order-based | `Rule.stop = brk["level"]`; `resolve_bar()` | any low at/below the level stops; test pins the level |
+| time stop = **90 trading sessions** | `RuleSettings.time_stop_sessions = 90` | bar walks count real sessions; test walks 90 |
+| fills are **gap-aware** (through the target at the open, better; through the stop, worse; both touched = conservative loss) | `resolve_bar()` | all four branches tested, including a gapped exit |
+| **entry B is reported beside A** and is the tradable version | `plan_html()`, `exit_html()`, `late_html()`, workflow comment | **audit finding #1 below** — the exit report reused A's price for B; fixed |
+| **round-trip cost 0.22%** | `RuleSettings.round_trip_cost_pct` | every net number in every message subtracts it |
+| alerts only, no orders; the scanner's state is never written | no `DhanClient` order call exists in the module; `STATE_IN` read-only | read-only contract test (`test_bug78`'s lesson: code markers, not docstring words) |
+
+**Audit findings.**
+
+1. **Entry B's exit number was wrong in one case — fixed (84a6b82).** The exit
+   report computed B's net from A's exit price. That is only right when B
+   entered *before* that exit: B buys the displacement bar's close, so when the
+   rule resolves on the very bar that created the order block (the MANINDS
+   shape, and the backtest's median win), B has not held a single session and
+   was credited with A's result. B is now walked over its own sessions and
+   reported as still open while it is (§3 bullet, `b_walk()`).
+2. **The report's cycle total (10,748) is the one acceptance number that could
+   not be reproduced** — best effort 9,271 over a 2,945-symbol universe, with
+   every row downstream of it inside ~2% (§5b). The gap is cycles that never
+   produce an order block; it is a bookkeeping difference, not a rule one, and
+   is recorded rather than hidden.
+3. **The state's zone list is lossy by design**, so 28 of the 29 names whose
+   first OB differs from the scanner's are the *state* having dropped an
+   earlier zone, not the rule disagreeing (§5c). The bar-derived event is
+   therefore the source of truth in the job, as the description requires.
+4. **Two sample caveats are documented, not corrected for.** The backtest
+   replays every symbol in the eod2 set (the description's data), which is a
+   **superset** of the live feed: the waiting list carries the stage-2 weekly
+   momentum gates, so live alerts are a subset of the backtested sample. And
+   `--universe` (today's `universe.csv`) is **survivorship-biased** — the live
+   option, off by default precisely because 2021-era delistings are missing
+   from it.
