@@ -2723,6 +2723,13 @@
       "session": "2026-08-26",
       "tap_number": null
     },
+    "OMAXE|2026-08-26|101.70|97.86|tap|tap1": {
+      "kind": "tap",
+      "price": 103.05,
+      "sent_at": "2026-10-08T10:45:30+05:30",
+      "session": "2026-10-08",
+      "tap_number": 1
+    },
     "OMAXE|2026-08-28|101.69999694824219|97.86000061035156|ob": {
       "kind": "ob",
       "price": null,
@@ -4431,7 +4438,7 @@
     "post_close": "2026-10-07"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-08T09:15:40+05:30",
+  "updated_at": "2026-10-08T10:45:30+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7638,10 +7645,10 @@
       "breakout_price": 108.62999725341797,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-08",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "14853",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "OMAXE",
       "week": "2026-08-24"
     },
