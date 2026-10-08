@@ -32,10 +32,46 @@
    "strategy": "precision_ob_entry",
    "symbol": "PARAGMILK",
    "target": 286.20001220703125
+  },
+  {
+   "born_session": "2026-10-06",
+   "breakout_session": "2026-08-17",
+   "entry": 2241.89990234375,
+   "entry_a": 2241.89990234375,
+   "entry_b": 2371.800048828125,
+   "entry_session": "2026-10-05",
+   "exit": {
+    "b": {
+     "fill": "gap-open",
+     "outcome": "win",
+     "price": 2378.0,
+     "reason": "target gapped through - filled at the open (better than the limit)",
+     "session": "2026-10-07",
+     "sessions": 1
+    },
+    "fill": "order",
+    "outcome": "win",
+    "price": 2348.800048828125,
+    "reason": "swing-high target filled (the alert ran late)",
+    "session": "2026-10-06",
+    "sessions": 1
+   },
+   "id": "EIMCOELECO-OBE-2026-10-06",
+   "last_checked": "2026-10-05",
+   "late_sessions": 2,
+   "origin_session": "2026-10-05",
+   "sessions_held": 0,
+   "stop": 2019.9000244140625,
+   "strategy": "precision_ob_entry",
+   "symbol": "EIMCOELECO",
+   "target": 2348.800048828125
   }
  ],
- "excluded": {},
- "last_run": "intraday 2026-10-08T15:15:28+05:30",
+ "excluded": {
+  "ARFIN|2026-04-13": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
+  "KOTAKBANK|2026-10-07": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
+ },
+ "last_run": "postclose 2026-10-08T15:30:36+05:30",
  "open": [],
  "sent": {
   "rule|AARTIIND|2026-06-15": "2026-10-07T15:54:49+05:30",
@@ -51,6 +87,7 @@
   "rule|ANANDRATHI|2026-06-29": "2026-10-07T15:54:49+05:30",
   "rule|ANTELOPUS|2026-09-02": "2026-10-07T15:54:49+05:30",
   "rule|APARINDS|2026-05-27": "2026-10-07T15:54:49+05:30",
+  "rule|ARFIN|2026-04-13": "2026-10-08T15:30:36+05:30",
   "rule|ARTEMISMED|2026-07-29": "2026-10-07T15:54:49+05:30",
   "rule|ASIANENE|2026-08-17": "2026-10-07T15:54:49+05:30",
   "rule|AUBANK|2026-06-12": "2026-10-07T15:54:49+05:30",
@@ -90,6 +127,7 @@
   "rule|DYCL|2026-06-18": "2026-10-07T15:54:49+05:30",
   "rule|E2E|2026-05-11": "2026-10-07T15:54:49+05:30",
   "rule|EBGNG|2026-06-19": "2026-10-07T15:54:49+05:30",
+  "rule|EIMCOELECO|2026-10-06": "2026-10-08T15:30:36+05:30",
   "rule|EMIL|2026-07-02": "2026-10-07T15:54:49+05:30",
   "rule|ENGINERSIN|2026-08-05": "2026-10-07T15:54:49+05:30",
   "rule|ENTERO|2026-08-11": "2026-10-07T15:54:49+05:30",
@@ -124,6 +162,7 @@
   "rule|KINGFA|2026-08-07": "2026-10-07T15:54:49+05:30",
   "rule|KMEW|2026-06-22": "2026-10-07T15:54:49+05:30",
   "rule|KOPRAN|2026-05-25": "2026-10-07T15:54:49+05:30",
+  "rule|KOTAKBANK|2026-10-07": "2026-10-08T15:30:36+05:30",
   "rule|KROSS|2026-09-21": "2026-10-07T15:54:49+05:30",
   "rule|KSL|2026-08-26": "2026-10-07T15:54:49+05:30",
   "rule|KTKBANK|2026-07-30": "2026-10-07T15:54:49+05:30",
