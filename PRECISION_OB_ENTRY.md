@@ -86,6 +86,15 @@ displacement comes.
   than `catchup_sessions` (default 3) is marked seen silently. The window is
   measured by the OB candle's age, not the confirmation bar's, suppressing stale
   OB candles.
+- **Ages are measured against a session that has actually closed.** The
+  postclose pass takes its date from `session_date()` — the last *completed*
+  session — never from `datetime.now(IST).date()`. The pass runs from 15:30 IST
+  until 05:29 IST, so after midnight the wall clock names a session that has not
+  happened yet; every age in the window used to be inflated by one, and an event
+  sitting exactly on the boundary at 23:45 IST was suppressed — and marked seen
+  forever — from 00:00. EIMCOELECO alerted on 08-Oct with `ob_age` exactly equal
+  to `catchup_sessions`; one phantom session and it would never have alerted at
+  all.
 - **Pre-confirmation resolutions are book records.** If a trade hits stop or target
   before the confirmation bar confirmed the zone, no position was ever live; it is
   recorded in the book for the audit trail, never reported as an active stop-out.
@@ -122,6 +131,21 @@ authoritative one. The workflow also accepts a `repository_dispatch` of type
 `precision_ob_entry`, so a cron-job.org ping at **15:12 IST** makes the slot as
 reliable as `scan.yml` and `btst.yml` (`CRON_JOBS.md`).
 
+**Which pass a run takes** is resolved in the workflow, in this order: an
+explicit `mode` input wins; a *scheduled* run uses the cron expression that
+fired it (`github.event.schedule`), so a late slot still runs the pass it was
+scheduled for; anything else goes by the **IST clock** — intraday between 09:15
+and 15:30 IST, postclose outside it. Two things this replaced:
+
+- Inferring the pass from the **current UTC hour** meant a delayed cron crossed
+  the 10:00Z boundary and ran the wrong pass. All three scheduled runs of this
+  workflow fired ~7 hours late (16:56Z, 17:32Z, 17:35Z), so the intraday slot
+  **never once ran as intraday**.
+- A 15-minute dispatcher therefore ran the intraday pass from 05:30 IST,
+  spending a bulk quote on a closed market every slot. It now runs postclose
+  outside market hours, and a *derived* intraday slot that lands after the bell
+  falls back to postclose rather than quoting a bar nobody can trade.
+
 ## 5. Cost shape
 
 | pass | market-data calls |
@@ -132,6 +156,22 @@ reliable as `scan.yml` and `btst.yml` (`CRON_JOBS.md`).
 The 5-minute `ob_tap_scan.py` remains the only heavy consumer. `--no-data`
 defers rule events instead of evaluating them (they are retried next run, never
 marked seen).
+
+A settled cycle is short-circuited on a **cycle index** (`cycles` in the job's
+own state), keyed `SYMBOL|breakout-session`. The rule yields exactly one event
+per cycle, but the dedupe key is `rule|SYM|BORN` and `born` is re-derived from
+the bars *after* the early gate has run — so a name whose state birth and bar
+birth disagree (ARFIN: 2026-10-06 in the state, 2026-04-13 in its bars) never
+matched and paid a full 560-day fetch on **every** run, ~210 a day at the live
+cadence, to rediscover that its cycle was settled. The index is recorded on the
+way past any marking, so an existing state heals itself on its first run.
+
+**A quiet run does not rewrite the state file.** `last_run` is session-scoped
+(`postclose 2026-10-08`) and the clock time lives in `last_run_at`, which the
+comparison ignores; the pass is skipped entirely when the book did not move.
+`last_run` used to carry a clock time and was written at the top of the pass, so
+every 15-minute run produced a commit — 145 commits in a day and a half for a
+job that sent two alerts.
 
 ## 5b. The backtest, reproduced
 
