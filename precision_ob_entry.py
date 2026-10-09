@@ -199,12 +199,87 @@ def sessions_between(bars: list, d0: date | None, d1: date | None) -> int:
     return sum(1 for b in bars if d0 < (as_date(b.session) or d0) <= d1)
 
 
+# NSE's close, as minutes since IST midnight. A session is only "completed"
+# once the clock passes this.
+CLOSE_IST_MIN = 15 * 60 + 30
+
+
+def session_date(now: datetime | None = None) -> date:
+    """The most recent COMPLETED session as of `now` (IST).
+
+    BUG (08-Oct-2026 audit): the postclose pass used `datetime.now(IST).date()`.
+    The workflow picks its pass from the UTC hour, so postclose runs from
+    15:30 IST until 05:29 IST - and from midnight onwards `now().date()` names
+    a session that HAS NOT HAPPENED YET. Every `weekday_sessions(..., today)`
+    in the catch-up window counted that phantom session, inflating the OB
+    candle's age and the event's lateness by one. An event sitting exactly on
+    the window boundary at 23:45 IST was silently suppressed - and marked seen
+    forever - from 00:00, so roughly 22 overnight runs a night could kill an
+    alert the next 16:10 slot would have sent. EIMCOELECO passed at ob_age
+    exactly == catchup_sessions; one session of phantom inflation and it would
+    never have alerted at all.
+
+    Weekends roll back to Friday. NSE holidays are not modelled, exactly as in
+    `weekday_sessions` - a holiday makes this one session optimistic, which is
+    the same drift the rest of the window already carries.
+    """
+    now = now or datetime.now(IST)
+    d = now.date()
+    if now.hour * 60 + now.minute < CLOSE_IST_MIN:
+        d -= timedelta(days=1)          # today's session is not complete yet
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
 def _sent(st: dict, key: str) -> bool:
     return key in st.setdefault("sent", {})
 
 
 def _mark(st: dict, key: str) -> None:
     st["sent"][key] = datetime.now(IST).isoformat(timespec="seconds")
+
+
+def _cycle_key(sym: str, brk: dict) -> str:
+    """The rule yields exactly ONE event per breakout cycle - the FIRST
+    precision OB born on/after the cross - so the cycle is the stable identity
+    of that event."""
+    return f"{sym}|{str(brk.get('session'))[:10]}"
+
+
+def _cycle_handled(st: dict, ckey: str) -> bool:
+    """True when this cycle's event was already resolved on an earlier run.
+
+    BUG (08-Oct-2026 audit): the dedupe key is `rule|SYM|BORN`, but `born` is
+    re-derived from freshly fetched bars after the early `_sent()` gate has
+    already run. When the state's birth and the bars' birth disagree - ARFIN
+    said 2026-10-06, its bars said 2026-04-13 - the early gate never matched,
+    so the symbol fell through to a full 560-day daily-history fetch on EVERY
+    run and was only short-circuited afterwards. At the live 15-minute cadence
+    that is ~210 wasted history requests a day on one already-excluded name,
+    and it contradicts the documented cost shape ("NO market-data call unless a
+    rule event fires"). Recording the cycle beside the key closes the gap
+    without touching the key format, so no existing marker is invalidated.
+    """
+    marked = (st.get("cycles") or {}).get(ckey)
+    return bool(marked) and marked in st.get("sent", {})
+
+
+def _mark_cycle(st: dict, ckey: str, key: str) -> None:
+    st.setdefault("cycles", {})[ckey] = key
+
+
+# `last_run` carries a clock time, so it differs on every run and would force a
+# commit even when nothing happened. It is the one field excluded from the
+# quiet-run comparison; `last_run` itself is session-scoped so it still records
+# which pass covered which session.
+_VOLATILE = ("last_run_at",)
+
+
+def _book_changed(before: dict, after: dict) -> bool:
+    def _stable(st: dict) -> dict:
+        return {k: v for k, v in (st or {}).items() if k not in _VOLATILE}
+    return _stable(before) != _stable(after)
 
 
 def _send_alerts(tg, messages: list[str]) -> bool:
@@ -898,16 +973,21 @@ def new_trade(sym: str, rule: Rule, late: int) -> dict:
 #  Modes
 # --------------------------------------------------------------------------- #
 def run_postclose(cfg, args, tg) -> int:
-    today = args.today or datetime.now(IST).date().isoformat()
+    # The session the rule is evaluated AGAINST: the last COMPLETED one, never
+    # the phantom date `now().date()` becomes after midnight IST (session_date).
+    today = args.today or session_date().isoformat()
     settings = rule_settings(cfg)
     params = cfg.ob_precision.params()
     st_in = load_json(STATE_IN)
     own = load_json(STATE_OWN)
+    # Kept so a quiet run can tell whether the book actually moved, and skip
+    # rewriting the file when it did not (see _book_changed).
+    on_disk = json.loads(json.dumps(own))
     own.setdefault("sent", {})
     own.setdefault("open", [])
     own.setdefault("closed", [])
     own.setdefault("excluded", {})
-    own["last_run"] = f"postclose {datetime.now(IST).isoformat(timespec='seconds')}"
+    own.setdefault("cycles", {})
 
     client = None
     if not args.no_data:
@@ -950,11 +1030,17 @@ def run_postclose(cfg, args, tg) -> int:
             events_total += 1
             born, z = first
             key = f"rule|{sym}|{born}"
-            if _sent(own, key) or not settings.confirm_alerts:
-                # Already handled (the bar-derived key below is the one that
-                # actually gates the alert), or confirmation alerts are off.
+            ckey = _cycle_key(sym, brk)
+            if _sent(own, key) or _cycle_handled(own, ckey) \
+                    or not settings.confirm_alerts:
+                # Already handled. The cycle check is what catches a name whose
+                # state-derived birth disagrees with the bars' own (ARFIN): the
+                # key above would never match, and the symbol would otherwise
+                # pay a full daily-history fetch on every run to discover that
+                # its cycle was settled long ago.
                 if not settings.confirm_alerts:
                     _mark(own, key)
+                    _mark_cycle(own, ckey, key)
                 events_handled += 1
                 continue
             # Cheap gate before any market-data call: an OB candle this old
@@ -964,6 +1050,7 @@ def run_postclose(cfg, args, tg) -> int:
             if weekday_sessions(as_date(gate_session), as_date(today)) \
                     > settings.catchup_sessions + 1:
                 _mark(own, key)
+                _mark_cycle(own, ckey, key)
                 seen_history.append(f"{sym}({gate_session})")
                 events_stale_ob += 1
                 continue
@@ -984,27 +1071,38 @@ def run_postclose(cfg, args, tg) -> int:
                 born, z = bar_births[0]
             key = f"rule|{sym}|{born}"
             if _sent(own, key):
+                # Heal the cycle index: a key marked before this job tracked
+                # cycles still settles the cycle, so record it and every later
+                # run short-circuits before paying for the fetch above.
+                _mark_cycle(own, ckey, key)
                 events_handled += 1
                 continue
             rule = evaluate_rule(bars, brk, born, params)
             if not rule.ok:
                 _mark(own, key)
+                _mark_cycle(own, ckey, key)
                 own["excluded"][f"{sym}|{born}"] = rule.reason
                 events_excluded += 1
                 log.info("%s: rule event %s excluded - %s", sym, born,
                          rule.reason)
                 continue
 
-            # Window = the OB candle's age, not the confirmation bar's
+            # Window = the OB candle's age, not the confirmation bar's. Both
+            # are measured against the last COMPLETED session (`today` from
+            # session_date), never against a phantom date rolled over after
+            # midnight IST - which used to add a session to every age here and
+            # suppress events sitting on the boundary.
             late = weekday_sessions(as_date(born), as_date(today))
             ob_age = weekday_sessions(as_date(rule.origin_session), as_date(today))
             if ob_age < 0 or ob_age > settings.catchup_sessions or late < 0 or late > settings.catchup_sessions:
                 _mark(own, key)                 # history: never replayed
+                _mark_cycle(own, ckey, key)
                 events_stale_ob += 1
                 seen_history.append(f"{sym}({rule.origin_session}, {ob_age}s)")
-                log.info("%s: OB candle %s is %d session(s) old (> %d) — "
-                         "stale OB candle, suppressed",
-                         sym, rule.origin_session, ob_age, settings.catchup_sessions)
+                log.info("%s: OB candle %s is %d session(s) old as of %s "
+                         "(> %d) — stale OB candle, suppressed",
+                         sym, rule.origin_session, ob_age, today,
+                         settings.catchup_sessions)
                 continue
 
             cap, rpct = args.capital, args.risk_pct
@@ -1045,6 +1143,7 @@ def run_postclose(cfg, args, tg) -> int:
                 own["open"].append(trade)
             events_alerted += 1
             _mark(own, key)
+            _mark_cycle(own, ckey, key)
         except Exception as exc:                # noqa: BLE001 - degrade
             log.warning("rule check failed for %s: %s", sym, exc)
 
@@ -1093,6 +1192,16 @@ def run_postclose(cfg, args, tg) -> int:
         return 1
     if _dry_run(cfg, args, tg):
         log.info("postclose dry-run complete: state not saved")
+        return 0
+    # Session-scoped on purpose. This used to be written, with a clock time, at
+    # the TOP of the pass, so the file differed on every single run and the
+    # workflow committed it every 15 minutes - 145 commits in a day and a half
+    # for a job that sent two alerts. `last_run` now names the pass and the
+    # session; the clock time lives in a field the quiet-run test ignores.
+    own["last_run"] = f"postclose {today}"
+    own["last_run_at"] = datetime.now(IST).isoformat(timespec="seconds")
+    if not _book_changed(on_disk, own):
+        log.info("postclose quiet: the book did not move - state not rewritten")
         return 0
     log.info("postclose done: %d alert(s), %d open trade(s)",
              len(msgs), len(own["open"]))
@@ -1167,6 +1276,12 @@ def forming_origin(bars: list, q: dict, today: str, params):
 
 
 def run_intraday(cfg, args, tg) -> int:
+    # Here `today` is the LIVE, forming session - the wall-clock IST date is
+    # correct, and deliberately NOT session_date(): this pass exists to catch
+    # entry B before today's close, so it must name today. It is also
+    # self-protecting after midnight, because the `refreshed_on != today` gate
+    # below skips every symbol the scanner has not refreshed for a session that
+    # has not started yet.
     today = args.today or datetime.now(IST).date().isoformat()
     settings = rule_settings(cfg)
     params = cfg.ob_precision.params()
@@ -1176,7 +1291,9 @@ def run_intraday(cfg, args, tg) -> int:
         return 0
     st_in = load_json(STATE_IN)
     own = load_json(STATE_OWN)
+    on_disk = json.loads(json.dumps(own))
     own.setdefault("sent", {})
+    own.setdefault("cycles", {})
     try:
         client = DhanClient(cfg.secrets.dhan_client_id,
                             cfg.secrets.dhan_access_token,
@@ -1362,9 +1479,12 @@ def run_intraday(cfg, args, tg) -> int:
     if _dry_run(cfg, args, tg):
         log.info("intraday dry-run complete: state not saved")
         return 0
+    own["last_run"] = f"intraday {today}"
+    own["last_run_at"] = datetime.now(IST).isoformat(timespec="seconds")
+    if not _book_changed(on_disk, own):
+        log.info("intraday quiet: the book did not move - state not rewritten")
+        return 0
     log.info("intraday done: %d alert(s)", len(msgs))
-    own["last_run"] = \
-        f"intraday {datetime.now(IST).isoformat(timespec='seconds')}"
     save_state(own, STATE_OWN)
     return 0
 
@@ -1397,6 +1517,14 @@ def run_explain(cfg, args, tg) -> int:
         for key, sent_at in sorted(own.get("sent", {}).items()):
             if key.split("|")[1:2] == [sym]:
                 print(f"  alert key {key}: sent {sent_at}")
+        settled = (own.get("cycles") or {}).get(_cycle_key(sym, brk))
+        if settled:
+            # Without this line the cycle index is an invisible reason for a
+            # name to be skipped - and it short-circuits BEFORE the bars are
+            # fetched, so `explain` would otherwise print nothing about it.
+            print(f"  cycle {str(brk['session'])[:10]} already settled by "
+                  f"{settled} - the rule allows one event per cycle, so this "
+                  f"name costs no data call")
         births = ob_births(rec, ctx)
         if not births:
             print("  post-breakout OBs: none yet - the rule is still waiting")

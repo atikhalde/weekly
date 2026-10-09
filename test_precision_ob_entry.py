@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -1258,3 +1259,152 @@ def test_paragmilk_and_stltech_shapes_end_to_end(tmp_path, monkeypatch):
     exit_msg = pye.exit_html(t, ex, RuleSettings())
     assert "BOOK RECORD" in exit_msg
     assert "no position was ever live" in exit_msg
+
+
+# --------------------------------------------------------------------------- #
+#  08-Oct-2026 audit regressions
+#
+#  The job ran 150/150 green and delivered two messages, but both were "MISSED"
+#  notices and the book never held a live trade. Three of the reasons were bugs
+#  rather than the rule being strict, and each one is pinned here.
+# --------------------------------------------------------------------------- #
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def test_session_date_never_names_an_incomplete_session():
+    """`session_date` is the last COMPLETED session, not `now().date()`.
+
+    The workflow picks its pass from the clock, so postclose runs from 15:30 IST
+    until 05:29 IST. After midnight the old `datetime.now(IST).date()` named a
+    session that has not happened yet.
+    """
+    # The real slot, and the evening around it: unchanged by the fix.
+    assert pye.session_date(datetime(2026, 10, 8, 16, 10, tzinfo=IST)) == date(2026, 10, 8)
+    assert pye.session_date(datetime(2026, 10, 8, 23, 45, tzinfo=IST)) == date(2026, 10, 8)
+    # The overnight runs that used to name tomorrow.
+    assert pye.session_date(datetime(2026, 10, 9, 0, 0, tzinfo=IST)) == date(2026, 10, 8)
+    assert pye.session_date(datetime(2026, 10, 9, 3, 0, tzinfo=IST)) == date(2026, 10, 8)
+    assert pye.session_date(datetime(2026, 10, 9, 5, 29, tzinfo=IST)) == date(2026, 10, 8)
+    # Before the close, today's session is not complete either.
+    assert pye.session_date(datetime(2026, 10, 9, 11, 0, tzinfo=IST)) == date(2026, 10, 8)
+    assert pye.session_date(datetime(2026, 10, 9, 15, 29, tzinfo=IST)) == date(2026, 10, 8)
+    assert pye.session_date(datetime(2026, 10, 9, 15, 30, tzinfo=IST)) == date(2026, 10, 9)
+    # A weekend rolls back to Friday.
+    assert pye.session_date(datetime(2026, 10, 10, 18, 0, tzinfo=IST)) == date(2026, 10, 9)
+    assert pye.session_date(datetime(2026, 10, 11, 2, 0, tzinfo=IST)) == date(2026, 10, 9)
+
+
+def test_overnight_run_does_not_inflate_the_catchup_window():
+    """EIMCOELECO's real shape, and the alert that nearly did not happen.
+
+    OB candle 2026-10-05, born 2026-10-06, catchup_sessions 3. It alerted at
+    15:30 IST on 08-Oct with `ob_age` exactly == 3 - on the boundary. Every run
+    after midnight named 09-Oct, which made ob_age 4 and would have suppressed
+    the same event permanently, with no alert at all.
+    """
+    s = RuleSettings()
+    origin, born = date(2026, 10, 5), date(2026, 10, 6)
+    for hh, mm in [(15, 30), (20, 0), (23, 45)]:
+        today = pye.session_date(datetime(2026, 10, 8, hh, mm, tzinfo=IST))
+        assert pye.weekday_sessions(origin, today) <= s.catchup_sessions
+        assert pye.weekday_sessions(born, today) <= s.catchup_sessions
+    for hh, mm in [(0, 0), (3, 0), (5, 29)]:        # overnight on 09-Oct
+        today = pye.session_date(datetime(2026, 10, 9, hh, mm, tzinfo=IST))
+        assert today == date(2026, 10, 8)
+        assert pye.weekday_sessions(origin, today) <= s.catchup_sessions
+    # What the old wall-clock `today` computed at 00:00 IST on 09-Oct.
+    assert pye.weekday_sessions(origin, date(2026, 10, 9)) > s.catchup_sessions
+
+
+def test_postclose_evaluates_against_the_completed_session(tmp_path, monkeypatch,
+                                                           caplog):
+    """With no --today, the pass takes its session from session_date(), so an
+    overnight run evaluates against the same session as the 16:10 slot."""
+    import logging
+    monkeypatch.setattr(pye, "session_date", lambda now=None: date(2026, 10, 8))
+    st = state(events=[ob_event(born="2026-09-10")], as_of=BORN)
+    with caplog.at_level(logging.INFO):
+        rc, _tg, _saved = run_pc(tmp_path, monkeypatch, st)   # no today=
+    assert rc == 0
+    assert "postclose 2026-10-08:" in caplog.text
+
+
+def test_cycle_gate_avoids_refetching_a_settled_cycle(tmp_path, monkeypatch):
+    """ARFIN's shape: the state's first post-breakout birth is not the birth the
+    bars report, so `rule|SYM|BORN` never matched and the symbol paid a full
+    560-day daily-history fetch on EVERY run - ~210 a day at the live 15-minute
+    cadence - only to rediscover that its cycle had been settled long ago. With
+    the cycle on the index the run must short-circuit before any data call.
+    """
+    p_in = tmp_path / "ob_precision_state.json"
+    p_own = tmp_path / "precision_ob_entry_state.json"
+    st = state(events=[ob_event(born="2026-10-07", origin="2026-10-06")],
+               as_of="2026-10-07")
+    own = {"sent": {f"rule|TEST|{BREAKOUT}": "2026-10-07T15:54:49+05:30"},
+           "cycles": {f"TEST|{BREAKOUT}": f"rule|TEST|{BREAKOUT}"},
+           "open": [], "closed": [], "excluded": {}}
+    p_in.write_text(json.dumps(st))
+    p_own.write_text(json.dumps(own))
+    monkeypatch.setattr(pye, "STATE_IN", p_in)
+    monkeypatch.setattr(pye, "STATE_OWN", p_own)
+    monkeypatch.setattr(pye, "DhanClient", lambda *a, **k: object())
+    calls: list = []
+
+    def counting_fetch(*a, **k):
+        calls.append(1)
+        return cycle_bars()
+
+    monkeypatch.setattr(pye, "fetch_bars", counting_fetch)
+    tg = FakeTG()
+    rc = pye.run_postclose(fake_cfg(), Args(today="2026-10-08"), tg)
+    assert rc == 0 and tg.sent == []
+    assert calls == []                     # the point of the fix: no data call
+
+
+def test_cycle_index_is_recorded_when_an_event_is_marked(tmp_path, monkeypatch):
+    """The index is what makes that fix self-healing: a key marked by an older
+    build still settles its cycle, so it is recorded on the way past and the
+    next run is cheap."""
+    st = state(events=[ob_event(born="2026-09-10")])
+    rc, tg, saved = run_pc(tmp_path, monkeypatch, st, today="2026-10-08")
+    assert rc == 0 and tg.sent == []
+    assert saved["cycles"] == {f"TEST|{BREAKOUT}": "rule|TEST|2026-09-10"}
+
+
+def test_quiet_run_does_not_rewrite_the_state_file(tmp_path, monkeypatch):
+    """The workflow commits whatever changed. `last_run` used to carry a clock
+    time and was written at the TOP of the pass, so every 15-minute run produced
+    a commit - 145 commits in a day and a half, for a job that sent two alerts.
+    A run that moves the book nowhere must leave the file byte-identical.
+    """
+    st = state(events=[ob_event(born="2026-09-10")], as_of=BORN)
+    rc, _tg, _saved = run_pc(tmp_path, monkeypatch, st, today=BORN)
+    assert rc == 0
+    p_own = tmp_path / "precision_ob_entry_state.json"
+    assert p_own.exists()                  # the first run did move the book
+    book = json.loads(p_own.read_text())
+    # Session-scoped on purpose: a clock time here is what made every run differ.
+    assert book["last_run"] == f"postclose {BORN}"
+    assert "last_run_at" in book           # the clock time lives in its own field
+    writes: list = []
+    monkeypatch.setattr(pye, "save_state", lambda s_, p: writes.append(p))
+    rc2, tg2, _saved2 = run_pc(tmp_path, monkeypatch, st, today=BORN)
+    assert rc2 == 0 and tg2.sent == []
+    assert writes == []                    # a quiet run must not touch the file
+
+
+def test_quiet_intraday_run_does_not_rewrite_the_state_file(tmp_path,
+                                                            monkeypatch):
+    """Same rule for the intraday pass: a stale holiday quote moves nothing."""
+    st = state(as_of=OB_CANDLE, as_of_high=124.0, as_of_low=111.0,
+               as_of_close=123.0, refreshed_on=BORN)
+    rc, _tg, _saved = run_id(tmp_path, monkeypatch, st, today=BORN)
+    assert rc == 0
+    p_own = tmp_path / "precision_ob_entry_state.json"
+    assert p_own.exists()
+    assert json.loads(p_own.read_text())["last_run"] == f"intraday {BORN}"
+    writes: list = []
+    monkeypatch.setattr(pye, "save_state", lambda s_, p: writes.append(p))
+    rc2, tg2, _s2 = run_id(tmp_path, monkeypatch, st, today=BORN)
+    assert rc2 == 0 and tg2.sent == []
+    assert writes == []

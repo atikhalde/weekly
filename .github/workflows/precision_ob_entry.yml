@@ -30,10 +30,27 @@ name: Precision OB Entry (OB candle)
 #                               trade already resolved, the alert says so
 #                               instead of quoting a plan nobody can take.
 #
+# Which pass a run takes is resolved in the step below, in order: an explicit
+# `mode` input; else, for a SCHEDULED run, the cron expression that fired it
+# (github.event.schedule); else the IST clock - intraday 09:15-15:30 IST,
+# postclose outside it. It used to be inferred from the current UTC hour, and
+# since GitHub's scheduler delayed all three of this workflow's scheduled runs
+# by ~7 hours (16:56Z, 17:32Z, 17:35Z), the 09:44Z intraday slot crossed the
+# 10:00Z boundary and silently ran as POSTCLOSE every single time. A derived
+# intraday slot that lands after the bell now falls back to postclose rather
+# than spending a bulk quote on a market that cannot be traded.
+#
+# The script dates itself the same way: the postclose pass evaluates against
+# session_date() - the last COMPLETED session - not datetime.now(IST).date(),
+# which after midnight IST names a session that has not happened yet and used
+# to inflate every age in the catch-up window by one.
+#
 # Cost shape: the postclose pass makes NO market-data call unless a rule event
 # fires (then one daily-history fetch for the OB candle and the target); the
-# intraday pass is one bulk quote plus a fetch per firing name. The 5-minute
-# scanner remains the only heavy consumer.
+# intraday pass is one bulk quote plus a fetch per firing name. A cycle already
+# settled is short-circuited on the cycle index in the job's own state, so a
+# name whose state birth and bar birth disagree does not re-fetch every run.
+# The 5-minute scanner remains the only heavy consumer.
 #
 # First-run safety: a rule event older than catchup_sessions (3) is marked seen
 # without an alert, so deploying this job never replays history into the chat.
@@ -47,7 +64,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Which pass to run (blank = by time of day)"
+        description: "Which pass to run (blank = by slot, else IST market hours)"
         type: choice
         options: ["", "intraday", "postclose", "explain", "digest"]
         default: ""
@@ -104,11 +121,44 @@ jobs:
           STRATEGY_CAPITAL: "100000"
           STRATEGY_RISK_PCT: "1.0"
         run: |
+          set -euo pipefail
           MODE="${{ inputs.mode }}"
-          if [ -z "$MODE" ]; then
-            H=$(date -u +%H)
-            if [ "$H" -lt 10 ]; then MODE=intraday; else MODE=postclose; fi
+          EXPLICIT=1
+          [ -n "$MODE" ] || EXPLICIT=0
+
+          # 1. A SCHEDULED run knows which slot it came from: the event carries
+          #    the cron expression that fired. This used to be inferred from the
+          #    current UTC hour, and GitHub's scheduler delayed all three of this
+          #    workflow's scheduled runs by ~7 hours (they fired at 16:56Z,
+          #    17:32Z and 17:35Z instead of 09:44Z/10:40Z) - so the intraday
+          #    slot crossed the 10:00Z boundary and silently ran as POSTCLOSE,
+          #    every single time. Naming the slot removes the guess.
+          if [ "$EXPLICIT" -eq 0 ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            case "${{ github.event.schedule }}" in
+              "44 9 * * 1-5")  MODE=intraday ;;
+              "40 10 * * 1-5") MODE=postclose ;;
+            esac
           fi
+
+          # 2. Otherwise take it from the IST clock - the market's own time, not
+          #    an arbitrary UTC hour. Intraday only while entry B (today's
+          #    close) can still be filled: 09:15-15:30 IST.
+          IST_HM=$(python3 -c "from datetime import datetime;from zoneinfo import ZoneInfo;n=datetime.now(ZoneInfo('Asia/Kolkata'));print(n.hour*100+n.minute)")
+          in_session() { [ "$IST_HM" -ge 915 ] && [ "$IST_HM" -le 1530 ]; }
+          if [ "$EXPLICIT" -eq 0 ] && [ -z "$MODE" ]; then
+            if in_session; then MODE=intraday; else MODE=postclose; fi
+          fi
+
+          # 3. A delayed slot must still do useful work. If intraday was chosen
+          #    but the market has closed, entry B is unfillable - fall back to
+          #    the postclose confirmation rather than burning a bulk quote on a
+          #    stale feed. An explicitly requested mode is always respected.
+          if [ "$EXPLICIT" -eq 0 ] && [ "$MODE" = "intraday" ] && ! in_session; then
+            echo "intraday slot landed outside market hours (${IST_HM} IST) - running postclose instead"
+            MODE=postclose
+          fi
+
+          echo "running mode=$MODE (${IST_HM} IST, event=${{ github.event_name }})"
           python precision_ob_entry.py \
             --mode "$MODE" \
             ${{ inputs.dry_run && '--dry-run' || '' }} \

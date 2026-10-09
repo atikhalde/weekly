@@ -151,21 +151,36 @@ high printed between the breakout and that candle, stop at the 26W level,
 | 5b | NSE precision OB entry — postclose | `precision_ob_entry.yml/dispatches` | **16:10 IST** |
 
 Everything else identical to your existing scan job (POST, same headers,
-`{"ref":"main"}`). A plain body is enough on both jobs: the workflow picks the
-pass from the UTC hour (before 10:00 UTC is intraday, after is postclose), so
-15:12 IST arrives as 09:42 UTC and takes the intraday branch. If you would
-rather be explicit, the `workflow_dispatch` body may carry
-`{"inputs":{"mode":"intraday"}}` (or `"postclose"`, `"explain"`, `"digest"`).
+`{"ref":"main"}`). A plain body is enough on both jobs. The workflow resolves the
+pass in this order:
+
+1. **An explicit `mode` input always wins** — the `workflow_dispatch` body may
+   carry `{"inputs":{"mode":"intraday"}}` (or `"postclose"`, `"explain"`,
+   `"digest"`).
+2. **A scheduled run uses the slot that fired it.** GitHub supplies the cron
+   expression in `github.event.schedule`, so `44 9 * * 1-5` means intraday and
+   `40 10 * * 1-5` means postclose regardless of when the runner actually picks
+   it up. This matters: GitHub's scheduler delayed all three of this workflow's
+   scheduled runs by roughly seven hours (they fired at 16:56Z, 17:32Z and
+   17:35Z), and when the pass was inferred from the *current* UTC hour the
+   09:44Z intraday slot crossed the 10:00Z boundary and silently ran as
+   postclose — every single time.
+3. **Otherwise it goes by the IST clock, not UTC**: intraday between **09:15 and
+   15:30 IST**, postclose outside it. So 15:12 IST takes the intraday branch,
+   and an overnight ping no longer spends a bulk quote on a closed market.
 
 Two notes:
 
 - The **intraday slot is the one that matters for acting**: entry A is the OB
   candle's close, which is already history when the rule can be evaluated, so
   the fillable price is entry B — the displacement bar's close — and it stops
-  being fillable at 15:30 IST. A late intraday run still works (the workflow
-  says so in the log); it just cannot be traded.
+  being fillable at 15:30 IST. If a derived intraday slot lands after the close,
+  the workflow now **falls back to postclose** rather than quoting a bar that can
+  no longer be traded; it says so in the log.
 - The job is cheap: the postclose pass makes **no market-data call** unless a
-  rule event actually fires, then one daily-history fetch for that symbol. The
+  rule event actually fires, then one daily-history fetch for that symbol. A
+  cycle already settled is short-circuited on the cycle index, so a name whose
+  state birth and bar birth disagree (ARFIN) does not re-fetch on every run. The
   5-minute scanner stays the only heavy consumer.
 
 ### Why 15:18 and not 15:20
