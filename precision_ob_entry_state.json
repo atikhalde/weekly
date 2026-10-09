@@ -71,7 +71,7 @@
   "ARFIN|2026-04-13": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "KOTAKBANK|2026-10-07": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "intraday 2026-10-09T08:45:27+05:30",
+ "last_run": "intraday 2026-10-09T09:00:40+05:30",
  "open": [],
  "sent": {
   "rule|AARTIIND|2026-06-15": "2026-10-07T15:54:49+05:30",
