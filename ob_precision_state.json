@@ -35,6 +35,13 @@
       "session": "2026-09-18",
       "tap_number": null
     },
+    "ACMESOLAR|2026-09-18|413.05|403.40|tap|tap1": {
+      "kind": "tap",
+      "price": 420.0,
+      "sent_at": "2026-10-09T09:30:44+05:30",
+      "session": "2026-10-09",
+      "tap_number": 1
+    },
     "ACMESOLAR|2026-09-21|413.04998779296875|403.3999938964844|ob": {
       "kind": "ob",
       "price": null,
@@ -223,6 +230,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-09-21",
       "tap_number": null
+    },
+    "AKUMS|2026-09-21|768.10|763.90|tap|tap1": {
+      "kind": "tap",
+      "price": 775.35,
+      "sent_at": "2026-10-09T09:30:44+05:30",
+      "session": "2026-10-09",
+      "tap_number": 1
     },
     "ALIVUS|2026-06-23|1084.800048828125|1068.9000244140625|ob": {
       "kind": "ob",
@@ -1288,6 +1302,13 @@
       "session": "2026-05-07",
       "tap_number": null
     },
+    "ENDURANCE|2026-05-07|2389.20|2332.20|tap|tap1": {
+      "kind": "tap",
+      "price": 2411.8,
+      "sent_at": "2026-10-09T09:30:44+05:30",
+      "session": "2026-10-09",
+      "tap_number": 1
+    },
     "ENGINERSIN|2026-04-01|186.0|177.5|ob": {
       "kind": "ob",
       "price": null,
@@ -2163,6 +2184,13 @@
       "session": "2026-07-30",
       "tap_number": null
     },
+    "LUMAXIND|2026-08-03|5196.00|5095.50|tap|tap1": {
+      "kind": "tap",
+      "price": 5242.0,
+      "sent_at": "2026-10-09T09:30:44+05:30",
+      "session": "2026-10-09",
+      "tap_number": 1
+    },
     "LUMAXIND|2026-08-03|5196.0|5095.5|ob": {
       "kind": "ob",
       "price": null,
@@ -2239,6 +2267,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-09-18",
       "tap_number": null
+    },
+    "MACPOWER|2026-09-18|1889.60|1831.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1911.2,
+      "sent_at": "2026-10-09T09:30:44+05:30",
+      "session": "2026-10-09",
+      "tap_number": 1
     },
     "MAHASTEEL|2026-07-29|770.9500122070312|718.25|ob": {
       "kind": "ob",
@@ -2995,6 +3030,13 @@
       "sent_at": "2026-10-02T09:15:37+05:30",
       "session": "2026-10-01",
       "tap_number": 0
+    },
+    "RAMRAT|2026-10-01|589.70|578.65|tap|tap1": {
+      "kind": "tap",
+      "price": 596.85,
+      "sent_at": "2026-10-09T09:30:44+05:30",
+      "session": "2026-10-09",
+      "tap_number": 1
     },
     "RATNAVEER|2026-06-17|167.14999389648438|164.5|ob": {
       "kind": "ob",
@@ -3878,6 +3920,13 @@
       "session": "2026-07-02",
       "tap_number": null
     },
+    "SUVEN|2026-07-02|280.65|272.20|tap|tap1": {
+      "kind": "tap",
+      "price": 284.35,
+      "sent_at": "2026-10-09T09:30:44+05:30",
+      "session": "2026-10-09",
+      "tap_number": 1
+    },
     "SUVEN|2026-07-03|280.6499938964844|272.20001220703125|ob": {
       "kind": "ob",
       "price": null,
@@ -4473,7 +4522,7 @@
     "post_close": "2026-10-08"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-09T09:15:45+05:30",
+  "updated_at": "2026-10-09T09:30:44+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -4554,10 +4603,10 @@
       "breakout_price": 398.8500061035156,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-09",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "27061",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ACMESOLAR",
       "week": "2026-08-17"
     },
@@ -4662,10 +4711,10 @@
       "breakout_price": 777.0499877929688,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-09",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "24715",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "AKUMS",
       "week": "2026-08-24"
     },
@@ -5866,10 +5915,10 @@
       "breakout_price": 3048.199951171875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-09",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "18822",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ENDURANCE",
       "week": "2026-08-17"
     },
@@ -7018,10 +7067,10 @@
       "breakout_price": 6249.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-09",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "2018",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "LUMAXIND",
       "week": "2026-08-31"
     },
@@ -7054,10 +7103,10 @@
       "breakout_price": 2055.699951171875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-09",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "22347",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MACPOWER",
       "week": "2026-09-14"
     },
@@ -8014,10 +8063,10 @@
       "breakout_price": 523.8499755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-09",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "10485",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "RAMRAT",
       "week": "2026-08-24"
     },
@@ -8896,10 +8945,10 @@
       "breakout_price": 371.3999938964844,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-09",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "11233",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SUVEN",
       "week": "2026-08-17"
     },
