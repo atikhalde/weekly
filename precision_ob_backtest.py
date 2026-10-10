@@ -22,6 +22,9 @@ Every decision below is made by the live code:
               Pine-exact port the live scanner runs, with config.yaml defaults
   the event   `precision_ob_entry.births_from_bars` / `evaluate_rule` - the
               alert's own funnel rows
+  the targets `evaluate_rule`'s own `target` / `target_b` - the alert's own
+              construction of each entry's sell limit (A's window ends at the
+              OB candle, B's at the displacement bar)
   fills       `precision_ob_entry.resolve_bar` (through `walk_bars`) - the
               gap-aware policy: gapped target/stop fill at the open, both
               touched resolves conservatively as a loss
@@ -239,15 +242,6 @@ def cycles(bars: list[Bar], start: date, len_short: int = 26,
 # --------------------------------------------------------------------------- #
 #  One event -> one trade
 # --------------------------------------------------------------------------- #
-def target_for(bars: list[Bar], breakout: str, entry_session: str) -> float | None:
-    """The highest high printed between the breakout session and the entry
-    session - the report's own construction, and the same window
-    `evaluate_rule` uses for entry A."""
-    highs = [b.high for b in bars
-             if breakout <= str(b.time)[:10] <= entry_session]
-    return max(highs) if highs else None
-
-
 def simulate(bars: list[Bar], entry: float, stop: float, target: float | None,
              entry_session: str, time_stop: int, cost_pct: float) -> dict | None:
     """One trade, resolved by the ALERT's own walker.
@@ -288,6 +282,10 @@ def run_symbol(bars: list[Bar], params, start: date, time_stop: int,
                      (no close > level requirement - the zone stop is below)
       B + 26W stop   entry = the displacement close, stop = the 26W level
       B + zone stop  entry = the displacement close, stop = the zone's stop
+
+    Each entry's target is the highest high between the breakout session and
+    ITS entry session - the shipped rule's own `target` (A) and `target_b` (B),
+    not a copy of the construction.
     """
     keys = ("cycles", "with_ob", "events", "pullback", "predates", "below",
             "taken", "censored", "trades", "az", "b26", "bz")
@@ -318,8 +316,11 @@ def run_symbol(bars: list[Bar], params, start: date, time_stop: int,
         origin_s = rule.origin_session
         born_bar = closes.get(born)
         born_close = born_bar.close if born_bar else None
-        tgt_a = target_for(bars, c["session"], origin_s) if origin_s else None
-        tgt_b = target_for(bars, c["session"], born)
+        # The shipped rule's own targets - the same windows the alert quotes -
+        # not a copy of them: A's ends at the OB candle, B's at the
+        # displacement bar.
+        tgt_a = rule.target if origin_s else None
+        tgt_b = rule.target_b
 
         # A side - the OB candle's close. The zone-stop variant is the wider
         # sample (it needs no close above the level: the zone's own stop is
