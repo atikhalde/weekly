@@ -17,6 +17,7 @@ line by line rather than taken on faith._
 | **excluded: OB candle predates the breakout (zone born on the breakout, origin the day before) 3,450 47%** | same row, with the description's own wording in the exclusion reason (the SMSPHARMA shape) |
 | **Entry** — the OB candle's close, taken only when it closes ABOVE the 26-week breakout level | `evaluate_rule()` row 2 + `Rule.entry_a = origin.close`; `origin.close <= level` → "OB close back below the 26W level" (1,629 excluded) |
 | **Target** — the first swing high after the breakout; "the highest high printed between the breakout session and the entry session (sell limit)" | `Rule.target = max(high for bars with breakout_session <= session <= origin_session)` — it excludes the displacement bar and always includes the OB candle's own high, so the limit can never sit behind the entry (the backtest's 0.9x median R:R) |
+| **Target (entry B)** — the same construction with B's entry session: the highest high between the breakout and the displacement bar | `Rule.target_b = max(high for bars with breakout_session <= session <= born_session)` — it includes the displacement bar's own high, so B's limit always sits above B's entry (the backtest's `tgt_b`; its B row averages +3.0% gross) |
 | **Stop** — the 26W breakout level | `Rule.stop = brk["level"]`, the same candle-derived c02 level the backtest dates its cycles from |
 | **Time stop** — 90 trading sessions | `RuleSettings.time_stop_sessions = 90`; counted from the entry (the OB candle's) session. The bar walks count real sessions; the zero-call daily check falls back to a weekday count |
 | **Fills** — "through the target fills at the open (better), through the stop at the open (worse); a session touching both resolves by its open, else counts conservatively as a loss" | `resolve_bar()` — the exact policy, in order: gap through the target → open; gap through the stop → open; both touched → conservative loss at the stop; else limit/stop. The bar walks always have the opens; the state-only pass uses `as_of_open` when the scanner carries it |
@@ -65,7 +66,11 @@ plan and its R:R are computed from A (the rule), the fillable version is shown
 from B, and the exit report gives the net from each. B is walked over its own
 sessions — it buys the displacement bar's close, so it starts one session later
 than A and is reported as still open while A has already resolved (a trade B
-never held must never be quoted A's exit price). Three alert moments cover
+never held must never be quoted A's exit price) — and against its **own
+target**: the highest high between the breakout and the displacement bar, the
+same construction the backtest builds its B row with. A's target can sit below
+B's entry; B's cannot, so every "from B" number is a draw from the quoted B
+row, never a fill at a limit the fillable entry never had. Three alert moments cover
 the three ways to act:
 
 | slot | mode | what it says | what is fillable |
@@ -273,6 +278,9 @@ edit that drifts from the backtest fails the suite:
   nothing touched);
 - the target window never including the displacement bar, and never sitting
   below the entry;
+- entry B's own target (`target_b`): the window breakout → displacement bar,
+  always above B's entry, carried by the rule, the plan, the trade book and
+  `b_walk` — rebuilt from the bars for trades recorded before it existed;
 - first-run safety, catch-up, the MISSED notice for an already-resolved late
   event, dry-run and failed-delivery semantics;
 - the intraday forming path: the OB candle resolved with `find_origin`, and
@@ -294,6 +302,7 @@ from the report on faith.
 | exclusion: OB close back **below** the 26W level | `evaluate_rule()` row 2 (`origin.close <= level`) | 1,613 excluded (report 1,629) |
 | entry = the OB candle's **close** (entry A) | `Rule.entry_a = origin.close` | test: entry equals the OB candle close on a synthetic cycle |
 | target = the highest high **between the breakout and the entry session**, sell limit | `Rule.target = max(high[session ∈ [breakout, origin]])` | target window excludes the displacement bar; test pins it |
+| target (entry B) = the highest high **between the breakout and B's entry session** (the displacement bar) | `Rule.target_b = max(high[session ∈ [breakout, born]])`; `b_walk` walks B against it | **audit finding #6 below** — B was walked against A's target; fixed |
 | stop = the **26W breakout level**, order-based | `Rule.stop = brk["level"]`; `resolve_bar()` | any low at/below the level stops; test pins the level |
 | time stop = **90 trading sessions** | `RuleSettings.time_stop_sessions = 90` | bar walks count real sessions; test walks 90 |
 | fills are **gap-aware** (through the target at the open, better; through the stop, worse; both touched = conservative loss) | `resolve_bar()` | all four branches tested, including a gapped exit |
@@ -341,3 +350,17 @@ from the report on faith.
      events breakdown: `events: 208 total (206 already handled, 2 deferred, ...)`.
    - **Message structure:** Messages lead with the OB candle and its age; `explain`
      prints B's own status alongside A.
+6. **Entry B was walked against entry A's target — fixed (10-Oct-2026).** The
+   report's target is "the highest high printed between the breakout session and
+   the entry session", and B's entry session is the displacement bar; the
+   backtest builds its B row that way (`tgt_b`, avg win +3.0% gross — a limit
+   always above B's entry). The scanner's `b_walk` reused A's target, which
+   usually sits *below* B's entry, so the per-trade "from B" numbers were fills
+   at a limit the fillable entry never had (PARAGMILK −0.79%, EIMCOELECO
+   +0.04%) — not draws from the quoted B row, against the code's own
+   "never drifts" rule. B now carries its own `target_b` end to end (rule,
+   plan, trade book, `b_walk`, `explain`, the forming alert), rebuilt from the
+   bars for trades recorded before it existed, and the backtest measures the
+   shipped `rule.target` / `rule.target_b` instead of its own `target_for`
+   copy. 117 tests pass (114 + 3 new). See `PRECISION_OB_ENTRY_AUDIT.md` §9
+   for the full clause-by-clause parity table.

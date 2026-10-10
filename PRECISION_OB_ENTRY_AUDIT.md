@@ -333,3 +333,62 @@ ARFIN, after  the cycle index : 0 history fetches          (211 already handled)
   feed, not of this job. Fixing it means changing the data source or the alert
   product (audit §6 F6 a/b/c) — a decision worth making deliberately rather
   than inside a bug-fix pass.
+
+---
+
+## 9. Rules parity re-check — scanner vs `Precision OB Rules.txt` (10-Oct-2026)
+
+**Question:** does `precision_ob_entry.py` implement the report's entry rules
+100%, clause by clause?
+
+**Verdict:** yes on the rule itself — every clause of the report's rule block
+and its methodology matches the code exactly — with **one mismatch on entry
+B's target, now fixed**. The comparison:
+
+| clause of `Precision OB Rules.txt` | where it lives in the scanner | match |
+|---|---|---|
+| Event: the first precision OB born on/after the 26W breakout, per cycle (the live scanner's `first_zone_after_breakout`) | `first_ob_after_breakout()` / `births_from_bars()`, one event per cycle (`_cycle_key`) | ✓ |
+| excluded: OB candle predates the breakout ("zone born on the breakout, origin the day before", SMSPHARMA) | `evaluate_rule()` row 1, identical reason string | ✓ |
+| Entry: the OB candle's close, only when it closes ABOVE the 26W level; excluded: "OB close back below the 26W level" | `evaluate_rule()` row 2 (`origin.close <= level`), `entry_a = origin.close` | ✓ |
+| Target: the highest high printed between the breakout session and the entry session (sell limit) | `Rule.target = max(high[breakout .. origin])` — the backtest's `target_for` window | ✓ (A) |
+| Stop: the 26W breakout level, order-based (any low at/below stops) | `Rule.stop = brk["level"]`; `resolve_bar()` (`l <= stop`) | ✓ |
+| Time stop: 90 trading sessions | `time_stop_sessions = 90` (code + `config.yaml`); `walk_bars` counts real sessions | ✓ |
+| Zone: origin = nearest bearish/neutral within 8 bars; displacement rvol ≥ 1.8, range ≥ 1.2 ATR, body ≥ 55%, CLV ≥ 0.72, close > 8-bar structure; zone = open-to-low | `cfg.ob_precision.params()` → `config.yaml` defaults → `ob_precision.replay` / `find_origin` / `zone_edges` | ✓ |
+| Cycles dated from the candle-derived c02 cross with the 26-week cross-lock | `breakout_of()` reads `breakout_26w_session`, persisted by `derive_26w_breakout(bars, 26, 26)` | ✓ |
+| Fills gap-aware: through the target at the open (better), through the stop at the open (worse), both touched resolves by its open else conservative loss | `resolve_bar()`, shared verbatim with the backtest | ✓ |
+| Quoted stats (A: 2,272 / 88.5% / +7.27% / −4.16% / +5.77% / +1.62R; B: 6,624 / 83% / +3.0% / −5.3% / +1.32% / +0.60R; cost 0.22%) | `STATS_A` / `STATS_B` quoted verbatim in every alert; the module docstring matches | ✓ |
+| Entry B is "the tradable version": its target is the highest high between the breakout and **its** entry session (the displacement bar) — the backtest's `tgt_b` | was: `b_walk` reused A's target | ✗ → **fixed** |
+
+**The mismatch and the fix.** The methodology defines the target per entry
+session; the backtest builds its B row with `tgt_b = target_for(bars, breakout,
+born)`. The scanner's `b_walk` walked B against A's target (a window ending at
+the OB candle), which in the common case sits *below* B's entry — so the
+per-trade "from B" numbers were fills at a limit the fillable entry never had
+(PARAGMILK "from B −0.79%", EIMCOELECO "+0.04%"), not draws from the quoted
+B row (+1.32% net/trade), against the code's own "the number on screen never
+drifts from the number in the report". Fixed 10-Oct-2026:
+
+- `Rule.target_b` — the highest high between the breakout and the displacement
+  session, computed in `evaluate_rule` (carried even by the excluded rows,
+  which the backtest's zone-stop variants measure);
+- carried end to end: `TradePlan.target_b`, `plan_html`'s "from B" line,
+  `new_trade` (the book), `b_walk` (rebuilt from the bars for trades recorded
+  before the field existed), `run_explain`, and the intraday forming alert
+  (B's prospective target, today's developing high included);
+- `precision_ob_backtest.py` now measures the shipped `rule.target` /
+  `rule.target_b` and its `target_for` copy is deleted — the report's A and B
+  rows are the scanner's own walks, targets included.
+
+**Verified:** 117 tests pass (114 + 3 new, pinning B's target window, the
+excluded rows' targets and the pre-fix-trade rebuild); a synthetic cycle shows
+the backtest's A row (win @ the swing high 120) and B row (win @ the
+displacement high 124) reproduced exactly by the scanner's own `walk_bars` /
+`b_walk`. The wider suite is unchanged at its 15 pre-existing failures
+(missing workflow files, `reportlab`/`openpyxl`).
+
+**Documented approximations, not rule mismatches:** the zero-data daily exit
+check counts the 90-session time stop in weekdays (no holiday calendar,
+~2-session drift, documented in `weekday_sessions`); the catch-up window,
+first-run safety, the cycle index and the forming/candidate alerts are
+alerting mechanics the report does not describe — they gate *when* an event
+alerts, never *what* the rule is.

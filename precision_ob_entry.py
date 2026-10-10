@@ -15,7 +15,10 @@ configuration with an earlier entry)
   Entry    the OB candle's close, taken only when that close is ABOVE the
            26W breakout level
   Target   the highest high printed between the breakout session and the entry
-           (the OB candle's) session - a sell limit
+           (the OB candle's) session - a sell limit. Entry B carries its OWN
+           target: the same construction with its entry session, the
+           displacement bar - so B's limit always sits above B's entry (the
+           backtest's tgt_b)
   Stop     the 26W breakout level - a stop order
   Time     stop: 90 trading sessions from the entry session, exit at the close
 
@@ -38,8 +41,10 @@ the backtest reports it beside A everywhere:
 
 Every alert this job sends therefore carries BOTH prices - A as the rule's own
 number, B as the price that could actually be filled - and the exit report
-shows the net return from each. A is never presented as a fill you could have
-taken without foresight.
+shows the net return from each, walked against its own target: A's ends at the
+OB candle, B's at the displacement bar, exactly as the backtest builds its A
+and B rows. A is never presented as a fill you could have taken without
+foresight.
 
 WHEN ALERTS FIRE (all three read the stage-2 scanner's committed state)
 -----------------------------------------------------------------------
@@ -100,7 +105,10 @@ STATE_OWN = ROOT / "precision_ob_entry_state.json"  # ours
 IST = ZoneInfo("Asia/Kolkata")
 
 # The backtest's hindsight check, quoted in every alert so the number on
-# screen never drifts from the number in the report.
+# screen never drifts from the number in the report. The B row is built with
+# B's OWN target - the highest high between the breakout and the displacement
+# bar - so every per-trade "from B" number is walked against that same
+# construction (b_walk), never against A's target.
 STATS_A = ("A · the OB candle's close: 88.5% win · avg win +7.27% · "
            "avg loss −4.16% · +5.77% net/trade · +1.62R · median win 1 session "
            "(n=2,272, 2021-26)")
@@ -446,6 +454,7 @@ class Rule:
     entry_b: float | None = None          # the displacement close
     stop: float | None = None             # = the 26W breakout level
     target: float | None = None           # highest high, breakout -> OB candle
+    target_b: float | None = None         # B's own: breakout -> displacement
 
 
 def evaluate_rule(bars: list, brk: dict, born_session: str, params) -> Rule:
@@ -462,6 +471,11 @@ def evaluate_rule(bars: list, brk: dict, born_session: str, params) -> Rule:
                entry session - it EXCLUDES the displacement bar and always
                includes the OB candle's own high, so the target can never sit
                below the entry
+      target_b entry B's own target: the same construction with B's entry
+               session - the displacement bar. It INCLUDES the displacement
+               bar's high, so B's sell limit always sits above B's entry (the
+               backtest's tgt_b, and why its B row averages a +3.0% win while
+               A's target can sit below B's entry)
       stop     the 26W breakout level
       time     90 sessions
     """
@@ -471,33 +485,43 @@ def evaluate_rule(bars: list, brk: dict, born_session: str, params) -> Rule:
         return Rule(False, "the 26W breakout level is unknown")
     level = float(level)
     born = next((b for b in bars if b.session == born_session), None)
+    # B's target needs only the displacement bar, so it is computed first and
+    # carried even by the excluded rows - the backtest's zone-stop variants
+    # measure those events too.
+    born_s = born.session if born else ""
+    highs_b = [b.high for b in bars if brk_s <= b.session <= born_s]
+    target_b = max(highs_b) if highs_b else None
     origin = resolve_origin(bars, born_session, params)
     if origin is None:
         return Rule(False, f"no origin candle resolved for the {born_session} "
                            "displacement", level=level,
-                    breakout_session=brk_s, born_session=born_session)
+                    breakout_session=brk_s, born_session=born_session,
+                    target_b=target_b)
     origin_s = origin.session
+    highs = [b.high for b in bars if brk_s <= b.session <= origin_s]
+    target = max(highs) if highs else None
     if origin_s < brk_s:
         return Rule(False, "OB candle predates the breakout (zone born on the "
                            "breakout, origin the day before)", level=level,
                     breakout_session=brk_s, born_session=born_session,
-                    origin_session=origin_s)
+                    origin_session=origin_s, target_b=target_b)
     if origin.close <= level:
         return Rule(False, "OB close back below the 26W level", level=level,
                     breakout_session=brk_s, born_session=born_session,
-                    origin_session=origin_s, entry_a=origin.close)
-    highs = [b.high for b in bars if brk_s <= b.session <= origin_s]
+                    origin_session=origin_s, entry_a=origin.close,
+                    target=target, target_b=target_b)
     if not highs:
         return Rule(False, "no bars between the breakout and the OB candle",
                     level=level, breakout_session=brk_s,
-                    born_session=born_session, origin_session=origin_s)
+                    born_session=born_session, origin_session=origin_s,
+                    target_b=target_b)
     return Rule(True, "the cycle's first post-breakout precision OB with the "
                       "OB candle above the 26W level",
                 level=level, breakout_session=brk_s,
                 born_session=born_session, origin_session=origin_s,
                 entry_a=origin.close,
                 entry_b=(born.close if born else None), stop=level,
-                target=max(highs))
+                target=target, target_b=target_b)
 
 
 # --------------------------------------------------------------------------- #
@@ -581,14 +605,33 @@ def b_walk(trade: dict, ex: dict, bars: list | None,
     the target, A is a win, B has not held a single session). B is walked over
     its own sessions and reported as still open when it has not resolved.
 
+    B is also walked against ITS OWN target, not A's: the report's target is
+    "the highest high printed between the breakout session and the entry
+    session", and B's entry session is the displacement bar - so B's sell limit
+    includes the displacement bar's high and always sits above B's entry,
+    exactly as the backtest's B row is built (its +3.0% avg win). A's target
+    can sit below B's entry; quoting it for B would report fills at a limit
+    the fillable entry never had.
+
     Returns B's exit dict, {"open": True} when it has not resolved by
     `through` (A's own exit session unless the caller says otherwise), or None
     when there is no B trade to walk at all."""
     born, entry_b = trade.get("born_session"), trade.get("entry_b")
     if not born or not entry_b or not bars:
         return None
+    target_b = trade.get("target_b")
+    if not target_b:
+        # A trade recorded before B carried its own target: rebuild it from
+        # the bars - the highest high between the breakout and the born
+        # session, the report's own construction for entry B.
+        brk_s = str(trade.get("breakout_session") or "")[:10]
+        highs = [b.high for b in bars if brk_s <= b.session <= born]
+        if highs:
+            target_b = max(highs)
+    if not target_b:
+        target_b = trade.get("target")
     b_trade = {"entry": float(entry_b), "stop": float(trade["stop"]),
-               "target": float(trade["target"]) if trade.get("target") else None,
+               "target": float(target_b) if target_b else None,
                "entry_session": born}
     res = walk_bars(b_trade, bars, through=through or str(ex.get("session") or ""),
                     time_stop_sessions=settings.time_stop_sessions)
@@ -715,6 +758,7 @@ class TradePlan:
     risk_pct: float
     late_sessions: int = 0
     time_stop_sessions: int = 90
+    target_b: float | None = None          # B's own target, breakout -> born
 
     @property
     def entry(self) -> float:
@@ -810,14 +854,18 @@ def plan_html(p: TradePlan, extra: str = "") -> str:
         f"₹{p.capital:,.0f}) · R:R {_rr_txt(p.target, p.entry_a, p.stop)}",
     ]
     if p.entry_b:
+        tb = p.target_b if p.target_b else p.target
+        b_tgt = (f"<b>{_fmt(tb)}</b> ({(tb / p.entry_b - 1) * 100:+.1f}%)"
+                 if tb else "set from the chart")
         lines += [
             "",
             "<b>THE FILLABLE VERSION (entry B)</b>",
             f"▶ The displacement close <b>{_fmt(p.entry_b)}</b> — the first "
             "real-time price at which this OB was knowable",
-            f"   from B: target {((p.target / p.entry_b - 1) * 100):+.1f}% · "
+            f"   from B: target {b_tgt} — the highest high between the "
+            "breakout and the displacement bar · "
             f"stop −{p.risk_pct_of(p.entry_b):.1f}% · R:R "
-            f"{_rr_txt(p.target, p.entry_b, p.stop)}",
+            f"{_rr_txt(tb, p.entry_b, p.stop)}",
         ]
     if extra:
         lines += ["", extra]
@@ -961,6 +1009,7 @@ def new_trade(sym: str, rule: Rule, late: int) -> dict:
             "entry_b": float(rule.entry_b) if rule.entry_b else None,
             "stop": float(rule.stop),
             "target": float(rule.target) if rule.target else None,
+            "target_b": float(rule.target_b) if rule.target_b else None,
             "breakout_session": rule.breakout_session,
             "born_session": rule.born_session,
             "origin_session": rule.origin_session,
@@ -1110,6 +1159,7 @@ def run_postclose(cfg, args, tg) -> int:
                              entry_b=float(rule.entry_b) if rule.entry_b else None,
                              stop=float(rule.stop),
                              target=float(rule.target) if rule.target else None,
+                             target_b=float(rule.target_b) if rule.target_b else None,
                              breakout_session=rule.breakout_session,
                              born_session=rule.born_session,
                              origin_session=rule.origin_session,
@@ -1390,9 +1440,18 @@ def run_intraday(cfg, args, tg) -> int:
                         highs = [b.high for b in bars if brk_s <= b.session
                                  <= o_s]
                         target = max(highs) if highs else None
+                        # B's own target: the same construction with B's entry
+                        # session - today, the displacement bar. Today's
+                        # developing high is the only new number in the window.
+                        tb_highs = [b.high for b in bars
+                                    if brk_s <= b.session < today]
+                        tb_highs.append(float(q.get("high") or 0.0))
+                        target_b = max(tb_highs) if tb_highs else None
+                        if not target_b:
+                            target_b = target
                         plan = TradePlan(
                             sym, entry_a=float(origin.close), entry_b=price,
-                            stop=level, target=target,
+                            stop=level, target=target, target_b=target_b,
                             breakout_session=brk_s, born_session=today,
                             origin_session=o_s, capital=args.capital,
                             risk_pct=args.risk_pct,
@@ -1413,6 +1472,8 @@ def run_intraday(cfg, args, tg) -> int:
                             f"precision OB.\n"
                             f"▶ Fillable now: <b>today's close</b> = entry B, "
                             f"the displacement close\n"
+                            f"   from B: target <b>{_fmt(target_b)}</b> — the "
+                            f"highest high between the breakout and today\n"
                             f"▶ The rule's own entry A = the OB candle's "
                             f"close {_fmt(origin.close)} — one bar of "
                             f"hindsight, already history\n"
@@ -1556,7 +1617,8 @@ def run_explain(cfg, args, tg) -> int:
             continue
         print(f"  RULE: taken · OB candle {rule.origin_session} close "
               f"{rule.entry_a:.2f} · displacement close {rule.entry_b} · "
-              f"stop {rule.stop:.2f} · target {rule.target:.2f} · R:R "
+              f"stop {rule.stop:.2f} · target {rule.target:.2f} · "
+              f"B target {rule.target_b:.2f} · R:R "
               f"{_rr_txt(rule.target, rule.entry_a, rule.stop)}")
         res = walk_bars({"entry": rule.entry_a, "stop": rule.stop,
                          "target": rule.target,
@@ -1567,13 +1629,13 @@ def run_explain(cfg, args, tg) -> int:
         print(f"  status: {res if res else 'open - neither order filled yet'}")
         if rule.entry_b:
             b_res = walk_bars({"entry": rule.entry_b, "stop": rule.stop,
-                               "target": rule.target,
+                               "target": rule.target_b or rule.target,
                                "entry_session": rule.born_session,
                                "born_session": rule.born_session},
                               bars, through=ctx.get("as_of"),
                               time_stop_sessions=settings.time_stop_sessions)
-            print(f"  status B (entered at the {rule.born_session} close): "
-                  f"{b_res if b_res else 'open'}")
+            print(f"  status B (entered at the {rule.born_session} close, "
+                  f"its own target): {b_res if b_res else 'open'}")
     return 0
 
 
@@ -1585,6 +1647,7 @@ def run_digest(cfg, args, tg) -> int:
         b_txt = f"{b:.2f}" if b else "  -  "
         print(f"  {t['symbol']:16s} A {t['entry']:.2f} · B {b_txt} · stop "
               f"{t['stop']:.2f} · target {(t.get('target') or 0):>9.2f} · "
+              f"B target {(t.get('target_b') or 0):>9.2f} · "
               f"entry session {t['entry_session']} "
               f"(~{t.get('sessions_held', 0)} ses)")
     print(f"closed: {len(own.get('closed', []))}")

@@ -238,6 +238,7 @@ def test_rule_taken_entry_is_the_ob_candle_close():
     assert r.entry_a == 110.0                  # the OB candle's close
     assert r.entry_b == 123.0                  # the displacement close
     assert r.stop == LEVEL                     # the 26W breakout level
+    assert r.target_b == 124.0                 # B's own target, see below
     assert r.origin_session == OB_CANDLE
     assert r.born_session == BORN
 
@@ -255,6 +256,30 @@ def test_rule_target_never_sits_below_the_entry():
     completes in one session."""
     r = rule_for()
     assert r.target >= r.entry_a
+
+
+def test_rule_target_b_is_the_highest_high_breakout_to_displacement():
+    """Entry B's own target (the backtest's tgt_b): the highest high between
+    the breakout and the DISPLACEMENT session. The displacement bar's own 124
+    IS in the window, so B's sell limit always sits above B's entry - the
+    reason the report's B row averages a +3.0% win."""
+    r = rule_for()
+    assert r.target_b == 124.0                 # the displacement bar's high
+    assert r.target_b >= r.target              # the window only grows past A's
+    assert r.target_b > r.entry_b              # never behind B's own entry
+    bars = quiet_bars()                        # a tame displacement (high 119)
+    r = evaluate_rule(bars, {"session": BREAKOUT, "level": LEVEL}, BORN, PARAMS)
+    assert r.ok and r.target_b == 120.0        # the swing high, not the 119
+
+
+def test_rule_excluded_rows_still_carry_both_targets():
+    """The backtest's zone-stop variants measure the excluded events too, so a
+    Rule rejected by a funnel row still carries its targets."""
+    bars = cycle_bars()
+    bars[5] = bar(OB_CANDLE, 99, 100, 95, 97)     # close below the level
+    r = evaluate_rule(bars, {"session": BREAKOUT, "level": LEVEL}, BORN, PARAMS)
+    assert not r.ok and r.reason == "OB close back below the 26W level"
+    assert r.target == 120.0 and r.target_b == 124.0
 
 
 def test_rule_walks_back_to_the_nearest_bearish_candle():
@@ -351,6 +376,7 @@ def test_nothing_touched_leaves_the_trade_open():
 def trade(**kw):
     base = {"id": "TEST-OBE-2026-09-30", "symbol": "TEST", "entry": 110.0,
             "entry_a": 110.0, "entry_b": 123.0, "stop": LEVEL, "target": 120.0,
+            "target_b": 124.0,          # B's own target: the displacement high
             "entry_session": OB_CANDLE, "last_checked": OB_CANDLE}
     base.update(kw)
     return base
@@ -502,8 +528,9 @@ def test_daily_exit_uses_the_states_own_open_when_it_has_one(monkeypatch):
 # --------------------------------------------------------------------------- #
 def plan(**kw):
     base = dict(symbol="TEST", entry_a=110.0, entry_b=123.0, stop=100.0,
-                target=120.0, breakout_session=BREAKOUT, born_session=BORN,
-                origin_session=OB_CANDLE, capital=100000.0, risk_pct=1.0)
+                target=120.0, target_b=124.0, breakout_session=BREAKOUT,
+                born_session=BORN, origin_session=OB_CANDLE, capital=100000.0,
+                risk_pct=1.0)
     base.update(kw)
     return TradePlan(**base)
 
@@ -522,7 +549,9 @@ def test_plan_html_carries_both_entries_and_the_rule_s_numbers():
     assert "Entry A" in html and "110.00" in html
     assert "entry b" in html.lower() and "123.00" in html
     assert "100.00" in html                       # the stop / 26W level
-    assert "120.00" in html                       # the target
+    assert "120.00" in html                       # A's target
+    assert "124.00" in html                       # B's own target
+    assert "from B: target" in html
     assert "2,272" in html and "6,624" in html    # both backtest rows
     assert "hindsight" in html
 
@@ -581,7 +610,9 @@ def test_late_html_is_a_notice_not_a_plan():
 def test_b_walk_is_one_session_behind_a_and_reports_its_own_exit():
     """A exits on the born session (the displacement gaps through the target);
     B entered at that very close, so the same bars leave B still open until
-    its own session resolves."""
+    its own session resolves. B is also walked against its OWN target (the
+    displacement bar's high, 124) - not A's 120 - so its win is its own fill
+    at its own limit, not A's gapped-through price."""
     bars = cycle_bars() + [bar("2026-10-05", 121, 125, 120, 124)]
     t = trade(born_session=BORN, origin_session=OB_CANDLE)
     a = walk_bars(t, bars, through="2026-10-05", time_stop_sessions=90)
@@ -589,10 +620,23 @@ def test_b_walk_is_one_session_behind_a_and_reports_its_own_exit():
     assert pye.b_walk(t, a, bars, RuleSettings()) == {"open": True}   # to A
     b = pye.b_walk(t, a, bars, RuleSettings(), through="2026-10-05")
     assert b["outcome"] == "win" and b["session"] == "2026-10-05"
-    assert b["price"] == 121.0                    # gapped through, at the open
+    assert b["price"] == 124.0                    # B's own target, at the limit
+    assert b["fill"] == "order"
     b_no_bars = pye.b_walk(t, a, None, RuleSettings())
     assert b_no_bars is None                      # nothing to walk, nothing said
     assert pye.b_walk(dict(t, entry_b=None), a, bars, RuleSettings()) is None
+
+
+def test_b_walk_rebuilds_b_s_target_for_a_trade_recorded_without_one():
+    """A trade recorded before B carried its own target is healed from the
+    bars: the highest high between the breakout and the displacement bar -
+    the report's own construction for entry B."""
+    bars = cycle_bars() + [bar("2026-10-05", 121, 125, 120, 124)]
+    t = trade(born_session=BORN, origin_session=OB_CANDLE)
+    del t["target_b"]                       # the pre-fix state shape
+    a = walk_bars(t, bars, through="2026-10-05", time_stop_sessions=90)
+    b = pye.b_walk(t, a, bars, RuleSettings(), through="2026-10-05")
+    assert b["outcome"] == "win" and b["price"] == 124.0
 
 
 def test_b_walk_leaves_b_open_when_it_has_not_resolved():
@@ -704,6 +748,7 @@ def test_postclose_fires_on_today_s_ob_birth_and_records_the_trade(
     t = saved["open"][0]
     assert t["entry_a"] == 110.0 and t["entry_b"] == 123.0
     assert t["stop"] == LEVEL and t["target"] == 120.0
+    assert t["target_b"] == 124.0    # B's own target: the displacement high
     assert t["entry_session"] == OB_CANDLE      # the OB candle's session
     assert t["breakout_session"] == BREAKOUT
     assert f"rule|TEST|{BORN}" in saved["sent"]
@@ -863,8 +908,11 @@ def test_postclose_exit_carries_b_s_own_result(tmp_path, monkeypatch):
     assert ex["outcome"] == "win" and ex["session"] == "2026-10-05"
     assert ex["b"]["outcome"] == "win" and ex["b"]["price"] == 121.0
     msg = [m for m in tg.sent if "TARGET HIT" in m][0]
-    # B bought 123 and the target (120) is below B's own entry, so B's "win"
-    # is still a net loss - quoted from B's walk, not reused from A's price.
+    # This trade predates target_b, so b_walk rebuilds it from the bars: the
+    # highest high between the breakout and the born session is the swing high
+    # 120 (the tame displacement bar printed only 119). B bought 123 and that
+    # target is below B's own entry, so B's "win" is still a net loss -
+    # quoted from B's own walk, not reused from A's price.
     assert "from B -1.85%" in msg and "still open" not in msg
 
 
@@ -935,11 +983,13 @@ def test_intraday_forming_alert_carries_the_fillable_entry_b(tmp_path,
 def test_intraday_forming_target_excludes_the_displacement_bar(tmp_path,
                                                                monkeypatch):
     """The rule's target is the highest high between the breakout and the OB
-    candle. Today's 124 belongs to the displacement bar and is NOT in it."""
+    candle. Today's 124 belongs to the displacement bar and is NOT in it -
+    but it IS in B's own target, whose entry session is today."""
     st = state(as_of=OB_CANDLE, as_of_high=116.0, as_of_low=108.0,
                as_of_close=110.0, refreshed_on=BORN)
     _rc, tg, _saved = run_id(tmp_path, monkeypatch, st, today=BORN)
     assert "🎯 Target <b>120.00</b>" in tg.sent[0]
+    assert "from B: target <b>124.00</b>" in tg.sent[0]
 
 
 def test_intraday_silent_when_the_ob_candle_is_below_the_level(tmp_path,
@@ -1071,8 +1121,9 @@ def test_confirm_alerts_off_marks_events_seen_without_sending(tmp_path,
 def test_the_rule_is_the_description():
     r = rule_for()
     settings = RuleSettings()
-    assert (r.ok, r.entry_a, r.stop, r.target,
-            settings.time_stop_sessions) == (True, 110.0, LEVEL, 120.0, 90)
+    assert (r.ok, r.entry_a, r.stop, r.target, r.target_b,
+            settings.time_stop_sessions) == (True, 110.0, LEVEL, 120.0, 124.0,
+                                             90)
     assert settings.round_trip_cost_pct == 0.22
     # the fill policy, in the description's own words
     assert pye.resolve_bar(100, 90, 120, 125, 130, 120)[:2] == ("win", 125.0)
