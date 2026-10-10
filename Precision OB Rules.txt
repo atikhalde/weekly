@@ -1,0 +1,77 @@
+Precision OB Entry Backtest - buy the order-block candle itself
+Event: the first precision order block born after the 26W breakout (the live scanner's first_zone_after_breakout rule) | Entry: the OB candle's close, taken only when it closes ABOVE the 26-week breakout level
+| Target: the first swing high after the breakout (sell limit) | Stop: the 26W breakout level (stop order) | Time stop: 90 trading sessions
+Generated 06-Oct-2026 20:23 by precision_ob_backtest.py - zones from the live ob_precision port (config.yaml defaults) - eod2 split/bonus-adjusted NSE daily data through 2026-09-25
+26W breakout cycles replayed (2021-present) 10,748
+.. formed a post-breakout precision OB 8,768 82%
+first post-breakout OBs - the events replayed 7,357 100%
+.. OB candle on/after the breakout (the pullback candle) 3,907 53%
+.. OB close above the 26W level (rule takes these) 2,278 58%
+.. classified (race resolved or 90 sessions watched) 2,272 31%
+excluded: OB candle predates the breakout (zone born on the breakout, origin the day before) 3,450 47%
+excluded: OB close back below the 26W level 1,629 22%
+excluded: censored at the data cutoff (unresolved, <90 sessions) 6 0%
+Trades 2,272 Win rate (target first) 88.5%
+Avg win (gross) +7.27% Loss rate (stop first) 11.0%
+Avg loss (gross) -4.16% Timeout rate 0.5%
+Avg timeout (gross) +2.94% Median win completes in 1 sessions
+Expectancy / trade (net) +5.77% Expectancy (R) +1.62
+Profit factor (gross) 14.13 Median reward:risk at entry 0.9x
+Best trade (net) +78.3% Worst trade (net) -34.9%
+Median trade (net) +4.41% Round-trip cost 0.22%
+The hindsight check: OB-candle close vs displacement close
+The OB candle is only knowable as a precision OB once the displacement bar AFTER it closes - buying its close uses one bar of foresight. The displacement bar's close is the first price at which the OB is
+knowable in real time. The gap between the rows is the hindsight premium; treat entry B as the tradable version of this idea.
+entry stop n win avg win avg loss expectancy net exp R
+A: OB candle close 26W level 2,272 89% +7.3% -4.2% +5.77% +1.62
+A: OB candle close zone stop 3,887 70% +10.5% -2.2% +6.75% +3.91
+B: displacement close 26W level 6,624 83% +3.0% -5.3% +1.32% +0.60
+B: displacement close zone stop 7,323 86% +3.6% -10.4% +1.53% +0.14
+Fixed-hold returns from the OB close (no target, no stop - hold N sessions) Precision OB entry backtest - OB candle close above 26W level -> buy close -> target swing high -> stop 26W level - generated 06-Oct-2026 20:23 page 2
+horizon n mean gross median win mean net
+5d 3,898 +11.29% +9.10% 93% +11.07%
+15d 3,871 +12.56% +9.65% 82% +12.34%
+30d 3,806 +14.04% +9.99% 75% +13.82%
+45d 3,736 +16.59% +11.29% 73% +16.37%
+60d 3,683 +18.69% +12.17% 72% +18.47%
+90d 3,600 +22.75% +15.52% 71% +22.53%
+By OB-candle year (regime check)
+year n win loss timeout avg win avg loss expectancy net exp R
+2021 549 91% 8% 1% +9.2% -4.5% +7.84% +1.63
+2022 263 88% 12% 0% +6.5% -6.4% +4.76% +1.36
+2023 503 92% 8% 0% +6.4% -1.5% +5.52% +1.90
+2024 481 84% 15% 1% +7.3% -5.2% +5.19% +1.52
+2025 219 85% 14% 0% +6.0% -3.6% +4.36% +2.14
+2026 257 88% 12% 0% +6.5% -3.1% +5.18% +1.08
+By OB type (same configuration)
+OB type n win loss timeout avg win avg loss expectancy net exp R
+<=7d 369 90% 10% 0% +4.1% -1.0% +3.41% +1.96
+8-15d 222 92% 8% 0% +5.0% -1.6% +4.29% +1.98
+16-30d 313 95% 5% 0% +5.5% -1.3% +4.92% +1.73
+31-45d 261 89% 11% 0% +6.7% -2.3% +5.42% +0.82
+>45d 1,107 85% 14% 1% +9.6% -5.9% +7.18% +1.60
+bearish OB candle 1,722 89% 11% 1% +7.7% -3.7% +6.21% +1.77
+neutral OB candle 550 88% 12% 1% +5.9% -5.6% +4.40% +1.15
+origin adjacent (offset 1) 1,385 89% 11% 1% +6.6% -4.5% +5.19% +1.39
+deeper origin (offset >1) 887 88% 11% 0% +8.3% -3.6% +6.69% +1.99
+strong displacement (rvol>=2.5) 1,571 89% 11% 1% +7.8% -4.5% +6.22% +1.87
+typical displacement (rvol<2.5) 701 88% 12% 0% +6.1% -3.5% +4.77% +1.07
+wide zone (>=1 ATR) 296 86% 13% 1% +7.9% -5.1% +5.85% +1.63
+narrow zone (<1 ATR) 1,976 89% 11% 0% +7.2% -4.0% +5.76% +1.62
+target within 5% 1,047 94% 6% 0% +3.0% -1.3% +2.47% +0.88
+target beyond 5% 1,225 84% 15% 1% +11.4% -5.2% +8.60% +2.26 Precision OB entry backtest - OB candle close above 26W level -> buy close -> target swing high -> stop 26W level - generated 06-Oct-2026 20:23 page 3
+Methodology & caveats
+- Signal: the first precision order block born on/after the 26W breakout session, per breakout cycle - the live scanner's own first_zone_after_breakout rule, applied to every historical cycle. Zones come from ob_precision.replay(), the Pine-exact port
+the live scanner runs, with config.yaml defaults: zone = the origin candle's open-to-low, origin = the nearest bearish or neutral candle within 8 bars before a displacement (close > 8-bar structure, rvol >= 1.8, range >= 1.2 ATR, body >= 55%,
+close-location-value >= 0.72).
+- Entry A is the origin candle's close - the ask. It uses one bar of hindsight: the origin only becomes a precision OB when the displacement bar after it closes. Entry B (displacement close) is reported beside it everywhere; prefer B when deciding
+what is actually tradable.
+- The OB candle must sit on/after the breakout session and close above the 26W level. Zones born on the breakout session whose origin candle predates it (the breakout bar itself is the displacement) are counted in the funnel and excluded - the
+SMSPHARMA shape.
+- Target = the highest high printed between the breakout session and the entry session (sell limit); stop = the 26W breakout level (stop order); 90-session time stop. Fills are gap-aware: through the target fills at the open (better), through the stop at
+the open (worse); a session touching both resolves by its open, else counts conservatively as a loss.
+- 26W breakout cycles are dated from the candle-derived c02 cross (derive_26w_breakout semantics) with the 26-week cross-lock. The live waiting list adds the c03..c13 weekly momentum gate, so this sample is a superset of the live feed.
+- Data: eod2 (github.com/BennyThadikaran/eod2_data) NSE daily OHLCV, adjusted for splits and bonuses, through 2026-09-25. universe.csv is today's universe: 2021-era delistings are absent (survivorship).
+- In-sample and descriptive: the configuration was chosen from this same history (it is the accepted Tap 1 configuration with an earlier entry). No portfolio simulation - overlapping signals count as independent trades; capital limits, correlation and
+slippage beyond the flat 0.22% round trip are not modelled.
+- The 26W level as stop is order-based (any low at/below the level stops the trade); the live zone invalidation is close-based and looser.
