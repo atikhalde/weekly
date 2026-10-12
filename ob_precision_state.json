@@ -4508,6 +4508,13 @@
       "session": "2026-08-24",
       "tap_number": null
     },
+    "YATHARTH|2026-09-17|988.00|960.50|tap|tap1": {
+      "kind": "tap",
+      "price": 990.3,
+      "sent_at": "2026-10-12T15:15:43+05:30",
+      "session": "2026-10-12",
+      "tap_number": 1
+    },
     "YATHARTH|2026-09-17|988.0|960.5|ob": {
       "kind": "ob",
       "price": null,
@@ -4536,7 +4543,7 @@
     "post_close": "2026-10-09"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-12T09:15:42+05:30",
+  "updated_at": "2026-10-12T15:15:43+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9653,10 +9660,10 @@
       "breakout_price": 922.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-12",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "17738",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "YATHARTH",
       "week": "2026-08-24"
     },
