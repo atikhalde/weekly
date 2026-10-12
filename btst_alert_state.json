@@ -1,11 +1,20 @@
 {
-  "date": "2026-10-09",
-  "scan_time": "22:07",
-  "generated_at_ist": "2026-10-09T22:07:58",
-  "too_late": true,
-  "too_early": false,
+  "date": "2026-10-13",
+  "scan_time": "00:48",
+  "generated_at_ist": "2026-10-13T00:48:31",
+  "too_late": false,
+  "too_early": true,
   "top3_actionable": [],
   "next_anticipated": [],
-  "excluded_locked": [],
-  "enterable": false
+  "excluded_locked": [
+    [
+      "SHRINGARMS",
+      "Locked at Upper Circuit +20%"
+    ],
+    [
+      "WSTCSTPAPR",
+      "Locked at Upper Circuit +20%"
+    ]
+  ],
+  "enterable": true
 }
