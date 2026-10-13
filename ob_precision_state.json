@@ -4389,6 +4389,13 @@
       "session": "2026-09-08",
       "tap_number": null
     },
+    "VENUSPIPES|2026-09-17|1935.00|1860.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1949.9,
+      "sent_at": "2026-10-13T14:15:33+05:30",
+      "session": "2026-10-13",
+      "tap_number": 1
+    },
     "VENUSPIPES|2026-09-17|1935.0|1860.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4620,7 +4627,7 @@
     "post_close": "2026-10-12"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-13T13:24:14+05:30",
+  "updated_at": "2026-10-13T14:15:33+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9661,10 +9668,10 @@
       "breakout_price": 1897.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-13",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9592",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "VENUSPIPES",
       "week": "2026-09-07"
     },
