@@ -1,13 +1,13 @@
 {
  "closed": [],
- "last_run": "intraday 2026-10-13T15:15:40+05:30",
+ "last_run": "postclose 2026-10-13T15:30:44+05:30",
  "open": [
   {
    "breakout_session": "2026-10-12",
    "entry": 265.3500061035156,
    "entry_session": "2026-10-12",
    "id": "SHRINGARMS-L1-2026-10-12",
-   "last_checked": "2026-10-12",
+   "last_checked": "2026-10-09",
    "leg": 1,
    "sessions_held": 0,
    "stop": 242.0,
