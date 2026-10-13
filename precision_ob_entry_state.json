@@ -73,6 +73,7 @@
   "GANDHAR|2026-06-19": "rule|GANDHAR|2026-07-20",
   "GOODLUCK|2026-05-04": "rule|GOODLUCK|2026-09-08",
   "HFCL|2026-04-21": "rule|HFCL|2026-04-30",
+  "NRAIL|2026-08-07": "rule|NRAIL|2026-09-04",
   "PREMIERPOL|2026-07-16": "rule|PREMIERPOL|2026-07-16",
   "RPTECH|2026-05-05": "rule|RPTECH|2026-05-05",
   "SHRINGARMS|2026-10-12": "rule|SHRINGARMS|2026-10-12",
@@ -84,8 +85,8 @@
   "KOTAKBANK|2026-10-07": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "SHRINGARMS|2026-10-12": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "intraday 2026-10-13",
- "last_run_at": "2026-10-13T09:15:33+05:30",
+ "last_run": "postclose 2026-10-13",
+ "last_run_at": "2026-10-13T15:45:29+05:30",
  "open": [],
  "sent": {
   "rule|AARTIIND|2026-06-15": "2026-10-07T15:54:49+05:30",
@@ -212,6 +213,7 @@
   "rule|NETWEB|2026-05-29": "2026-10-07T15:54:49+05:30",
   "rule|NIACL|2026-06-19": "2026-10-07T15:54:49+05:30",
   "rule|NITINSPIN|2026-08-18": "2026-10-07T15:54:49+05:30",
+  "rule|NRAIL|2026-09-04": "2026-10-13T15:45:29+05:30",
   "rule|NRBBEARING|2026-08-05": "2026-10-07T15:54:49+05:30",
   "rule|OAL|2026-08-26": "2026-10-07T15:54:49+05:30",
   "rule|OFSS|2026-04-23": "2026-10-07T15:54:49+05:30",
