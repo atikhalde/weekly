@@ -2849,6 +2849,13 @@
       "session": "2026-06-16",
       "tap_number": null
     },
+    "PARADEEP|2026-07-29|137.50|134.00|tap|tap1": {
+      "kind": "tap",
+      "price": 139.2,
+      "sent_at": "2026-10-13T13:24:14+05:30",
+      "session": "2026-10-13",
+      "tap_number": 1
+    },
     "PARADEEP|2026-07-29|137.5|134.0|ob": {
       "kind": "ob",
       "price": null,
@@ -3843,6 +3850,13 @@
       "session": "2026-10-05",
       "tap_number": 0
     },
+    "STLTECH|2026-10-05|955.35|889.00|tap|tap1": {
+      "kind": "tap",
+      "price": 963.45,
+      "sent_at": "2026-10-13T13:24:14+05:30",
+      "session": "2026-10-13",
+      "tap_number": 1
+    },
     "STOVEKRAFT|2026-05-27|561.0|552.0999755859375|ob": {
       "kind": "ob",
       "price": null,
@@ -4025,6 +4039,13 @@
       "session": "2026-10-07",
       "tap_number": 0
     },
+    "TATVA|2026-10-07|1790.00|1682.90|tap|tap1": {
+      "kind": "tap",
+      "price": 1786.0,
+      "sent_at": "2026-10-13T13:24:14+05:30",
+      "session": "2026-10-13",
+      "tap_number": 1
+    },
     "TBOTEK|2026-06-12|1230.0|1195.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4157,6 +4178,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-07-27",
       "tap_number": null
+    },
+    "TNPETRO|2026-09-01|113.50|108.30|tap|tap1": {
+      "kind": "tap",
+      "price": 112.14,
+      "sent_at": "2026-10-13T13:24:14+05:30",
+      "session": "2026-10-13",
+      "tap_number": 1
     },
     "TNPETRO|2026-09-01|113.5|108.30000305175781|ob": {
       "kind": "ob",
@@ -4592,7 +4620,7 @@
     "post_close": "2026-10-12"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-13T09:15:39+05:30",
+  "updated_at": "2026-10-13T13:24:14+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5433,6 +5461,20 @@
       "status": "waiting",
       "symbol": "CARTRADE",
       "week": "2026-08-17"
+    },
+    "CCAVENUE": {
+      "added_at": "2026-10-13",
+      "breakout_26w_session": {},
+      "breakout_bar": "2026-10-12T09:15+05:30",
+      "breakout_price": 149.5,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 18.75,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "16249",
+      "status": "waiting",
+      "symbol": "CCAVENUE",
+      "week": "2026-10-12"
     },
     "CENTUM": {
       "added_at": "2026-09-27",
@@ -7780,6 +7822,24 @@
       "symbol": "NPST",
       "week": "2026-09-14"
     },
+    "NRAIL": {
+      "added_at": "2026-10-13",
+      "breakout_26w_session": {
+        "close": 544.5499877929688,
+        "level": 534.4000244140625,
+        "session": "2026-08-07"
+      },
+      "breakout_bar": "2026-10-12T14:30+05:30",
+      "breakout_price": 707.6500244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 706.4000244140625,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "20314",
+      "status": "waiting",
+      "symbol": "NRAIL",
+      "week": "2026-10-12"
+    },
     "NRBBEARING": {
       "added_at": "2026-09-27",
       "breakout_26w_session": {
@@ -7881,10 +7941,10 @@
       "breakout_price": 159.8300018310547,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-13",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9741",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "PARADEEP",
       "week": "2026-08-24"
     },
@@ -7941,6 +8001,24 @@
       "status": "tapped",
       "symbol": "PAYTM",
       "week": "2026-08-24"
+    },
+    "PERSISTENT": {
+      "added_at": "2026-10-13",
+      "breakout_26w_session": {
+        "close": 5875.0,
+        "level": 5722.0,
+        "session": "2026-08-28"
+      },
+      "breakout_bar": "2026-10-13T10:10+05:30",
+      "breakout_price": 5915.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 5910.0,
+      "resolved_at": "2026-10-13",
+      "resolved_reason": "all 3 order block(s) invalidated/exhausted",
+      "security_id": "18365",
+      "status": "invalid",
+      "symbol": "PERSISTENT",
+      "week": "2026-10-12"
     },
     "PITTIENG": {
       "added_at": "2026-09-27",
@@ -8441,6 +8519,24 @@
       "status": "waiting",
       "symbol": "SAMBHV",
       "week": "2026-09-14"
+    },
+    "SANATHAN": {
+      "added_at": "2026-10-13",
+      "breakout_26w_session": {
+        "close": 529.25,
+        "level": 512.0,
+        "session": "2026-09-24"
+      },
+      "breakout_bar": "2026-10-13T09:55+05:30",
+      "breakout_price": 548.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 544.2999877929688,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "28805",
+      "status": "waiting",
+      "symbol": "SANATHAN",
+      "week": "2026-10-12"
     },
     "SANSERA": {
       "added_at": "2026-09-27",
@@ -8957,10 +9053,10 @@
       "breakout_price": 690.0999755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-13",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9313",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "STLTECH",
       "week": "2026-08-24"
     },
@@ -9155,10 +9251,10 @@
       "breakout_price": 1895.300048828125,
       "exchange_segment": "NSE_EQ",
       "level_26w": 1880.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-13",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "5162",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TATVA",
       "week": "2026-10-05"
     },
@@ -9335,10 +9431,10 @@
       "breakout_price": 121.44999694824219,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-13",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "3509",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TNPETRO",
       "week": "2026-08-31"
     },
@@ -9571,6 +9667,24 @@
       "status": "waiting",
       "symbol": "VENUSPIPES",
       "week": "2026-09-07"
+    },
+    "VHLTD": {
+      "added_at": "2026-10-13",
+      "breakout_26w_session": {
+        "close": 151.0,
+        "level": 146.0,
+        "session": "2026-10-13"
+      },
+      "breakout_bar": "2026-10-13T09:15+05:30",
+      "breakout_price": 157.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 146.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "23386",
+      "status": "waiting",
+      "symbol": "VHLTD",
+      "week": "2026-10-12"
     },
     "VINCOFE": {
       "added_at": "2026-09-27",
@@ -15515,6 +15629,81 @@
         }
       ],
       "zones_seen": 4
+    },
+    "CCAVENUE": {
+      "as_of": "2026-10-09",
+      "as_of_close": 14.899999618530273,
+      "as_of_high": 15.199999809265137,
+      "as_of_low": 14.859999656677246,
+      "atr": 0.5726132051595892,
+      "breakout_26w_session": {},
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 14.899999618530273,
+      "prev_highs": [
+        15.600000381469727,
+        15.520000457763672,
+        15.369999885559082,
+        15.449999809265137,
+        15.489999771118164,
+        15.800000190734863,
+        15.5600004196167,
+        15.199999809265137
+      ],
+      "prev_lows": [
+        14.949999809265137,
+        15.029999732971191,
+        15.25,
+        14.979999542236328,
+        14.859999656677246
+      ],
+      "prev_volumes": [
+        42406012.0,
+        16515500.0,
+        10593710.0,
+        46480923.0,
+        15304318.0,
+        6402972.0,
+        21347420.0,
+        8049310.0,
+        9133232.0,
+        6133145.0,
+        6856447.0,
+        11575582.0,
+        7376759.0,
+        13286633.0,
+        11659060.0,
+        17222230.0,
+        9135276.0,
+        9784750.0,
+        10475038.0
+      ],
+      "refreshed_on": "2026-10-13",
+      "session_index": 249,
+      "zones": [
+        {
+          "atr_at_birth": 0.45401557827367445,
+          "body_frac_at_birth": 0.8452379871117751,
+          "born_index": 171,
+          "born_session": "2026-06-18",
+          "bottom": 14.1899995803833,
+          "clv_at_birth": 0.9047620128882249,
+          "departed": true,
+          "entry": 14.427999687194824,
+          "origin_index": 170,
+          "origin_session": "2026-06-17",
+          "range_atr_at_birth": 1.8501571152731457,
+          "rvol_at_birth": 3.055291269113749,
+          "state": 0,
+          "stop": 14.12189724364225,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 14.359999656677246,
+          "width": 0.1700000762939453
+        }
+      ],
+      "zones_seen": 2
     },
     "CENTUM": {
       "as_of": "2026-10-01",
@@ -29877,6 +30066,127 @@
       ],
       "zones_seen": 3
     },
+    "NRAIL": {
+      "as_of": "2026-10-09",
+      "as_of_close": 636.1500244140625,
+      "as_of_high": 662.0999755859375,
+      "as_of_low": 625.3499755859375,
+      "atr": 36.76082161472048,
+      "breakout_26w_session": {
+        "close": 544.5499877929688,
+        "level": 534.4000244140625,
+        "session": "2026-08-07"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 636.1500244140625,
+      "prev_highs": [
+        685.0,
+        679.4500122070312,
+        680.0,
+        680.0,
+        679.0,
+        669.0999755859375,
+        668.0,
+        662.0999755859375
+      ],
+      "prev_lows": [
+        650.0499877929688,
+        655.0,
+        648.0,
+        643.1500244140625,
+        625.3499755859375
+      ],
+      "prev_volumes": [
+        40702.0,
+        113606.0,
+        31432.0,
+        11537.0,
+        18686.0,
+        12067.0,
+        35475.0,
+        19435.0,
+        13942.0,
+        24892.0,
+        61627.0,
+        15189.0,
+        9700.0,
+        22172.0,
+        31444.0,
+        11965.0,
+        10667.0,
+        29846.0,
+        17252.0
+      ],
+      "refreshed_on": "2026-10-13",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 23.577949919773477,
+          "body_frac_at_birth": 0.8101266048470347,
+          "born_index": 194,
+          "born_session": "2026-07-23",
+          "bottom": 421.54998779296875,
+          "clv_at_birth": 0.8101266048470347,
+          "departed": true,
+          "entry": 431.21002197265625,
+          "origin_index": 192,
+          "origin_session": "2026-07-21",
+          "range_atr_at_birth": 2.177882567324113,
+          "rvol_at_birth": 5.925049180863134,
+          "state": 0,
+          "stop": 418.0132953050027,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 428.45001220703125,
+          "width": 6.9000244140625
+        },
+        {
+          "atr_at_birth": 25.74561889633287,
+          "body_frac_at_birth": 0.8573586424109376,
+          "born_index": 225,
+          "born_session": "2026-09-04",
+          "bottom": 489.0,
+          "clv_at_birth": 0.886592755890784,
+          "departed": true,
+          "entry": 507.48421750485556,
+          "origin_index": 224,
+          "origin_session": "2026-09-03",
+          "range_atr_at_birth": 3.853083221905417,
+          "rvol_at_birth": 9.786583281010078,
+          "state": 0,
+          "stop": 485.13815716555007,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 502.8500061035156,
+          "width": 13.850006103515625
+        },
+        {
+          "atr_at_birth": 29.484230875935616,
+          "body_frac_at_birth": 0.7617818298211517,
+          "born_index": 227,
+          "born_session": "2026-09-08",
+          "bottom": 584.0,
+          "clv_at_birth": 0.9323048181705973,
+          "departed": true,
+          "entry": 599.4,
+          "origin_index": 226,
+          "origin_session": "2026-09-07",
+          "range_atr_at_birth": 1.9790231541553107,
+          "rvol_at_birth": 4.986957008991302,
+          "state": 0,
+          "stop": 579.5773653686097,
+          "tap_bar_index": 230,
+          "tap_session": "2026-09-11",
+          "taps": 1,
+          "top": 595.0,
+          "width": 11.0
+        }
+      ],
+      "zones_seen": 5
+    },
     "NRBBEARING": {
       "as_of": "2026-09-28",
       "as_of_close": 541.5,
@@ -30954,6 +31264,63 @@
         }
       ],
       "zones_seen": 5
+    },
+    "PERSISTENT": {
+      "as_of": "2026-10-09",
+      "as_of_close": 5770.0,
+      "as_of_high": 5789.0,
+      "as_of_low": 5499.0,
+      "atr": 166.91459467613325,
+      "breakout_26w_session": {
+        "close": 5875.0,
+        "level": 5722.0,
+        "session": "2026-08-28"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 5770.0,
+      "prev_highs": [
+        5348.5,
+        5397.0,
+        5396.0,
+        5620.0,
+        5553.5,
+        5529.0,
+        5629.0,
+        5789.0
+      ],
+      "prev_lows": [
+        5387.5,
+        5463.5,
+        5447.5,
+        5430.0,
+        5499.0
+      ],
+      "prev_volumes": [
+        335360.0,
+        812335.0,
+        412053.0,
+        233465.0,
+        494682.0,
+        352582.0,
+        350423.0,
+        388889.0,
+        411640.0,
+        307915.0,
+        335528.0,
+        294063.0,
+        611251.0,
+        506268.0,
+        768988.0,
+        266663.0,
+        298344.0,
+        332743.0,
+        773886.0
+      ],
+      "refreshed_on": "2026-10-13",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 3
     },
     "PITTIENG": {
       "as_of": "2026-10-09",
@@ -34331,6 +34698,85 @@
         }
       ],
       "zones_seen": 6
+    },
+    "SANATHAN": {
+      "as_of": "2026-10-09",
+      "as_of_close": 503.20001220703125,
+      "as_of_high": 514.4500122070312,
+      "as_of_low": 500.45001220703125,
+      "atr": 21.131565885307566,
+      "breakout_26w_session": {
+        "close": 529.25,
+        "level": 512.0,
+        "session": "2026-09-24"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 503.20001220703125,
+      "prev_highs": [
+        530.9500122070312,
+        527.75,
+        513.2000122070312,
+        532.2999877929688,
+        532.2999877929688,
+        530.9500122070312,
+        524.1500244140625,
+        514.4500122070312
+      ],
+      "prev_lows": [
+        506.5,
+        522.25,
+        512.9000244140625,
+        499.5,
+        500.45001220703125
+      ],
+      "prev_volumes": [
+        142861.0,
+        58337.0,
+        95303.0,
+        43107.0,
+        107246.0,
+        51399.0,
+        34433.0,
+        484976.0,
+        786460.0,
+        189507.0,
+        74280.0,
+        88348.0,
+        99234.0,
+        80531.0,
+        103861.0,
+        45492.0,
+        33869.0,
+        52584.0,
+        24539.0
+      ],
+      "refreshed_on": "2026-10-13",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 21.13360303455581,
+          "body_frac_at_birth": 0.8428762765779341,
+          "born_index": 237,
+          "born_session": "2026-09-23",
+          "bottom": 466.79998779296875,
+          "clv_at_birth": 0.9027964025818448,
+          "departed": true,
+          "entry": 483.7040424427044,
+          "origin_index": 236,
+          "origin_session": "2026-09-22",
+          "range_atr_at_birth": 1.7767906273043128,
+          "rvol_at_birth": 3.872566301017098,
+          "state": 0,
+          "stop": 463.6299473377854,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 479.8999938964844,
+          "width": 13.100006103515625
+        }
+      ],
+      "zones_seen": 3
     },
     "SANSERA": {
       "as_of": "2026-10-09",
@@ -41384,6 +41830,85 @@
         }
       ],
       "zones_seen": 4
+    },
+    "VHLTD": {
+      "as_of": "2026-10-09",
+      "as_of_close": 142.89999389648438,
+      "as_of_high": 142.89999389648438,
+      "as_of_low": 136.0,
+      "atr": 5.561300779733169,
+      "breakout_26w_session": {
+        "close": 151.0,
+        "level": 146.0,
+        "session": "2026-10-13"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 142.89999389648438,
+      "prev_highs": [
+        132.0,
+        132.10000610351562,
+        134.0,
+        131.99000549316406,
+        131.0,
+        131.5500030517578,
+        136.10000610351562,
+        142.89999389648438
+      ],
+      "prev_lows": [
+        124.0,
+        128.0,
+        129.0,
+        131.0,
+        136.0
+      ],
+      "prev_volumes": [
+        12124.0,
+        34703.0,
+        71786.0,
+        42536.0,
+        90680.0,
+        91880.0,
+        26659.0,
+        53448.0,
+        23968.0,
+        6373.0,
+        31292.0,
+        57692.0,
+        3118.0,
+        16427.0,
+        7505.0,
+        68525.0,
+        79381.0,
+        159535.0,
+        104822.0
+      ],
+      "refreshed_on": "2026-10-13",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 4.60179642373165,
+          "body_frac_at_birth": 0.5594942967872529,
+          "born_index": 226,
+          "born_session": "2026-09-07",
+          "bottom": 116.0,
+          "clv_at_birth": 0.7303801465809213,
+          "departed": true,
+          "entry": 117.31600341796874,
+          "origin_index": 224,
+          "origin_session": "2026-09-03",
+          "range_atr_at_birth": 1.7167212102513443,
+          "rvol_at_birth": 3.896977059874514,
+          "state": 2,
+          "stop": 115.30973053644026,
+          "tap_bar_index": 232,
+          "tap_session": "2026-09-16",
+          "taps": 3,
+          "top": 116.94000244140625,
+          "width": 0.94000244140625
+        }
+      ],
+      "zones_seen": 1
     },
     "VINCOFE": {
       "as_of": "2026-10-09",
