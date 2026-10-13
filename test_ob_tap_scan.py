@@ -1245,6 +1245,27 @@ def _unrepresented_cycle_records(data, weekly, resolvable=None):
     """
     cooldown = 26                                   # breakout_cooldown_weeks
     folded_on = as_date(str(data.get("updated_at") or "")[:10])
+
+    # state.json and ob_precision_state.json are committed by independent
+    # workflows.  When the weekly source is newer, every absent cycle may
+    # legitimately be in flight to this job's next fold.  Using breakout_bar
+    # to decide that is incorrect: scan.py can discover yesterday's cross on a
+    # delayed/recovery run today (CCAVENUE/NRAIL did exactly that on 13-Oct),
+    # making the pre-scan invariant fail and preventing harvest_waiting from
+    # ever repairing the state.  Keep the strict fixed-point check only when
+    # the OB state is at least as new as its source.
+    def utc_timestamp(value):
+        try:
+            stamp = pd.Timestamp(value)
+            return stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp.tz_convert("UTC")
+        except (TypeError, ValueError):
+            return None
+
+    ob_updated = utc_timestamp(data.get("updated_at"))
+    weekly_updated = utc_timestamp(weekly.get("updated_at"))
+    if ob_updated is not None and weekly_updated is not None and weekly_updated > ob_updated:
+        return []
+
     waiting = data.get("waiting") or {}
     missing = []
     for sym, rec in sorted(
