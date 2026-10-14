@@ -4638,10 +4638,10 @@
   "data_outage_on": null,
   "digest_on": {
     "manual": "2026-09-28",
-    "post_close": "2026-10-13"
+    "post_close": "2026-10-14"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-14T15:00:33+05:30",
+  "updated_at": "2026-10-14T15:45:33+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5924,6 +5924,19 @@
       "status": "waiting",
       "symbol": "DYCL",
       "week": "2026-08-24"
+    },
+    "DYNAMATECH": {
+      "added_at": "2026-10-14",
+      "breakout_bar": "2026-10-14T15:10+05:30",
+      "breakout_price": 14414.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 14409.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "4525",
+      "status": "waiting",
+      "symbol": "DYNAMATECH",
+      "week": "2026-10-12"
     },
     "E2E": {
       "added_at": "2026-10-07",
