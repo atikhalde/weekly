@@ -4641,7 +4641,7 @@
     "post_close": "2026-10-13"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-14T09:15:41+05:30",
+  "updated_at": "2026-10-14T10:00:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7102,6 +7102,24 @@
       "status": "waiting",
       "symbol": "KRBL",
       "week": "2026-08-17"
+    },
+    "KRISHANA": {
+      "added_at": "2026-10-14",
+      "breakout_26w_session": {
+        "close": 146.7899932861328,
+        "level": 143.6999969482422,
+        "session": "2026-06-24"
+      },
+      "breakout_bar": "2026-10-14T09:35+05:30",
+      "breakout_price": 208.02999877929688,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 206.38999938964844,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "12847",
+      "status": "waiting",
+      "symbol": "KRISHANA",
+      "week": "2026-10-12"
     },
     "KROSS": {
       "added_at": "2026-09-27",
@@ -25707,6 +25725,127 @@
         }
       ],
       "zones_seen": 7
+    },
+    "KRISHANA": {
+      "as_of": "2026-10-12",
+      "as_of_close": 194.7899932861328,
+      "as_of_high": 201.0,
+      "as_of_low": 194.10000610351562,
+      "atr": 7.612404115999974,
+      "breakout_26w_session": {
+        "close": 146.7899932861328,
+        "level": 143.6999969482422,
+        "session": "2026-06-24"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 194.7899932861328,
+      "prev_highs": [
+        193.0,
+        188.10000610351562,
+        186.52999877929688,
+        196.5,
+        194.64999389648438,
+        192.6999969482422,
+        200.0,
+        201.0
+      ],
+      "prev_lows": [
+        186.52000427246094,
+        190.1999969482422,
+        187.17999267578125,
+        184.2100067138672,
+        194.10000610351562
+      ],
+      "prev_volumes": [
+        700166.0,
+        1194736.0,
+        423003.0,
+        358867.0,
+        1006347.0,
+        829723.0,
+        526685.0,
+        631052.0,
+        356024.0,
+        613298.0,
+        331174.0,
+        1098163.0,
+        1805453.0,
+        1043482.0,
+        1697639.0,
+        413924.0,
+        293743.0,
+        2164858.0,
+        434359.0
+      ],
+      "refreshed_on": "2026-10-14",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 4.486866439746323,
+          "body_frac_at_birth": 0.7174598714991822,
+          "born_index": 118,
+          "born_session": "2026-04-02",
+          "bottom": 93.0,
+          "clv_at_birth": 0.9079362061438432,
+          "departed": true,
+          "entry": 96.09763687468168,
+          "origin_index": 116,
+          "origin_session": "2026-03-30",
+          "range_atr_at_birth": 2.8081955733082773,
+          "rvol_at_birth": 4.385688518179566,
+          "state": 0,
+          "stop": 92.32697003403806,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 95.29000091552734,
+          "width": 2.2900009155273438
+        },
+        {
+          "atr_at_birth": 7.315648370905544,
+          "body_frac_at_birth": 0.870967494943816,
+          "born_index": 193,
+          "born_session": "2026-07-23",
+          "bottom": 136.3000030517578,
+          "clv_at_birth": 0.8817208417603067,
+          "departed": true,
+          "entry": 144.16682281027863,
+          "origin_index": 192,
+          "origin_session": "2026-07-22",
+          "range_atr_at_birth": 1.9068708938665722,
+          "rvol_at_birth": 2.647516518680776,
+          "state": 0,
+          "stop": 135.20265579612197,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 142.85000610351562,
+          "width": 6.5500030517578125
+        },
+        {
+          "atr_at_birth": 9.058162592320885,
+          "body_frac_at_birth": 0.7512825207832532,
+          "born_index": 198,
+          "born_session": "2026-07-30",
+          "bottom": 162.6999969482422,
+          "clv_at_birth": 0.905128674629407,
+          "departed": true,
+          "entry": 167.04000549316407,
+          "origin_index": 197,
+          "origin_session": "2026-07-29",
+          "range_atr_at_birth": 2.1527544688291695,
+          "rvol_at_birth": 2.5500457350361403,
+          "state": 0,
+          "stop": 161.34127255939404,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 165.8000030517578,
+          "width": 3.100006103515625
+        }
+      ],
+      "zones_seen": 6
     },
     "KROSS": {
       "as_of": "2026-09-25",
