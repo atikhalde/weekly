@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-14",
+  "scan_time": "20:09",
+  "generated_at_ist": "2026-10-14T20:09:50",
+  "too_late": true,
+  "too_early": false,
+  "top3_actionable": [
+    {
+      "symbol": "BLUSPRING",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_above",
+      "pre": 7,
+      "price": 166.25,
+      "qty": 601,
+      "invest": 99916.25,
+      "day_ret": 6.230031948881787,
+      "rvol": 1.513473974187224,
+      "close_pos": 0.9076029686155591,
+      "gap_pct": -8.660130718954248,
+      "prime": ""
+    },
+    {
+      "symbol": "GANDHAR",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 6/8",
+      "arm": "ant_above",
+      "pre": 6,
+      "price": 310.95001220703125,
+      "qty": 321,
+      "invest": 99814.95391845703,
+      "day_ret": 2.963580201003735,
+      "rvol": 0.9043022639012182,
+      "close_pos": 0.9098722924490341,
+      "gap_pct": -2.067952876010078,
+      "prime": ""
+    }
+  ],
+  "next_anticipated": [
+    {
+      "symbol": "MODISONLTD",
+      "close": 545.2999877929688,
+      "level": 546.0,
+      "which": "C+D",
+      "gap_pct": 0.12820736392513737,
+      "side": "below",
+      "pre": 6,
+      "ret_12m": 242.35308385992184,
+      "dist_200dma": 114.30409662127077,
+      "day_ret": 5.883492775333732,
+      "prev_close": 519.5499877929688,
+      "high": 545.5,
+      "close_pos": 0.9943658533230634,
+      "rvol": 1.1744829100540153,
+      "vol_today": 193413.0,
+      "vma50": 164679.28,
+      "vma_bars": 50,
+      "atr_pct": 5.181943804514164,
+      "turnover_cr": 3.734393379354553,
+      "partial_frac": 1.0,
+      "base_from_high": -4.844324580042358,
+      "ret_3m_prior": 80.36799507396155,
+      "ok": true,
+      "mcap_cr": 1758.76,
+      "rank": 3
+    }
+  ],
+  "excluded_locked": [
+    [
+      "SEJALLTD",
+      "Locked at Upper Circuit +20%"
+    ],
+    [
+      "BHEL",
+      "Locked at Upper Circuit +5%"
+    ],
+    [
+      "MODISONLTD",
+      "Locked at Upper Circuit +5%"
+    ]
+  ],
+  "enterable": false
+}
