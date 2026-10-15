@@ -2660,6 +2660,13 @@
       "session": "2026-10-12",
       "tap_number": 0
     },
+    "NETWEB|2026-10-12|4740.00|4644.60|tap|tap1": {
+      "kind": "tap",
+      "price": 4797.6,
+      "sent_at": "2026-10-15T09:30:37+05:30",
+      "session": "2026-10-15",
+      "tap_number": 1
+    },
     "NEULANDLAB|2026-04-06|12500.0|12060.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4662,7 +4669,7 @@
     "post_close": "2026-10-14"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-15T09:15:42+05:30",
+  "updated_at": "2026-10-15T09:30:37+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7825,10 +7832,10 @@
       "breakout_price": 5284.7998046875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-15",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "17433",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "NETWEB",
       "week": "2026-08-17"
     },
