@@ -1806,6 +1806,13 @@
       "session": "2026-09-09",
       "tap_number": null
     },
+    "INDNIPPON|2026-09-09|1130.10|1092.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1149.7,
+      "sent_at": "2026-10-15T14:00:39+05:30",
+      "session": "2026-10-15",
+      "tap_number": 1
+    },
     "INDOBORAX|2026-08-20|437.10|422.25|tap|tap1": {
       "kind": "tap",
       "price": 442.3,
@@ -4676,7 +4683,7 @@
     "post_close": "2026-10-14"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-15T11:30:43+05:30",
+  "updated_at": "2026-10-15T14:00:39+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6769,10 +6776,10 @@
       "breakout_price": 1293.9000244140625,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-15",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "4747",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "INDNIPPON",
       "week": "2026-09-07"
     },
