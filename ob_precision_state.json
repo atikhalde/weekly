@@ -280,6 +280,13 @@
       "session": "2026-06-29",
       "tap_number": null
     },
+    "ANANTRAJ|2026-07-03|523.00|513.00|tap|tap1": {
+      "kind": "tap",
+      "price": 526.9,
+      "sent_at": "2026-10-15T15:15:35+05:30",
+      "session": "2026-10-15",
+      "tap_number": 1
+    },
     "ANANTRAJ|2026-07-03|523.0|513.0|ob": {
       "kind": "ob",
       "price": null,
@@ -3871,6 +3878,13 @@
       "session": "2026-09-07",
       "tap_number": null
     },
+    "STAR|2026-09-07|1053.90|1043.10|tap|tap1": {
+      "kind": "tap",
+      "price": 1057.5,
+      "sent_at": "2026-10-15T15:15:35+05:30",
+      "session": "2026-10-15",
+      "tap_number": 1
+    },
     "STEL|2026-06-02|451.0|435.6000061035156|ob": {
       "kind": "ob",
       "price": null,
@@ -4683,7 +4697,7 @@
     "post_close": "2026-10-14"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-15T15:00:47+05:30",
+  "updated_at": "2026-10-15T15:15:35+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -4976,10 +4990,10 @@
       "breakout_price": 646.25,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-15",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "13620",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ANANTRAJ",
       "week": "2026-08-17"
     },
@@ -9242,10 +9256,10 @@
       "breakout_price": 1235.800048828125,
       "exchange_segment": "NSE_EQ",
       "level_26w": 1231.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-15",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "7374",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "STAR",
       "week": "2026-09-21"
     },
