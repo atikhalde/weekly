@@ -2415,6 +2415,13 @@
       "session": "2026-10-05",
       "tap_number": 0
     },
+    "MARINE|2026-10-05|440.40|416.65|tap|tap1": {
+      "kind": "tap",
+      "price": 441.8,
+      "sent_at": "2026-10-15T11:30:43+05:30",
+      "session": "2026-10-15",
+      "tap_number": 1
+    },
     "MAXESTATES|2026-08-17|442.79998779296875|435.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4669,7 +4676,7 @@
     "post_close": "2026-10-14"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-15T09:45:36+05:30",
+  "updated_at": "2026-10-15T11:30:43+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7544,10 +7551,10 @@
       "breakout_price": 396.04998779296875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-15",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "1328",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MARINE",
       "week": "2026-08-24"
     },
