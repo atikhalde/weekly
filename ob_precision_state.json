@@ -1981,6 +1981,13 @@
       "session": "2026-08-18",
       "tap_number": null
     },
+    "JYOTICNC|2026-09-21|964.00|928.60|tap|tap1": {
+      "kind": "tap",
+      "price": 989.4,
+      "sent_at": "2026-10-16T09:30:36+05:30",
+      "session": "2026-10-16",
+      "tap_number": 1
+    },
     "JYOTICNC|2026-09-21|964.0|928.5999755859375|ob": {
       "kind": "ob",
       "price": null,
@@ -4725,7 +4732,7 @@
     "post_close": "2026-10-15"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-16T09:15:39+05:30",
+  "updated_at": "2026-10-16T09:30:36+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7134,10 +7141,10 @@
       "breakout_price": 1084.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": 1065.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-16",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "21334",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "JYOTICNC",
       "week": "2026-09-21"
     },
