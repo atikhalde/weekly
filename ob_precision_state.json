@@ -1162,6 +1162,13 @@
       "session": "2026-06-17",
       "tap_number": null
     },
+    "DIXON|2026-07-06|12470.00|12325.00|tap|tap1": {
+      "kind": "tap",
+      "price": 12539.0,
+      "sent_at": "2026-10-16T10:00:37+05:30",
+      "session": "2026-10-16",
+      "tap_number": 1
+    },
     "DIXON|2026-07-06|12470.0|12325.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4732,7 +4739,7 @@
     "post_close": "2026-10-15"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-16T09:45:34+05:30",
+  "updated_at": "2026-10-16T10:00:37+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6009,10 +6016,10 @@
       "breakout_price": 14687.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-16",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "21690",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "DIXON",
       "week": "2026-08-17"
     },
