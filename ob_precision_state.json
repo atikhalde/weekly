@@ -3066,6 +3066,13 @@
       "session": "2026-10-12",
       "tap_number": 0
     },
+    "PTCIL|2026-10-12|24470.00|24200.00|tap|tap1": {
+      "kind": "tap",
+      "price": 24875.0,
+      "sent_at": "2026-10-16T12:30:48+05:30",
+      "session": "2026-10-16",
+      "tap_number": 1
+    },
     "PVRINOX|2026-07-24|1002.5|990.0|ob": {
       "kind": "ob",
       "price": null,
@@ -3324,6 +3331,13 @@
       "sent_at": "2026-10-07T09:15:55+05:30",
       "session": "2026-10-06",
       "tap_number": 0
+    },
+    "RRKABEL|2026-10-06|2524.00|2465.00|tap|tap1": {
+      "kind": "tap",
+      "price": 2543.9,
+      "sent_at": "2026-10-16T12:30:48+05:30",
+      "session": "2026-10-16",
+      "tap_number": 1
     },
     "RUBYMILLS|2026-04-10|221.89999389648438|215.0|ob": {
       "kind": "ob",
@@ -4739,7 +4753,7 @@
     "post_close": "2026-10-15"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-16T10:00:37+05:30",
+  "updated_at": "2026-10-16T12:30:48+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8416,10 +8430,10 @@
       "breakout_price": 19920.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-16",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "16682",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "PTCIL",
       "week": "2026-08-17"
     },
@@ -8704,10 +8718,10 @@
       "breakout_price": 2852.89990234375,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-16",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "18566",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "RRKABEL",
       "week": "2026-08-17"
     },
