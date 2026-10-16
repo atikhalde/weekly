@@ -4753,7 +4753,7 @@
     "post_close": "2026-10-15"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-16T12:30:48+05:30",
+  "updated_at": "2026-10-16T13:15:32+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5328,6 +5328,24 @@
       "status": "tapped",
       "symbol": "AUROPHARMA",
       "week": "2026-08-31"
+    },
+    "AURUM": {
+      "added_at": "2026-10-16",
+      "breakout_26w_session": {
+        "close": 210.7899932861328,
+        "level": 209.8000030517578,
+        "session": "2026-06-24"
+      },
+      "breakout_bar": "2026-10-16T12:55+05:30",
+      "breakout_price": 265.8500061035156,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 264.6400146484375,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "10310",
+      "status": "waiting",
+      "symbol": "AURUM",
+      "week": "2026-10-12"
     },
     "AVADHSUGAR": {
       "added_at": "2026-10-07",
@@ -6839,6 +6857,24 @@
       "symbol": "INDGN",
       "week": "2026-08-24"
     },
+    "INDHOTEL": {
+      "added_at": "2026-10-16",
+      "breakout_26w_session": {
+        "close": 752.2999877929688,
+        "level": 748.0,
+        "session": "2026-07-10"
+      },
+      "breakout_bar": "2026-10-16T12:50+05:30",
+      "breakout_price": 758.4000244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 757.4000244140625,
+      "resolved_at": "2026-10-16",
+      "resolved_reason": "all 1 order block(s) invalidated/exhausted",
+      "security_id": "1512",
+      "status": "invalid",
+      "symbol": "INDHOTEL",
+      "week": "2026-10-12"
+    },
     "INDIAGLYCO": {
       "added_at": "2026-09-27",
       "breakout_26w_session": {},
@@ -8206,6 +8242,24 @@
       "status": "tapped",
       "symbol": "OPTIEMUS",
       "week": "2026-10-05"
+    },
+    "ORIENTHOT": {
+      "added_at": "2026-10-16",
+      "breakout_26w_session": {
+        "close": 141.44000244140625,
+        "level": 125.9000015258789,
+        "session": "2026-06-23"
+      },
+      "breakout_bar": "2026-10-16T12:55+05:30",
+      "breakout_price": 149.19000244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 148.8000030517578,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "2493",
+      "status": "waiting",
+      "symbol": "ORIENTHOT",
+      "week": "2026-10-12"
     },
     "PARADEEP": {
       "added_at": "2026-09-27",
@@ -13827,6 +13881,106 @@
         }
       ],
       "zones_seen": 3
+    },
+    "AURUM": {
+      "as_of": "2026-10-15",
+      "as_of_close": 239.10000610351562,
+      "as_of_high": 254.0,
+      "as_of_low": 233.2100067138672,
+      "atr": 10.266137889304549,
+      "breakout_26w_session": {
+        "close": 210.7899932861328,
+        "level": 209.8000030517578,
+        "session": "2026-06-24"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 239.10000610351562,
+      "prev_highs": [
+        234.0,
+        236.39999389648438,
+        235.8000030517578,
+        235.0,
+        235.86000061035156,
+        249.89999389648438,
+        245.0,
+        254.0
+      ],
+      "prev_lows": [
+        226.36000061035156,
+        226.25,
+        227.0500030517578,
+        235.00999450683594,
+        233.2100067138672
+      ],
+      "prev_volumes": [
+        149650.0,
+        162802.0,
+        106125.0,
+        73019.0,
+        67430.0,
+        103745.0,
+        63133.0,
+        64994.0,
+        461824.0,
+        104235.0,
+        48055.0,
+        135512.0,
+        124143.0,
+        92988.0,
+        87841.0,
+        37185.0,
+        3885115.0,
+        453883.0,
+        1914031.0
+      ],
+      "refreshed_on": "2026-10-16",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 6.461187528077486,
+          "body_frac_at_birth": 0.6589150404417244,
+          "born_index": 156,
+          "born_session": "2026-06-04",
+          "bottom": 175.00999450683594,
+          "clv_at_birth": 0.8682172284821401,
+          "departed": true,
+          "entry": 183.36301070329614,
+          "origin_index": 152,
+          "origin_session": "2026-05-29",
+          "range_atr_at_birth": 1.996536060968152,
+          "rvol_at_birth": 3.297764119014087,
+          "state": 2,
+          "stop": 174.0408163776243,
+          "tap_bar_index": 162,
+          "tap_session": "2026-06-12",
+          "taps": 4,
+          "top": 182.1999969482422,
+          "width": 7.19000244140625
+        },
+        {
+          "atr_at_birth": 8.544239999219693,
+          "body_frac_at_birth": 0.6127413608173555,
+          "born_index": 172,
+          "born_session": "2026-06-29",
+          "bottom": 203.0,
+          "clv_at_birth": 0.9327127874539342,
+          "departed": true,
+          "entry": 211.86796503091423,
+          "origin_index": 169,
+          "origin_session": "2026-06-23",
+          "range_atr_at_birth": 1.6350197585717328,
+          "rvol_at_birth": 1.9996612085600618,
+          "state": 0,
+          "stop": 201.71836400011705,
+          "tap_bar_index": 198,
+          "tap_session": "2026-08-04",
+          "taps": 1,
+          "top": 210.3300018310547,
+          "width": 7.3300018310546875
+        }
+      ],
+      "zones_seen": 4
     },
     "AVADHSUGAR": {
       "as_of": "2026-10-15",
@@ -23738,6 +23892,63 @@
       ],
       "zones_seen": 2
     },
+    "INDHOTEL": {
+      "as_of": "2026-10-15",
+      "as_of_close": 741.4500122070312,
+      "as_of_high": 752.5499877929688,
+      "as_of_low": 728.2999877929688,
+      "atr": 16.578782193463663,
+      "breakout_26w_session": {
+        "close": 752.2999877929688,
+        "level": 748.0,
+        "session": "2026-07-10"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 741.4500122070312,
+      "prev_highs": [
+        736.0,
+        743.0,
+        732.25,
+        723.4500122070312,
+        722.0999755859375,
+        724.1500244140625,
+        730.0,
+        752.5499877929688
+      ],
+      "prev_lows": [
+        709.75,
+        708.0999755859375,
+        709.5499877929688,
+        716.7999877929688,
+        728.2999877929688
+      ],
+      "prev_volumes": [
+        3256156.0,
+        2983659.0,
+        1255870.0,
+        1295095.0,
+        1140542.0,
+        1538596.0,
+        2741065.0,
+        26142773.0,
+        3733640.0,
+        4023940.0,
+        3696656.0,
+        2461719.0,
+        3190796.0,
+        2320806.0,
+        1043907.0,
+        2159163.0,
+        1751176.0,
+        1680761.0,
+        5011978.0
+      ],
+      "refreshed_on": "2026-10-16",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 1
+    },
     "INDIAGLYCO": {
       "as_of": "2026-09-28",
       "as_of_close": 297.5,
@@ -32231,6 +32442,106 @@
         }
       ],
       "zones_seen": 6
+    },
+    "ORIENTHOT": {
+      "as_of": "2026-10-15",
+      "as_of_close": 145.5800018310547,
+      "as_of_high": 147.6699981689453,
+      "as_of_low": 141.5,
+      "atr": 4.176040450084412,
+      "breakout_26w_session": {
+        "close": 141.44000244140625,
+        "level": 125.9000015258789,
+        "session": "2026-06-23"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 145.5800018310547,
+      "prev_highs": [
+        144.38999938964844,
+        145.0,
+        142.6999969482422,
+        141.32000732421875,
+        141.5,
+        141.99000549316406,
+        142.8300018310547,
+        147.6699981689453
+      ],
+      "prev_lows": [
+        138.10000610351562,
+        138.14999389648438,
+        138.5,
+        140.3699951171875,
+        141.5
+      ],
+      "prev_volumes": [
+        1243314.0,
+        1833650.0,
+        292194.0,
+        295043.0,
+        422911.0,
+        382049.0,
+        670774.0,
+        1048759.0,
+        511057.0,
+        627946.0,
+        149684.0,
+        869875.0,
+        343678.0,
+        188020.0,
+        209210.0,
+        233006.0,
+        473885.0,
+        239877.0,
+        2188070.0
+      ],
+      "refreshed_on": "2026-10-16",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 4.397052736190932,
+          "body_frac_at_birth": 0.6868133019773549,
+          "born_index": 162,
+          "born_session": "2026-06-12",
+          "bottom": 100.5999984741211,
+          "clv_at_birth": 0.8104399059320648,
+          "departed": true,
+          "entry": 104.4114722390964,
+          "origin_index": 160,
+          "origin_session": "2026-06-10",
+          "range_atr_at_birth": 1.6556541884015188,
+          "rvol_at_birth": 1.8941940336916285,
+          "state": 0,
+          "stop": 99.94044056369245,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 103.62000274658203,
+          "width": 3.0200042724609375
+        },
+        {
+          "atr_at_birth": 6.909533967838746,
+          "body_frac_at_birth": 0.8157894736842105,
+          "born_index": 209,
+          "born_session": "2026-08-19",
+          "bottom": 119.12000274658203,
+          "clv_at_birth": 0.8157894736842105,
+          "departed": true,
+          "entry": 123.1519989013672,
+          "origin_index": 208,
+          "origin_session": "2026-08-18",
+          "range_atr_at_birth": 2.7498236622669165,
+          "rvol_at_birth": 17.638440210454696,
+          "state": 0,
+          "stop": 118.08357265140621,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 122.0,
+          "width": 2.8799972534179688
+        }
+      ],
+      "zones_seen": 5
     },
     "PARADEEP": {
       "as_of": "2026-10-09",
