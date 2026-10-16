@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-16",
+  "scan_time": "19:44",
+  "generated_at_ist": "2026-10-16T19:44:16",
+  "too_late": true,
+  "too_early": false,
+  "top3_actionable": [
+    {
+      "symbol": "SHANTIGOLD",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_above",
+      "pre": 7,
+      "price": 423.29998779296875,
+      "qty": 236,
+      "invest": 99898.79711914062,
+      "day_ret": 7.029074031091964,
+      "rvol": 1.5932110972177211,
+      "close_pos": 0.9484844785748106,
+      "gap_pct": -8.56629761973062,
+      "prime": ""
+    },
+    {
+      "symbol": "PREMIERPOL",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_above",
+      "pre": 7,
+      "price": 111.51000213623047,
+      "qty": 896,
+      "invest": 99912.9619140625,
+      "day_ret": 3.2595650912980556,
+      "rvol": 0.7038791628980169,
+      "close_pos": 0.9387502670288086,
+      "gap_pct": -4.50797125169695,
+      "prime": ""
+    }
+  ],
+  "next_anticipated": [],
+  "excluded_locked": [],
+  "enterable": false
+}
