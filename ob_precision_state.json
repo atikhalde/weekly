@@ -112,6 +112,13 @@
       "session": "2026-09-02",
       "tap_number": null
     },
+    "AEGISVOPAK|2026-09-02|267.90|260.70|tap|tap1": {
+      "kind": "tap",
+      "price": 269.05,
+      "sent_at": "2026-10-19T09:30:43+05:30",
+      "session": "2026-10-19",
+      "tap_number": 1
+    },
     "AETHER|2026-01-01|830.0999755859375|829.6500244140625|ob": {
       "kind": "ob",
       "price": null,
@@ -1540,6 +1547,13 @@
       "session": "2026-10-07",
       "tap_number": 0
     },
+    "GANDHAR|2026-10-07|283.30|275.90|tap|tap1": {
+      "kind": "tap",
+      "price": 290.45,
+      "sent_at": "2026-10-19T09:30:43+05:30",
+      "session": "2026-10-19",
+      "tap_number": 1
+    },
     "GANESHBE|2026-02-09|69.12000274658203|68.4000015258789|ob": {
       "kind": "ob",
       "price": null,
@@ -2695,6 +2709,13 @@
       "session": "2026-04-06",
       "tap_number": null
     },
+    "NELCO|2026-06-18|731.00|711.35|tap|tap1": {
+      "kind": "tap",
+      "price": 804.2,
+      "sent_at": "2026-10-19T09:30:43+05:30",
+      "session": "2026-10-19",
+      "tap_number": 1
+    },
     "NELCO|2026-06-18|731.0|711.3499755859375|ob": {
       "kind": "ob",
       "price": null,
@@ -2988,6 +3009,13 @@
       "sent_at": "2026-10-07T09:15:55+05:30",
       "session": "2026-10-06",
       "tap_number": 0
+    },
+    "PARAGMILK|2026-10-06|271.45|258.00|tap|tap1": {
+      "kind": "tap",
+      "price": 275.9,
+      "sent_at": "2026-10-19T09:30:43+05:30",
+      "session": "2026-10-19",
+      "tap_number": 1
     },
     "PARAS|2026-06-09|860.7000122070312|825.0499877929688|ob": {
       "kind": "ob",
@@ -4802,7 +4830,7 @@
     "post_close": "2026-10-16"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-19T09:15:41+05:30",
+  "updated_at": "2026-10-19T09:30:43+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -4955,10 +4983,10 @@
       "breakout_price": 314.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-19",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "757336",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "AEGISVOPAK",
       "week": "2026-09-14"
     },
@@ -6529,10 +6557,10 @@
       "breakout_price": 305.75,
       "exchange_segment": "NSE_EQ",
       "level_26w": 304.6499938964844,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-19",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "20303",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "GANDHAR",
       "week": "2026-10-12"
     },
@@ -8037,10 +8065,10 @@
       "breakout_price": 1081.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-19",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "2388",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "NELCO",
       "week": "2026-08-17"
     },
@@ -8357,10 +8385,10 @@
       "breakout_price": 286.25,
       "exchange_segment": "NSE_EQ",
       "level_26w": 286.20001220703125,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-19",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "17130",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "PARAGMILK",
       "week": "2026-10-05"
     },
