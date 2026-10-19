@@ -1,42 +1,44 @@
 {
-  "date": "2026-10-16",
-  "scan_time": "19:49",
-  "generated_at_ist": "2026-10-16T19:49:39",
+  "date": "2026-10-19",
+  "scan_time": "22:07",
+  "generated_at_ist": "2026-10-19T22:07:43",
   "too_late": true,
   "too_early": false,
-  "top3_actionable": [
+  "top3_actionable": [],
+  "next_anticipated": [
     {
-      "symbol": "SHANTIGOLD",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 7/8",
-      "arm": "ant_above",
-      "pre": 7,
-      "price": 423.29998779296875,
-      "qty": 236,
-      "invest": 99898.79711914062,
-      "day_ret": 7.029074031091964,
-      "rvol": 1.5932110972177211,
-      "close_pos": 0.9484844785748106,
-      "gap_pct": -8.56629761973062,
-      "prime": ""
-    },
-    {
-      "symbol": "PREMIERPOL",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 7/8",
-      "arm": "ant_above",
-      "pre": 7,
-      "price": 111.51000213623047,
-      "qty": 896,
-      "invest": 99912.9619140625,
-      "day_ret": 3.2595650912980556,
-      "rvol": 0.7038791628980169,
-      "close_pos": 0.9387502670288086,
-      "gap_pct": -4.50797125169695,
-      "prime": ""
+      "symbol": "HFCL",
+      "close": 268.80999755859375,
+      "level": 275.9100036621094,
+      "which": "C+D",
+      "gap_pct": 2.573305066608089,
+      "side": "below",
+      "pre": 6,
+      "ret_12m": 251.79948262702777,
+      "dist_200dma": 77.32477635717319,
+      "day_ret": 2.9923362293462707,
+      "prev_close": 256.010009765625,
+      "high": 268.81,
+      "close_pos": 0.9999997932763546,
+      "rvol": 1.3089626130143936,
+      "vol_today": 15112730.0,
+      "vma50": 11545578.04,
+      "vma_bars": 50,
+      "atr_pct": 5.200433947843286,
+      "turnover_cr": 182.8575224816379,
+      "partial_frac": 1.0,
+      "base_from_high": -7.212494520805679,
+      "ret_3m_prior": 23.063986573028373,
+      "ok": true,
+      "mcap_cr": 41241.59,
+      "rank": 1
     }
   ],
-  "next_anticipated": [],
-  "excluded_locked": [],
+  "excluded_locked": [
+    [
+      "HFCL",
+      "Locked at Upper Circuit +5%"
+    ]
+  ],
   "enterable": false
 }
