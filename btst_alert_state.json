@@ -1,44 +1,11 @@
 {
-  "date": "2026-10-19",
-  "scan_time": "22:09",
-  "generated_at_ist": "2026-10-19T22:09:05",
+  "date": "2026-10-20",
+  "scan_time": "19:58",
+  "generated_at_ist": "2026-10-20T19:58:53",
   "too_late": true,
   "too_early": false,
   "top3_actionable": [],
-  "next_anticipated": [
-    {
-      "symbol": "HFCL",
-      "close": 268.80999755859375,
-      "level": 275.9100036621094,
-      "which": "C+D",
-      "gap_pct": 2.573305066608089,
-      "side": "below",
-      "pre": 6,
-      "ret_12m": 251.79948262702777,
-      "dist_200dma": 77.32477635717319,
-      "day_ret": 2.9923362293462707,
-      "prev_close": 256.010009765625,
-      "high": 268.81,
-      "close_pos": 0.9999997932763546,
-      "rvol": 1.3089626130143936,
-      "vol_today": 15112730.0,
-      "vma50": 11545578.04,
-      "vma_bars": 50,
-      "atr_pct": 5.200433947843286,
-      "turnover_cr": 182.8575224816379,
-      "partial_frac": 1.0,
-      "base_from_high": -7.212494520805679,
-      "ret_3m_prior": 23.063986573028373,
-      "ok": true,
-      "mcap_cr": 41241.59,
-      "rank": 1
-    }
-  ],
-  "excluded_locked": [
-    [
-      "HFCL",
-      "Locked at Upper Circuit +5%"
-    ]
-  ],
+  "next_anticipated": [],
+  "excluded_locked": [],
   "enterable": false
 }
