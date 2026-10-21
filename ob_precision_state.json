@@ -4788,6 +4788,13 @@
       "session": "2026-06-19",
       "tap_number": null
     },
+    "WABAG|2026-06-19|1769.90|1739.20|tap|tap1": {
+      "kind": "tap",
+      "price": 1793.3,
+      "sent_at": "2026-10-21T12:30:45+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "WELENT|2026-06-04|517.5|502.8999938964844|ob": {
       "kind": "ob",
       "price": null,
@@ -4956,7 +4963,7 @@
     "post_close": "2026-10-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-21T11:30:42+05:30",
+  "updated_at": "2026-10-21T12:30:45+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10439,10 +10446,10 @@
       "breakout_price": 2266.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "20188",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "WABAG",
       "week": "2026-09-07"
     },
