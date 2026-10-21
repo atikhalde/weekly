@@ -392,6 +392,13 @@
       "session": "2026-08-14",
       "tap_number": null
     },
+    "ASAHIINDIA|2026-08-14|903.15|879.10|tap|tap1": {
+      "kind": "tap",
+      "price": 907.2,
+      "sent_at": "2026-10-21T10:00:41+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "ASIANENE|2026-08-17|399.0|366.3999938964844|ob": {
       "kind": "ob",
       "price": null,
@@ -524,6 +531,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-09-02",
       "tap_number": null
+    },
+    "AYMSYNTEX|2026-09-02|253.90|249.10|tap|tap1": {
+      "kind": "tap",
+      "price": 255.6,
+      "sent_at": "2026-10-21T10:00:41+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
     },
     "BAJAJ-AUTO|2026-04-10|9365.0|9262.0|ob": {
       "kind": "ob",
@@ -1504,6 +1518,13 @@
       "sent_at": "2026-10-08T09:15:40+05:30",
       "session": "2026-10-06",
       "tap_number": 0
+    },
+    "FINEORG|2026-10-06|5124.00|5060.00|tap|tap1": {
+      "kind": "tap",
+      "price": 5163.5,
+      "sent_at": "2026-10-21T10:00:41+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
     },
     "FOSECOIND|2026-09-16|6277.50|6100.00|tap|tap1": {
       "kind": "tap",
@@ -4200,6 +4221,13 @@
       "session": "2026-09-28",
       "tap_number": 0
     },
+    "SUNFLAG|2026-09-28|395.00|390.20|tap|tap1": {
+      "kind": "tap",
+      "price": 398.7,
+      "sent_at": "2026-10-21T10:00:41+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "SURAKSHA|2026-08-13|265.0|257.5|ob": {
       "kind": "ob",
       "price": null,
@@ -4332,6 +4360,13 @@
       "sent_at": "2026-10-12T15:39:22+05:30",
       "session": "2026-10-09",
       "tap_number": 0
+    },
+    "TCPLPACK|2026-10-09|4057.10|3905.50|tap|tap1": {
+      "kind": "tap",
+      "price": 4008.8,
+      "sent_at": "2026-10-21T10:00:41+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
     },
     "TDPOWERSYS|2026-08-05|572.5|553.0499877929688|ob": {
       "kind": "ob",
@@ -4879,7 +4914,7 @@
     "post_close": "2026-10-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-21T09:30:43+05:30",
+  "updated_at": "2026-10-21T10:00:41+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5362,10 +5397,10 @@
       "breakout_price": 962.9500122070312,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "5378",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ASAHIINDIA",
       "week": "2026-08-17"
     },
@@ -5556,10 +5591,10 @@
       "breakout_price": 282.04998779296875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "10285",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "AYMSYNTEX",
       "week": "2026-08-31"
     },
@@ -6516,10 +6551,10 @@
       "breakout_price": 5447.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": 5407.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "3744",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "FINEORG",
       "week": "2026-10-05"
     },
@@ -9682,10 +9717,10 @@
       "breakout_price": 430.54998779296875,
       "exchange_segment": "NSE_EQ",
       "level_26w": 428.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "3348",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SUNFLAG",
       "week": "2026-09-28"
     },
@@ -9844,10 +9879,10 @@
       "breakout_price": 4460.10009765625,
       "exchange_segment": "NSE_EQ",
       "level_26w": 4410.89990234375,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "184",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TCPLPACK",
       "week": "2026-10-12"
     },
