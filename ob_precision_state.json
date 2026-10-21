@@ -2702,6 +2702,13 @@
       "session": "2026-10-06",
       "tap_number": 0
     },
+    "MOTILALOFS|2026-10-06|994.00|965.05|tap|tap1": {
+      "kind": "tap",
+      "price": 1001.0,
+      "sent_at": "2026-10-21T11:00:39+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "MSTCLTD|2026-06-04|451.54998779296875|442.0|ob": {
       "kind": "ob",
       "price": null,
@@ -3142,6 +3149,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-07-28",
       "tap_number": null
+    },
+    "PRUDENT|2026-07-28|2920.90|2833.30|tap|tap1": {
+      "kind": "tap",
+      "price": 2954.6,
+      "sent_at": "2026-10-21T11:00:39+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
     },
     "PTCIL|2026-06-02|16755.0|15930.0|ob": {
       "kind": "ob",
@@ -4921,7 +4935,7 @@
     "post_close": "2026-10-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-21T10:15:40+05:30",
+  "updated_at": "2026-10-21T11:00:39+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8048,10 +8062,10 @@
       "breakout_price": 993.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "14947",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MOTILALOFS",
       "week": "2026-08-17"
     },
@@ -8688,10 +8702,10 @@
       "breakout_price": 3462.699951171875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9553",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "PRUDENT",
       "week": "2026-08-24"
     },
