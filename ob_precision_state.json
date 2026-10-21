@@ -1603,6 +1603,13 @@
       "session": "2026-04-10",
       "tap_number": null
     },
+    "GANESHBE|2026-04-10|83.90|80.87|tap|tap1": {
+      "kind": "tap",
+      "price": 85.75,
+      "sent_at": "2026-10-21T10:15:40+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "GANESHBE|2026-09-28|128.50|125.00|ob": {
       "kind": "ob",
       "price": 137.32000732421875,
@@ -4914,7 +4921,7 @@
     "post_close": "2026-10-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-21T10:00:41+05:30",
+  "updated_at": "2026-10-21T10:15:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6659,10 +6666,10 @@
       "breakout_price": 136.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": 135.85000610351562,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "5617",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "GANESHBE",
       "week": "2026-09-28"
     },
