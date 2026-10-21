@@ -1253,6 +1253,13 @@
       "session": "2026-06-18",
       "tap_number": null
     },
+    "DYNAMATECH|2026-09-25|12516.00|12350.00|tap|tap1": {
+      "kind": "tap",
+      "price": 12681.0,
+      "sent_at": "2026-10-21T14:00:41+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "EBGNG|2026-04-10|376.3999938964844|366.04998779296875|ob": {
       "kind": "ob",
       "price": null,
@@ -2001,6 +2008,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-08-26",
       "tap_number": null
+    },
+    "IOLCP|2026-08-26|170.69|167.10|tap|tap1": {
+      "kind": "tap",
+      "price": 172.63,
+      "sent_at": "2026-10-21T14:00:41+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
     },
     "JAMNAAUTO|2026-10-06|136.35|128.41|ob": {
       "kind": "ob",
@@ -4970,7 +4984,7 @@
     "post_close": "2026-10-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-21T13:00:43+05:30",
+  "updated_at": "2026-10-21T14:00:41+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6337,10 +6351,10 @@
       "breakout_price": 14414.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": 14409.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "4525",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "DYNAMATECH",
       "week": "2026-10-12"
     },
@@ -7261,10 +7275,10 @@
       "breakout_price": 181.66000366210938,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "20413",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "IOLCP",
       "week": "2026-08-24"
     },
