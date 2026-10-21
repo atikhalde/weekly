@@ -2072,6 +2072,13 @@
       "session": "2026-10-14",
       "tap_number": 0
     },
+    "JINDALSAW|2026-10-14|269.05|264.70|tap|tap1": {
+      "kind": "tap",
+      "price": 270.5,
+      "sent_at": "2026-10-21T14:45:39+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "JYOTICNC|2026-08-18|838.7000122070312|822.4000244140625|ob": {
       "kind": "ob",
       "price": null,
@@ -4991,7 +4998,7 @@
     "post_close": "2026-10-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-21T14:30:48+05:30",
+  "updated_at": "2026-10-21T14:45:39+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7368,10 +7375,10 @@
       "breakout_price": 282.20001220703125,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "3024",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "JINDALSAW",
       "week": "2026-08-17"
     },
