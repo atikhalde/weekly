@@ -1967,6 +1967,13 @@
       "session": "2026-10-06",
       "tap_number": 0
     },
+    "JAMNAAUTO|2026-10-06|136.35|128.41|tap|tap1": {
+      "kind": "tap",
+      "price": 137.17,
+      "sent_at": "2026-10-21T09:30:43+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "JASH|2026-06-05|426.54998779296875|413.8999938964844|ob": {
       "kind": "ob",
       "price": null,
@@ -3079,6 +3086,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-08-12",
       "tap_number": null
+    },
+    "PITTIENG|2026-08-12|972.90|937.80|tap|tap1": {
+      "kind": "tap",
+      "price": 974.2,
+      "sent_at": "2026-10-21T09:30:43+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
     },
     "POLICYBZR|2026-08-11|1665.00|1578.40|tap|tap1": {
       "kind": "tap",
@@ -4704,6 +4718,13 @@
       "session": "2026-06-04",
       "tap_number": null
     },
+    "WELENT|2026-09-04|677.00|661.60|tap|tap1": {
+      "kind": "tap",
+      "price": 688.15,
+      "sent_at": "2026-10-21T09:30:43+05:30",
+      "session": "2026-10-21",
+      "tap_number": 1
+    },
     "WELENT|2026-09-04|677.0|661.5999755859375|ob": {
       "kind": "ob",
       "price": null,
@@ -4858,7 +4879,7 @@
     "post_close": "2026-10-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-21T09:15:36+05:30",
+  "updated_at": "2026-10-21T09:30:43+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7181,10 +7202,10 @@
       "breakout_price": 149.52000427246094,
       "exchange_segment": "NSE_EQ",
       "level_26w": 148.89999389648438,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "20778",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "JAMNAAUTO",
       "week": "2026-10-05"
     },
@@ -8503,10 +8524,10 @@
       "breakout_price": 1104.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "14134",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "PITTIENG",
       "week": "2026-08-24"
     },
@@ -10359,10 +10380,10 @@
       "breakout_price": 635.5999755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-21",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "11626",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "WELENT",
       "week": "2026-08-17"
     },
