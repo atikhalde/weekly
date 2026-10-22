@@ -3913,6 +3913,13 @@
       "session": "2026-10-16",
       "tap_number": 0
     },
+    "SHRIPISTON|2026-10-16|4340.00|4316.00|tap|tap1": {
+      "kind": "tap",
+      "price": 4346.9,
+      "sent_at": "2026-10-22T14:30:48+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
+    },
     "SIEMENS|2026-04-15|3340.00|3275.50|tap|tap1": {
       "kind": "tap",
       "price": 3391.6,
@@ -5089,7 +5096,7 @@
     "post_close": "2026-10-21"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-22T14:15:38+05:30",
+  "updated_at": "2026-10-22T14:30:48+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9482,10 +9489,10 @@
       "breakout_price": 4589.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "17186",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SHRIPISTON",
       "week": "2026-08-17"
     },
