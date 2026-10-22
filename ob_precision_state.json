@@ -462,6 +462,13 @@
       "session": "2026-10-07",
       "tap_number": 0
     },
+    "AVADHSUGAR|2026-10-07|870.45|856.00|tap|tap1": {
+      "kind": "tap",
+      "price": 871.0,
+      "sent_at": "2026-10-22T13:15:35+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
+    },
     "AVALON|2026-04-09|1012.1500244140625|975.25|ob": {
       "kind": "ob",
       "price": null,
@@ -5061,7 +5068,7 @@
     "post_close": "2026-10-21"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-22T13:00:44+05:30",
+  "updated_at": "2026-10-22T13:15:35+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5666,10 +5673,10 @@
       "breakout_price": 904.3499755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": 884.7999877929688,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "21406",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "AVADHSUGAR",
       "week": "2026-10-05"
     },
