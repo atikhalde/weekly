@@ -1309,6 +1309,13 @@
       "session": "2026-08-13",
       "tap_number": null
     },
+    "EDELWEISS|2026-08-13|119.37|117.41|tap|tap1": {
+      "kind": "tap",
+      "price": 120.08,
+      "sent_at": "2026-10-22T12:00:33+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
+    },
     "EIMCOELECO|2026-04-09|1495.0|1405.5|ob": {
       "kind": "ob",
       "price": null,
@@ -5047,7 +5054,7 @@
     "post_close": "2026-10-21"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-22T11:45:34+05:30",
+  "updated_at": "2026-10-22T12:00:33+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6468,10 +6475,10 @@
       "breakout_price": 134.1300048828125,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "15119",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "EDELWEISS",
       "week": "2026-08-31"
     },
