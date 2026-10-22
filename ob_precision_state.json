@@ -2807,6 +2807,13 @@
       "session": "2026-10-16",
       "tap_number": 0
     },
+    "MVGJL|2026-10-16|213.79|208.00|tap|tap1": {
+      "kind": "tap",
+      "price": 214.63,
+      "sent_at": "2026-10-22T11:45:34+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
+    },
     "NAM-INDIA|2026-04-17|962.4500122070312|954.6500244140625|ob": {
       "kind": "ob",
       "price": null,
@@ -5040,7 +5047,7 @@
     "post_close": "2026-10-21"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-22T09:45:31+05:30",
+  "updated_at": "2026-10-22T11:45:34+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8221,10 +8228,10 @@
       "breakout_price": 239.82000732421875,
       "exchange_segment": "NSE_EQ",
       "level_26w": 233.99000549316406,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "19015",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MVGJL",
       "week": "2026-10-19"
     },
