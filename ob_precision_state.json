@@ -2800,6 +2800,13 @@
       "session": "2026-08-14",
       "tap_number": null
     },
+    "MSTCLTD|2026-08-14|588.85|572.75|tap|tap1": {
+      "kind": "tap",
+      "price": 593.65,
+      "sent_at": "2026-10-22T14:15:38+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
+    },
     "MSTCLTD|2026-08-17|588.8499755859375|572.75|ob": {
       "kind": "ob",
       "price": null,
@@ -2834,6 +2841,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-04-17",
       "tap_number": null
+    },
+    "NAM-INDIA|2026-04-17|962.45|954.65|tap|tap1": {
+      "kind": "tap",
+      "price": 970.8,
+      "sent_at": "2026-10-22T14:15:38+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
     },
     "NAVINFLUOR|2026-08-06|7690.0|7551.0|ob": {
       "kind": "ob",
@@ -5075,7 +5089,7 @@
     "post_close": "2026-10-21"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-22T13:45:32+05:30",
+  "updated_at": "2026-10-22T14:15:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8220,10 +8234,10 @@
       "breakout_price": 745.9500122070312,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9356",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MSTCLTD",
       "week": "2026-08-24"
     },
@@ -8274,10 +8288,10 @@
       "breakout_price": 1235.300048828125,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "357",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "NAM-INDIA",
       "week": "2026-08-17"
     },
