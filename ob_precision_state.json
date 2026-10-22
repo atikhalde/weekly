@@ -77,6 +77,13 @@
       "session": "2026-07-20",
       "tap_number": null
     },
+    "ADOR|2026-07-20|1344.90|1340.20|tap|tap1": {
+      "kind": "tap",
+      "price": 1344.6,
+      "sent_at": "2026-10-22T09:30:37+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
+    },
     "AEGISVOPAK|2026-06-12|197.6999969482422|193.41000366210938|ob": {
       "kind": "ob",
       "price": null,
@@ -3689,6 +3696,13 @@
       "session": "2026-06-24",
       "tap_number": null
     },
+    "SETL|2026-08-26|312.00|300.00|tap|tap1": {
+      "kind": "tap",
+      "price": 326.35,
+      "sent_at": "2026-10-22T09:30:37+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
+    },
     "SETL|2026-08-26|312.0|300.0|ob": {
       "kind": "ob",
       "price": null,
@@ -4136,6 +4150,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-06-02",
       "tap_number": null
+    },
+    "STEL|2026-06-15|500.00|488.10|tap|tap1": {
+      "kind": "tap",
+      "price": 502.8,
+      "sent_at": "2026-10-22T09:30:37+05:30",
+      "session": "2026-10-22",
+      "tap_number": 1
     },
     "STEL|2026-06-15|500.0|488.1000061035156|ob": {
       "kind": "ob",
@@ -5005,7 +5026,7 @@
     "post_close": "2026-10-21"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-22T09:15:36+05:30",
+  "updated_at": "2026-10-22T09:30:37+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5122,10 +5143,10 @@
       "breakout_price": 1597.5,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "34",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ADOR",
       "week": "2026-08-17"
     },
@@ -9272,10 +9293,10 @@
       "breakout_price": 309.6499938964844,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "29075",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SETL",
       "week": "2026-08-17"
     },
@@ -9700,10 +9721,10 @@
       "breakout_price": 658.0999755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-22",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "21484",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "STEL",
       "week": "2026-08-31"
     },
