@@ -448,6 +448,13 @@
       "session": "2026-08-31",
       "tap_number": null
     },
+    "ASIANHOTNR|2026-08-31|301.95|294.25|tap|tap1": {
+      "kind": "tap",
+      "price": 304.9,
+      "sent_at": "2026-10-23T09:45:38+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "ATHERENERG|2026-08-28|1454.80|1430.00|tap|tap1": {
       "kind": "tap",
       "price": 1466.4,
@@ -572,6 +579,13 @@
       "price": 255.6,
       "sent_at": "2026-10-21T10:00:41+05:30",
       "session": "2026-10-21",
+      "tap_number": 1
+    },
+    "AZAD|2026-08-13|2472.10|2450.40|tap|tap1": {
+      "kind": "tap",
+      "price": 2492.7,
+      "sent_at": "2026-10-23T09:45:38+05:30",
+      "session": "2026-10-23",
       "tap_number": 1
     },
     "BAJAJ-AUTO|2026-04-10|9365.0|9262.0|ob": {
@@ -5194,7 +5208,7 @@
     "post_close": "2026-10-22"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-23T09:30:42+05:30",
+  "updated_at": "2026-10-23T09:45:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5709,10 +5723,10 @@
       "breakout_price": 415.04998779296875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "18422",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ASIANHOTNR",
       "week": "2026-09-07"
     },
@@ -5889,10 +5903,10 @@
       "breakout_price": 2987.60009765625,
       "exchange_segment": "NSE_EQ",
       "level_26w": 2986.60009765625,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "20905",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "AZAD",
       "week": "2026-09-28"
     },
