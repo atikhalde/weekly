@@ -14,6 +14,13 @@
       "session": "2026-06-15",
       "tap_number": null
     },
+    "AARTIIND|2026-06-15|433.65|424.00|tap|tap1": {
+      "kind": "tap",
+      "price": 440.15,
+      "sent_at": "2026-10-23T09:30:42+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "ACMESOLAR|2026-03-12|226.02000427246094|217.10000610351562|ob": {
       "kind": "ob",
       "price": null,
@@ -370,6 +377,13 @@
       "sent_at": "2026-10-08T12:15:33+05:30",
       "session": "2026-10-06",
       "tap_number": 0
+    },
+    "ARFIN|2026-10-06|87.95|86.42|tap|tap1": {
+      "kind": "tap",
+      "price": 88.65,
+      "sent_at": "2026-10-23T09:30:42+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
     },
     "ARROWGREEN|2026-03-30|414.04998779296875|383.1000061035156|ob": {
       "kind": "ob",
@@ -1953,6 +1967,13 @@
       "session": "2026-10-15",
       "tap_number": 1
     },
+    "INDOAMIN|2026-09-21|122.67|117.70|tap|tap1": {
+      "kind": "tap",
+      "price": 123.5,
+      "sent_at": "2026-10-23T09:30:42+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "INDOBORAX|2026-08-20|437.10|422.25|tap|tap1": {
       "kind": "tap",
       "price": 442.3,
@@ -2205,6 +2226,13 @@
       "session": "2026-08-12",
       "tap_number": null
     },
+    "KENNAMET|2026-08-21|3550.00|3480.00|tap|tap1": {
+      "kind": "tap",
+      "price": 3537.1,
+      "sent_at": "2026-10-23T09:30:42+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "KENNAMET|2026-08-21|3550.0|3480.0|ob": {
       "kind": "ob",
       "price": null,
@@ -2428,6 +2456,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-07-30",
       "tap_number": null
+    },
+    "LTFOODS|2026-07-30|378.20|368.00|tap|tap1": {
+      "kind": "tap",
+      "price": 382.0,
+      "sent_at": "2026-10-23T09:30:42+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
     },
     "LUMAXIND|2026-08-03|5196.00|5095.50|tap|tap1": {
       "kind": "tap",
@@ -4312,6 +4347,13 @@
       "session": "2026-10-14",
       "tap_number": 0
     },
+    "STOVEKRAFT|2026-10-14|813.95|794.00|tap|tap1": {
+      "kind": "tap",
+      "price": 815.0,
+      "sent_at": "2026-10-23T09:30:42+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "STYLEBAAZA|2026-03-24|244.14999389648438|241.10000610351562|ob": {
       "kind": "ob",
       "price": null,
@@ -4668,6 +4710,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-07-27",
       "tap_number": null
+    },
+    "TMB|2026-07-27|810.65|795.00|tap|tap1": {
+      "kind": "tap",
+      "price": 816.6,
+      "sent_at": "2026-10-23T09:30:42+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
     },
     "TNPETRO|2026-09-01|113.50|108.30|tap|tap1": {
       "kind": "tap",
@@ -5145,7 +5194,7 @@
     "post_close": "2026-10-22"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-23T09:15:40+05:30",
+  "updated_at": "2026-10-23T09:30:42+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5190,10 +5239,10 @@
       "breakout_price": 544.0499877929688,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "7",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "AARTIIND",
       "week": "2026-08-24"
     },
@@ -5542,10 +5591,10 @@
       "breakout_price": 107.87999725341797,
       "exchange_segment": "NSE_EQ",
       "level_26w": 106.19999694824219,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "758700",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ARFIN",
       "week": "2026-10-05"
     },
@@ -7310,10 +7359,10 @@
       "breakout_price": 155.47000122070312,
       "exchange_segment": "NSE_EQ",
       "level_26w": 152.64999389648438,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "9116",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "INDOAMIN",
       "week": "2026-10-05"
     },
@@ -7654,10 +7703,10 @@
       "breakout_price": 4869.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "11841",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "KENNAMET",
       "week": "2026-09-07"
     },
@@ -7902,10 +7951,10 @@
       "breakout_price": 473.25,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "13816",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "LTFOODS",
       "week": "2026-08-24"
     },
@@ -9876,10 +9925,10 @@
       "breakout_price": 851.4500122070312,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "2107",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "STOVEKRAFT",
       "week": "2026-08-31"
     },
@@ -10254,10 +10303,10 @@
       "breakout_price": 917.2000122070312,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "10945",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TMB",
       "week": "2026-08-31"
     },
