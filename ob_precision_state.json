@@ -2506,6 +2506,13 @@
       "session": "2026-08-05",
       "tap_number": null
     },
+    "LUMAXTECH|2026-08-11|1742.00|1711.30|tap|tap1": {
+      "kind": "tap",
+      "price": 1746.8,
+      "sent_at": "2026-10-23T10:00:45+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "LUMAXTECH|2026-08-11|1742.0|1711.300048828125|ob": {
       "kind": "ob",
       "price": null,
@@ -3135,6 +3142,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-04-27",
       "tap_number": null
+    },
+    "OFSS|2026-06-24|9700.00|9668.00|tap|tap1": {
+      "kind": "tap",
+      "price": 9682.0,
+      "sent_at": "2026-10-23T10:00:45+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
     },
     "OFSS|2026-06-24|9700.0|9668.0|ob": {
       "kind": "ob",
@@ -5208,7 +5222,7 @@
     "post_close": "2026-10-22"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-23T09:45:38+05:30",
+  "updated_at": "2026-10-23T10:00:45+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7997,10 +8011,10 @@
       "breakout_price": 2114.199951171875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "14014",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "LUMAXTECH",
       "week": "2026-08-31"
     },
@@ -8673,10 +8687,10 @@
       "breakout_price": 12036.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "10738",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "OFSS",
       "week": "2026-08-24"
     },
