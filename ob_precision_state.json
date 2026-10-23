@@ -21,6 +21,13 @@
       "session": "2026-10-23",
       "tap_number": 1
     },
+    "ABDL|2026-09-24|660.65|631.70|tap|tap1": {
+      "kind": "tap",
+      "price": 666.05,
+      "sent_at": "2026-10-23T11:00:46+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "ACMESOLAR|2026-03-12|226.02000427246094|217.10000610351562|ob": {
       "kind": "ob",
       "price": null,
@@ -5264,7 +5271,7 @@
     "post_close": "2026-10-22"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-23T10:30:45+05:30",
+  "updated_at": "2026-10-23T11:00:46+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5327,10 +5334,10 @@
       "breakout_price": 762.5,
       "exchange_segment": "NSE_EQ",
       "level_26w": 753.7999877929688,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "24308",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ABDL",
       "week": "2026-10-12"
     },
