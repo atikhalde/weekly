@@ -1043,6 +1043,13 @@
       "session": "2026-07-02",
       "tap_number": null
     },
+    "COMSYN|2026-08-10|210.00|205.25|tap|tap1": {
+      "kind": "tap",
+      "price": 211.0,
+      "sent_at": "2026-10-23T10:30:45+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
+    },
     "COMSYN|2026-08-10|210.0|205.25|ob": {
       "kind": "ob",
       "price": null,
@@ -1959,6 +1966,13 @@
       "sent_at": "2026-09-28T14:46:17+05:30",
       "session": "2026-08-26",
       "tap_number": null
+    },
+    "IGPL|2026-08-26|501.05|485.10|tap|tap1": {
+      "kind": "tap",
+      "price": 511.85,
+      "sent_at": "2026-10-23T10:30:45+05:30",
+      "session": "2026-10-23",
+      "tap_number": 1
     },
     "INDNIPPON|2026-09-04|1076.199951171875|1055.0999755859375|ob": {
       "kind": "ob",
@@ -5250,7 +5264,7 @@
     "post_close": "2026-10-22"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-23T10:15:45+05:30",
+  "updated_at": "2026-10-23T10:30:45+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6311,10 +6325,10 @@
       "breakout_price": 299.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "21578",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "COMSYN",
       "week": "2026-08-31"
     },
@@ -7329,10 +7343,10 @@
       "breakout_price": 533.4500122070312,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "14086",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "IGPL",
       "week": "2026-08-24"
     },
