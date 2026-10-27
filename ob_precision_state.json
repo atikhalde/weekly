@@ -1323,6 +1323,13 @@
       "session": "2026-06-18",
       "tap_number": null
     },
+    "DYCL|2026-06-18|328.05|321.10|tap|tap1": {
+      "kind": "tap",
+      "price": 349.3,
+      "sent_at": "2026-10-27T13:00:40+05:30",
+      "session": "2026-10-27",
+      "tap_number": 1
+    },
     "DYNAMATECH|2026-09-25|12516.00|12350.00|tap|tap1": {
       "kind": "tap",
       "price": 12681.0,
@@ -5313,7 +5320,7 @@
     "post_close": "2026-10-26"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-27T09:45:37+05:30",
+  "updated_at": "2026-10-27T13:00:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6662,10 +6669,10 @@
       "breakout_price": 476.1499938964844,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-27",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "10417",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "DYCL",
       "week": "2026-08-24"
     },
