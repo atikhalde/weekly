@@ -1,11 +1,32 @@
 {
-  "date": "2026-10-27",
-  "scan_time": "21:03",
-  "generated_at_ist": "2026-10-27T21:03:47",
+  "date": "2026-10-28",
+  "scan_time": "21:46",
+  "generated_at_ist": "2026-10-28T21:46:39",
   "too_late": true,
   "too_early": false,
-  "top3_actionable": [],
+  "top3_actionable": [
+    {
+      "symbol": "TIPSMUSIC",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_above",
+      "pre": 7,
+      "price": 793.9000244140625,
+      "qty": 125,
+      "invest": 99237.50305175781,
+      "day_ret": 7.28378708298143,
+      "rvol": 3.5290238498553395,
+      "close_pos": 0.9190480065724206,
+      "gap_pct": -1.1337610718550954,
+      "prime": ""
+    }
+  ],
   "next_anticipated": [],
-  "excluded_locked": [],
+  "excluded_locked": [
+    [
+      "PASHUPATI",
+      "Locked at Upper Circuit +5%"
+    ]
+  ],
   "enterable": false
 }
