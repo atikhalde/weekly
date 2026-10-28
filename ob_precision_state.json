@@ -5341,7 +5341,7 @@
     "post_close": "2026-10-27"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-28T09:15:39+05:30",
+  "updated_at": "2026-10-28T09:45:37+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7092,6 +7092,24 @@
       "status": "tapped",
       "symbol": "GANESHBE",
       "week": "2026-09-28"
+    },
+    "GCSL": {
+      "added_at": "2026-10-28",
+      "breakout_26w_session": {
+        "close": 409.6499938964844,
+        "level": 406.45001220703125,
+        "session": "2026-05-27"
+      },
+      "breakout_bar": "2026-10-28T09:25+05:30",
+      "breakout_price": 756.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 749.4500122070312,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "758986",
+      "status": "waiting",
+      "symbol": "GCSL",
+      "week": "2026-10-26"
     },
     "GHCLTEXTIL": {
       "added_at": "2026-09-27",
@@ -22514,6 +22532,85 @@
         }
       ],
       "zones_seen": 3
+    },
+    "GCSL": {
+      "as_of": "2026-10-26",
+      "as_of_close": 733.0,
+      "as_of_high": 740.75,
+      "as_of_low": 721.5,
+      "atr": 20.23628009411596,
+      "breakout_26w_session": {
+        "close": 409.6499938964844,
+        "level": 406.45001220703125,
+        "session": "2026-05-27"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 733.0,
+      "prev_highs": [
+        741.0,
+        742.0,
+        743.9500122070312,
+        749.4500122070312,
+        730.0,
+        728.7999877929688,
+        730.8499755859375,
+        740.75
+      ],
+      "prev_lows": [
+        721.0,
+        691.9000244140625,
+        705.3499755859375,
+        712.0999755859375,
+        721.5
+      ],
+      "prev_volumes": [
+        273458.0,
+        378027.0,
+        247015.0,
+        321775.0,
+        266383.0,
+        225480.0,
+        392492.0,
+        479957.0,
+        325976.0,
+        250671.0,
+        790570.0,
+        328605.0,
+        279530.0,
+        300862.0,
+        486685.0,
+        597441.0,
+        310794.0,
+        549871.0,
+        297726.0
+      ],
+      "refreshed_on": "2026-10-28",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 17.049566294345354,
+          "body_frac_at_birth": 0.7675830647103071,
+          "born_index": 169,
+          "born_session": "2026-07-02",
+          "bottom": 425.3999938964844,
+          "clv_at_birth": 0.8837915323551535,
+          "departed": true,
+          "entry": 433.24000244140626,
+          "origin_index": 168,
+          "origin_session": "2026-07-01",
+          "range_atr_at_birth": 1.9179380661358236,
+          "rvol_at_birth": 2.844946386476147,
+          "state": 0,
+          "stop": 422.8425589523326,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 431.0,
+          "width": 5.600006103515625
+        }
+      ],
+      "zones_seen": 1
     },
     "GHCLTEXTIL": {
       "as_of": "2026-10-26",
