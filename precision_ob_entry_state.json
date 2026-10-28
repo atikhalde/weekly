@@ -103,6 +103,7 @@
  ],
  "cycles": {
   "ABDL|2026-06-12": "rule|ABDL|2026-09-11",
+  "APLAPOLLO|2026-08-28": "rule|APLAPOLLO|2026-10-27",
   "ARFIN|2026-04-13": "rule|ARFIN|2026-04-13",
   "ARIHANTCAP|2026-09-22": "rule|ARIHANTCAP|2026-09-22",
   "AURUM|2026-06-24": "rule|AURUM|2026-06-29",
@@ -117,6 +118,7 @@
   "GAEL|2026-05-07": "rule|GAEL|2026-05-07",
   "GALAXYSURF|2026-08-14": "rule|GALAXYSURF|2026-08-14",
   "GANDHAR|2026-06-19": "rule|GANDHAR|2026-07-20",
+  "GCSL|2026-05-27": "rule|GCSL|2026-07-02",
   "GOODLUCK|2026-05-04": "rule|GOODLUCK|2026-09-08",
   "HFCL|2026-04-21": "rule|HFCL|2026-04-30",
   "JINDALSAW|2026-07-09": "rule|JINDALSAW|2026-10-14",
@@ -137,14 +139,15 @@
   "TIPSMUSIC|2026-10-16": "rule|TIPSMUSIC|2026-10-16"
  },
  "excluded": {
+  "APLAPOLLO|2026-10-27": "OB close back below the 26W level",
   "ARFIN|2026-04-13": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "GAEL|2026-05-07": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "KOTAKBANK|2026-10-07": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "SHRINGARMS|2026-10-12": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "TIPSMUSIC|2026-10-16": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "intraday 2026-10-28",
- "last_run_at": "2026-10-28T09:15:31+05:30",
+ "last_run": "postclose 2026-10-28",
+ "last_run_at": "2026-10-28T15:45:31+05:30",
  "open": [],
  "sent": {
   "rule|AARTIIND|2026-06-15": "2026-10-07T15:54:49+05:30",
@@ -161,6 +164,7 @@
   "rule|ANANDRATHI|2026-06-29": "2026-10-07T15:54:49+05:30",
   "rule|ANTELOPUS|2026-09-02": "2026-10-07T15:54:49+05:30",
   "rule|APARINDS|2026-05-27": "2026-10-07T15:54:49+05:30",
+  "rule|APLAPOLLO|2026-10-27": "2026-10-28T15:45:31+05:30",
   "rule|ARFIN|2026-04-13": "2026-10-08T15:30:36+05:30",
   "rule|ARIHANTCAP|2026-09-22": "2026-10-15T15:45:24+05:30",
   "rule|ARTEMISMED|2026-07-29": "2026-10-07T15:54:49+05:30",
@@ -222,6 +226,7 @@
   "rule|GAEL|2026-05-07": "2026-10-14T15:45:30+05:30",
   "rule|GALAXYSURF|2026-08-14": "2026-10-15T15:45:24+05:30",
   "rule|GANDHAR|2026-07-20": "2026-10-12T15:45:32+05:30",
+  "rule|GCSL|2026-07-02": "2026-10-28T15:45:31+05:30",
   "rule|GHCLTEXTIL|2026-07-02": "2026-10-07T15:54:49+05:30",
   "rule|GIPCL|2026-08-10": "2026-10-07T15:54:49+05:30",
   "rule|GLAND|2026-05-19": "2026-10-07T15:54:49+05:30",
