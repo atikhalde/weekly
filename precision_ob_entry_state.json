@@ -143,8 +143,8 @@
   "SHRINGARMS|2026-10-12": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "TIPSMUSIC|2026-10-16": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "postclose 2026-10-27",
- "last_run_at": "2026-10-27T15:45:29+05:30",
+ "last_run": "intraday 2026-10-28",
+ "last_run_at": "2026-10-28T09:15:31+05:30",
  "open": [],
  "sent": {
   "rule|AARTIIND|2026-06-15": "2026-10-07T15:54:49+05:30",
