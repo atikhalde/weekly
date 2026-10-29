@@ -130,6 +130,7 @@
   "ORIENTHOT|2026-06-23": "rule|ORIENTHOT|2026-08-19",
   "PREMIERPOL|2026-07-16": "rule|PREMIERPOL|2026-07-16",
   "RPTECH|2026-05-05": "rule|RPTECH|2026-05-05",
+  "SGMART|2026-05-08": "rule|SGMART|2026-07-08",
   "SHRINGARMS|2026-10-12": "rule|SHRINGARMS|2026-10-12",
   "SHRIPISTON|2026-06-24": "rule|SHRIPISTON|2026-08-24",
   "SKYGOLD|2026-04-29": "rule|SKYGOLD|2026-07-09",
@@ -146,8 +147,8 @@
   "SHRINGARMS|2026-10-12": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "TIPSMUSIC|2026-10-16": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "intraday 2026-10-29",
- "last_run_at": "2026-10-29T09:15:33+05:30",
+ "last_run": "postclose 2026-10-29",
+ "last_run_at": "2026-10-29T15:45:35+05:30",
  "open": [],
  "sent": {
   "rule|AARTIIND|2026-06-15": "2026-10-07T15:54:49+05:30",
@@ -331,6 +332,7 @@
   "rule|SEAMECLTD|2026-08-20": "2026-10-07T15:54:49+05:30",
   "rule|SENORES|2026-05-15": "2026-10-07T15:54:49+05:30",
   "rule|SETL|2026-06-22": "2026-10-07T15:54:49+05:30",
+  "rule|SGMART|2026-07-08": "2026-10-29T15:45:35+05:30",
   "rule|SHANTIGOLD|2026-08-14": "2026-10-07T15:54:49+05:30",
   "rule|SHAREINDIA|2026-09-09": "2026-10-07T15:54:49+05:30",
   "rule|SHILPAMED|2026-06-23": "2026-10-07T15:54:49+05:30",
