@@ -5355,7 +5355,7 @@
     "post_close": "2026-10-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-29T09:30:47+05:30",
+  "updated_at": "2026-10-29T10:15:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9678,6 +9678,24 @@
       "status": "tapped",
       "symbol": "SETL",
       "week": "2026-08-17"
+    },
+    "SGMART": {
+      "added_at": "2026-10-29",
+      "breakout_26w_session": {
+        "close": 599.5,
+        "level": 583.5,
+        "session": "2026-05-08"
+      },
+      "breakout_bar": "2026-10-29T09:50+05:30",
+      "breakout_price": 867.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 860.5999755859375,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "758889",
+      "status": "waiting",
+      "symbol": "SGMART",
+      "week": "2026-10-26"
     },
     "SHANTIGOLD": {
       "added_at": "2026-10-06",
@@ -38428,6 +38446,106 @@
         }
       ],
       "zones_seen": 4
+    },
+    "SGMART": {
+      "as_of": "2026-10-27",
+      "as_of_close": 799.4000244140625,
+      "as_of_high": 805.0,
+      "as_of_low": 791.6500244140625,
+      "atr": 37.36297259632558,
+      "breakout_26w_session": {
+        "close": 599.5,
+        "level": 583.5,
+        "session": "2026-05-08"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 799.4000244140625,
+      "prev_highs": [
+        766.5999755859375,
+        822.0,
+        842.0,
+        787.8499755859375,
+        768.2000122070312,
+        804.75,
+        809.9000244140625,
+        805.0
+      ],
+      "prev_lows": [
+        737.2000122070312,
+        741.2000122070312,
+        735.0499877929688,
+        777.5499877929688,
+        791.6500244140625
+      ],
+      "prev_volumes": [
+        491934.0,
+        125096.0,
+        314856.0,
+        397450.0,
+        255968.0,
+        152651.0,
+        324541.0,
+        305426.0,
+        258246.0,
+        226518.0,
+        107784.0,
+        179245.0,
+        385388.0,
+        908533.0,
+        378521.0,
+        268681.0,
+        784700.0,
+        1400227.0,
+        398226.0
+      ],
+      "refreshed_on": "2026-10-29",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 19.800216974914104,
+          "body_frac_at_birth": 0.6753486101017442,
+          "born_index": 73,
+          "born_session": "2026-02-09",
+          "bottom": 362.0,
+          "clv_at_birth": 0.7469766306322675,
+          "departed": true,
+          "entry": 380.56403905548456,
+          "origin_index": 72,
+          "origin_session": "2026-02-06",
+          "range_atr_at_birth": 2.714616716983384,
+          "rvol_at_birth": 4.56083843455111,
+          "state": 0,
+          "stop": 359.0299674537629,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 377.0,
+          "width": 15.0
+        },
+        {
+          "atr_at_birth": 26.472238598833908,
+          "body_frac_at_birth": 0.7706473951741342,
+          "born_index": 172,
+          "born_session": "2026-07-08",
+          "bottom": 585.9500122070312,
+          "clv_at_birth": 0.8102678054449369,
+          "departed": true,
+          "entry": 605.7650029477901,
+          "origin_index": 171,
+          "origin_session": "2026-07-07",
+          "range_atr_at_birth": 3.3846769418995923,
+          "rvol_at_birth": 15.58401362087932,
+          "state": 0,
+          "stop": 581.9791764172062,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 601.0,
+          "width": 15.04998779296875
+        }
+      ],
+      "zones_seen": 5
     },
     "SHANTIGOLD": {
       "as_of": "2026-10-23",
