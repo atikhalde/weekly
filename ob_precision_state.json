@@ -1806,6 +1806,13 @@
       "session": "2026-10-12",
       "tap_number": 0
     },
+    "GOODLUCK|2026-10-12|501.90|492.40|tap|tap1": {
+      "kind": "tap",
+      "price": 507.15,
+      "sent_at": "2026-10-29T09:30:47+05:30",
+      "session": "2026-10-29",
+      "tap_number": 1
+    },
     "GRAPHITE|2026-07-16|624.0499877929688|620.4000244140625|ob": {
       "kind": "ob",
       "price": null,
@@ -5348,7 +5355,7 @@
     "post_close": "2026-10-28"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-29T09:15:42+05:30",
+  "updated_at": "2026-10-29T09:30:47+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7219,10 +7226,10 @@
       "breakout_price": 558.0999755859375,
       "exchange_segment": "NSE_EQ",
       "level_26w": 557.3666381835938,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-10-29",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "6125",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "GOODLUCK",
       "week": "2026-10-12"
     },
