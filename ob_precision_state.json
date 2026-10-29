@@ -5352,10 +5352,10 @@
   "data_outage_on": null,
   "digest_on": {
     "manual": "2026-09-28",
-    "post_close": "2026-10-28"
+    "post_close": "2026-10-29"
   },
   "logic_version": 1,
-  "updated_at": "2026-10-29T10:15:38+05:30",
+  "updated_at": "2026-10-29T15:45:46+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
