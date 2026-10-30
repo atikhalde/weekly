@@ -102,6 +102,7 @@
   }
  ],
  "cycles": {
+  "63MOONS|2026-07-30": "rule|63MOONS|2026-07-30",
   "ABDL|2026-06-12": "rule|ABDL|2026-09-11",
   "APLAPOLLO|2026-08-28": "rule|APLAPOLLO|2026-10-27",
   "ARFIN|2026-04-13": "rule|ARFIN|2026-04-13",
@@ -147,10 +148,11 @@
   "SHRINGARMS|2026-10-12": "OB candle predates the breakout (zone born on the breakout, origin the day before)",
   "TIPSMUSIC|2026-10-16": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "intraday 2026-10-30",
- "last_run_at": "2026-10-30T09:15:28+05:30",
+ "last_run": "postclose 2026-10-30",
+ "last_run_at": "2026-10-30T15:45:31+05:30",
  "open": [],
  "sent": {
+  "rule|63MOONS|2026-07-30": "2026-10-30T15:45:31+05:30",
   "rule|AARTIIND|2026-06-15": "2026-10-07T15:54:49+05:30",
   "rule|ABDL|2026-09-11": "2026-10-15T15:45:24+05:30",
   "rule|ACE|2026-08-18": "2026-10-07T15:54:49+05:30",
