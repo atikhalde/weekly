@@ -973,6 +973,13 @@
       "session": "2026-08-26",
       "tap_number": null
     },
+    "CGCL|2026-08-26|225.11|217.00|tap|tap1": {
+      "kind": "tap",
+      "price": 226.59,
+      "sent_at": "2026-11-02T10:45:35+05:30",
+      "session": "2026-11-02",
+      "tap_number": 1
+    },
     "CHENNPETRO|2025-10-28|785.7999877929688|746.0|ob": {
       "kind": "ob",
       "price": null,
@@ -5390,7 +5397,7 @@
     "post_close": "2026-10-30"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-02T09:15:41+05:30",
+  "updated_at": "2026-11-02T10:45:35+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6383,10 +6390,10 @@
       "breakout_price": 266.29998779296875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-02",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "20329",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "CGCL",
       "week": "2026-08-31"
     },
@@ -9091,6 +9098,20 @@
       "status": "invalid",
       "symbol": "PERSISTENT",
       "week": "2026-10-12"
+    },
+    "PETRONET": {
+      "added_at": "2026-11-02",
+      "breakout_26w_session": {},
+      "breakout_bar": "2026-11-02T10:20+05:30",
+      "breakout_price": 300.75,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 300.6000061035156,
+      "resolved_at": "2026-11-02",
+      "resolved_reason": "all 2 order block(s) invalidated/exhausted",
+      "security_id": "11351",
+      "status": "invalid",
+      "symbol": "PETRONET",
+      "week": "2026-11-02"
     },
     "PITTIENG": {
       "added_at": "2026-09-27",
@@ -34454,6 +34475,59 @@
       "session_index": 248,
       "zones": [],
       "zones_seen": 3
+    },
+    "PETRONET": {
+      "as_of": "2026-10-30",
+      "as_of_close": 289.5,
+      "as_of_high": 289.5,
+      "as_of_low": 284.6499938964844,
+      "atr": 6.909061080752529,
+      "breakout_26w_session": {},
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 289.5,
+      "prev_highs": [
+        299.20001220703125,
+        293.1000061035156,
+        292.0,
+        292.75,
+        296.0,
+        292.5,
+        289.1499938964844,
+        289.5
+      ],
+      "prev_lows": [
+        282.04998779296875,
+        288.1000061035156,
+        283.8500061035156,
+        283.25,
+        284.6499938964844
+      ],
+      "prev_volumes": [
+        2861154.0,
+        5098731.0,
+        3121238.0,
+        2877618.0,
+        2081631.0,
+        1341069.0,
+        1307842.0,
+        2676515.0,
+        1839630.0,
+        1660563.0,
+        1333698.0,
+        3550832.0,
+        1808224.0,
+        2777895.0,
+        2282931.0,
+        2461969.0,
+        1994438.0,
+        1927423.0,
+        1717275.0
+      ],
+      "refreshed_on": "2026-11-02",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 2
     },
     "PITTIENG": {
       "as_of": "2026-10-19",
