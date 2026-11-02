@@ -5394,10 +5394,10 @@
   "data_outage_on": null,
   "digest_on": {
     "manual": "2026-09-28",
-    "post_close": "2026-10-30"
+    "post_close": "2026-11-02"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-02T10:45:35+05:30",
+  "updated_at": "2026-11-02T15:45:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
