@@ -5411,7 +5411,7 @@
     "post_close": "2026-11-02"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-03T09:45:40+05:30",
+  "updated_at": "2026-11-03T10:30:56+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5462,6 +5462,24 @@
       "status": "waiting",
       "symbol": "63MOONS",
       "week": "2026-10-26"
+    },
+    "AARTIDRUGS": {
+      "added_at": "2026-11-03",
+      "breakout_26w_session": {
+        "close": 422.29998779296875,
+        "level": 422.20001220703125,
+        "session": "2026-07-17"
+      },
+      "breakout_bar": "2026-11-02T09:15+05:30",
+      "breakout_price": 462.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 457.95001220703125,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "4481",
+      "status": "waiting",
+      "symbol": "AARTIDRUGS",
+      "week": "2026-11-02"
     },
     "AARTIIND": {
       "added_at": "2026-09-27",
@@ -11445,6 +11463,85 @@
         }
       ],
       "zones_seen": 6
+    },
+    "AARTIDRUGS": {
+      "as_of": "2026-11-02",
+      "as_of_close": 453.79998779296875,
+      "as_of_high": 463.5,
+      "as_of_low": 441.95001220703125,
+      "atr": 18.744393280398757,
+      "breakout_26w_session": {
+        "close": 422.29998779296875,
+        "level": 422.20001220703125,
+        "session": "2026-07-17"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 453.79998779296875,
+      "prev_highs": [
+        389.25,
+        386.3500061035156,
+        382.79998779296875,
+        404.79998779296875,
+        456.8999938964844,
+        457.95001220703125,
+        449.0,
+        463.5
+      ],
+      "prev_lows": [
+        380.8500061035156,
+        405.0,
+        434.25,
+        432.5,
+        441.95001220703125
+      ],
+      "prev_volumes": [
+        132855.0,
+        147075.0,
+        246945.0,
+        78159.0,
+        69107.0,
+        74623.0,
+        103261.0,
+        78406.0,
+        69625.0,
+        104210.0,
+        93130.0,
+        159060.0,
+        193036.0,
+        91644.0,
+        324800.0,
+        11572516.0,
+        951968.0,
+        291563.0,
+        750107.0
+      ],
+      "refreshed_on": "2026-11-03",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 17.696638821576713,
+          "body_frac_at_birth": 0.8265895749824039,
+          "born_index": 245,
+          "born_session": "2026-10-28",
+          "bottom": 370.29998779296875,
+          "clv_at_birth": 0.8265895749824039,
+          "departed": true,
+          "entry": 383.4353949878838,
+          "origin_index": 242,
+          "origin_session": "2026-10-23",
+          "range_atr_at_birth": 2.9327599675710765,
+          "rvol_at_birth": 15.908019128911205,
+          "state": 0,
+          "stop": 367.64549196973223,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 380.25,
+          "width": 9.95001220703125
+        }
+      ],
+      "zones_seen": 3
     },
     "AARTIIND": {
       "as_of": "2026-10-22",
