@@ -5411,7 +5411,7 @@
     "post_close": "2026-11-02"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-03T12:15:44+05:30",
+  "updated_at": "2026-11-03T13:30:44+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10500,6 +10500,24 @@
       "status": "tapped",
       "symbol": "TALBROAUTO",
       "week": "2026-09-14"
+    },
+    "TANLA": {
+      "added_at": "2026-11-03",
+      "breakout_26w_session": {
+        "close": 618.5,
+        "level": 598.9000244140625,
+        "session": "2026-07-23"
+      },
+      "breakout_bar": "2026-11-03T13:10+05:30",
+      "breakout_price": 664.7999877929688,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 656.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "13976",
+      "status": "waiting",
+      "symbol": "TANLA",
+      "week": "2026-11-02"
     },
     "TATVA": {
       "added_at": "2026-10-06",
@@ -43383,6 +43401,106 @@
         }
       ],
       "zones_seen": 4
+    },
+    "TANLA": {
+      "as_of": "2026-11-02",
+      "as_of_close": 645.4500122070312,
+      "as_of_high": 650.0,
+      "as_of_low": 630.75,
+      "atr": 25.955324526825088,
+      "breakout_26w_session": {
+        "close": 618.5,
+        "level": 598.9000244140625,
+        "session": "2026-07-23"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 645.4500122070312,
+      "prev_highs": [
+        597.5,
+        588.7000122070312,
+        576.4000244140625,
+        585.5,
+        616.25,
+        635.5,
+        643.0,
+        650.0
+      ],
+      "prev_lows": [
+        565.8499755859375,
+        576.25,
+        595.0,
+        616.25,
+        630.75
+      ],
+      "prev_volumes": [
+        132721.0,
+        309236.0,
+        367977.0,
+        412653.0,
+        195449.0,
+        1823460.0,
+        1426458.0,
+        1176140.0,
+        653656.0,
+        499346.0,
+        2386301.0,
+        2999237.0,
+        742302.0,
+        529446.0,
+        736706.0,
+        3558705.0,
+        2495276.0,
+        1913891.0,
+        1356447.0
+      ],
+      "refreshed_on": "2026-11-03",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 21.987497144487087,
+          "body_frac_at_birth": 0.7677964032706568,
+          "born_index": 108,
+          "born_session": "2026-04-09",
+          "bottom": 415.1000061035156,
+          "clv_at_birth": 0.8305084745762712,
+          "departed": true,
+          "entry": 428.9577494860077,
+          "origin_index": 105,
+          "origin_session": "2026-04-06",
+          "range_atr_at_birth": 1.3416715784495972,
+          "rvol_at_birth": 1.8546795306021846,
+          "state": 0,
+          "stop": 411.8018815318426,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 425.0,
+          "width": 9.899993896484375
+        },
+        {
+          "atr_at_birth": 16.400160052517084,
+          "body_frac_at_birth": 0.8585167460905667,
+          "born_index": 235,
+          "born_session": "2026-10-13",
+          "bottom": 496.45001220703125,
+          "clv_at_birth": 0.9244506001227409,
+          "departed": true,
+          "entry": 499.11000366210936,
+          "origin_index": 234,
+          "origin_session": "2026-10-12",
+          "range_atr_at_birth": 2.2194920230961923,
+          "rvol_at_birth": 4.394586887720722,
+          "state": 0,
+          "stop": 493.9899881991537,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 498.3500061035156,
+          "width": 1.899993896484375
+        }
+      ],
+      "zones_seen": 6
     },
     "TATVA": {
       "as_of": "2026-10-09",
