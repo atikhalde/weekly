@@ -5411,7 +5411,7 @@
     "post_close": "2026-11-02"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-03T13:30:44+05:30",
+  "updated_at": "2026-11-03T14:00:42+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8504,6 +8504,24 @@
       "status": "waiting",
       "symbol": "MBAPL",
       "week": "2026-08-24"
+    },
+    "MCX": {
+      "added_at": "2026-11-03",
+      "breakout_26w_session": {
+        "close": 3187.89990234375,
+        "level": 3136.0,
+        "session": "2026-05-11"
+      },
+      "breakout_bar": "2026-11-03T13:30+05:30",
+      "breakout_price": 3524.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 3481.39990234375,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "31181",
+      "status": "waiting",
+      "symbol": "MCX",
+      "week": "2026-11-02"
     },
     "MEDANTA": {
       "added_at": "2026-09-27",
@@ -30856,6 +30874,106 @@
           "taps": 0,
           "top": 143.1999969482422,
           "width": 6.5
+        }
+      ],
+      "zones_seen": 4
+    },
+    "MCX": {
+      "as_of": "2026-11-02",
+      "as_of_close": 3249.0,
+      "as_of_high": 3257.800048828125,
+      "as_of_low": 3178.0,
+      "atr": 103.83384941499294,
+      "breakout_26w_session": {
+        "close": 3187.89990234375,
+        "level": 3136.0,
+        "session": "2026-05-11"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 3249.0,
+      "prev_highs": [
+        3113.699951171875,
+        3113.39990234375,
+        3135.0,
+        3200.0,
+        3208.0,
+        3247.39990234375,
+        3253.39990234375,
+        3257.800048828125
+      ],
+      "prev_lows": [
+        3098.0,
+        3132.5,
+        3150.10009765625,
+        3170.10009765625,
+        3178.0
+      ],
+      "prev_volumes": [
+        1520917.0,
+        2369566.0,
+        2036568.0,
+        1632264.0,
+        1699974.0,
+        1651987.0,
+        1399612.0,
+        1881087.0,
+        2182612.0,
+        1155788.0,
+        1258483.0,
+        1085507.0,
+        931839.0,
+        1247980.0,
+        1527959.0,
+        1010327.0,
+        1413427.0,
+        1722322.0,
+        1161368.0
+      ],
+      "refreshed_on": "2026-11-03",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 72.29706284991089,
+          "body_frac_at_birth": 0.7018633540372671,
+          "born_index": 53,
+          "born_session": "2026-01-14",
+          "bottom": 2174.0,
+          "clv_at_birth": 0.8260869565217391,
+          "departed": true,
+          "entry": 2237.013471312984,
+          "origin_index": 50,
+          "origin_session": "2026-01-09",
+          "range_atr_at_birth": 2.226923109369421,
+          "rvol_at_birth": 2.159357565001707,
+          "state": 0,
+          "stop": 2163.1554405725133,
+          "tap_bar_index": 74,
+          "tap_session": "2026-02-16",
+          "taps": 2,
+          "top": 2224.0,
+          "width": 50.0
+        },
+        {
+          "atr_at_birth": 92.91113346013074,
+          "body_frac_at_birth": 0.7578745013857072,
+          "born_index": 192,
+          "born_session": "2026-08-11",
+          "bottom": 2621.0,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 2638.079931640625,
+          "origin_index": 190,
+          "origin_session": "2026-08-07",
+          "range_atr_at_birth": 1.6402759999601833,
+          "rvol_at_birth": 2.160330426950823,
+          "state": 0,
+          "stop": 2607.0633299809806,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 2633.199951171875,
+          "width": 12.199951171875
         }
       ],
       "zones_seen": 4
