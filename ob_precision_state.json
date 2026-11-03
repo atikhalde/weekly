@@ -5411,7 +5411,7 @@
     "post_close": "2026-11-02"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-03T10:30:56+05:30",
+  "updated_at": "2026-11-03T11:45:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6514,6 +6514,24 @@
       "status": "tapped",
       "symbol": "COMSYN",
       "week": "2026-08-31"
+    },
+    "CONSOFINVT": {
+      "added_at": "2026-11-03",
+      "breakout_26w_session": {
+        "close": 261.44000244140625,
+        "level": 254.0,
+        "session": "2026-07-09"
+      },
+      "breakout_bar": "2026-11-03T11:20+05:30",
+      "breakout_price": 320.95001220703125,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 320.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "11732",
+      "status": "waiting",
+      "symbol": "CONSOFINVT",
+      "week": "2026-11-02"
     },
     "COSMOFIRST": {
       "added_at": "2026-09-27",
@@ -18649,6 +18667,127 @@
         }
       ],
       "zones_seen": 5
+    },
+    "CONSOFINVT": {
+      "as_of": "2026-10-30",
+      "as_of_close": 310.1000061035156,
+      "as_of_high": 314.79998779296875,
+      "as_of_low": 301.0,
+      "atr": 12.456224635992658,
+      "breakout_26w_session": {
+        "close": 261.44000244140625,
+        "level": 254.0,
+        "session": "2026-07-09"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 310.1000061035156,
+      "prev_highs": [
+        295.0,
+        286.0,
+        289.0,
+        281.0,
+        281.0,
+        292.79998779296875,
+        305.0,
+        314.79998779296875
+      ],
+      "prev_lows": [
+        270.1000061035156,
+        272.54998779296875,
+        276.0,
+        289.0,
+        301.0
+      ],
+      "prev_volumes": [
+        2475.0,
+        3292.0,
+        5657.0,
+        7491.0,
+        4219.0,
+        895.0,
+        4401.0,
+        20375.0,
+        6644.0,
+        15593.0,
+        9183.0,
+        4586.0,
+        9211.0,
+        61440.0,
+        10993.0,
+        924.0,
+        111435.0,
+        124314.0,
+        18501.0
+      ],
+      "refreshed_on": "2026-11-03",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 12.078580673815297,
+          "body_frac_at_birth": 0.9305712018694197,
+          "born_index": 65,
+          "born_session": "2026-02-02",
+          "bottom": 163.14999389648438,
+          "clv_at_birth": 0.9968571254185268,
+          "departed": true,
+          "entry": 170.08001098632812,
+          "origin_index": 64,
+          "origin_session": "2026-01-30",
+          "range_atr_at_birth": 2.897691454416924,
+          "rvol_at_birth": 12.329447997234224,
+          "state": 0,
+          "stop": 161.33820679541208,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 168.10000610351562,
+          "width": 4.95001220703125
+        },
+        {
+          "atr_at_birth": 10.289692880165916,
+          "body_frac_at_birth": 0.8156930254380463,
+          "born_index": 169,
+          "born_session": "2026-07-08",
+          "bottom": 225.0,
+          "clv_at_birth": 0.8156930254380463,
+          "departed": true,
+          "entry": 231.80214166667204,
+          "origin_index": 168,
+          "origin_session": "2026-07-07",
+          "range_atr_at_birth": 2.130286921507405,
+          "rvol_at_birth": 8.530168408962513,
+          "state": 0,
+          "stop": 223.45654606797513,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 229.9499969482422,
+          "width": 4.9499969482421875
+        },
+        {
+          "atr_at_birth": 12.211279995791188,
+          "body_frac_at_birth": 0.7272450427380005,
+          "born_index": 173,
+          "born_session": "2026-07-14",
+          "bottom": 255.3300018310547,
+          "clv_at_birth": 0.8439671938263488,
+          "departed": true,
+          "entry": 265.52801697150807,
+          "origin_index": 172,
+          "origin_session": "2026-07-13",
+          "range_atr_at_birth": 2.708151158341123,
+          "rvol_at_birth": 5.143032240645584,
+          "state": 0,
+          "stop": 253.49830983168602,
+          "tap_bar_index": 208,
+          "tap_session": "2026-09-01",
+          "taps": 3,
+          "top": 263.3299865722656,
+          "width": 7.9999847412109375
+        }
+      ],
+      "zones_seen": 4
     },
     "COSMOFIRST": {
       "as_of": "2026-09-25",
