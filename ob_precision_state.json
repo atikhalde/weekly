@@ -5432,7 +5432,7 @@
     "post_close": "2026-11-03"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-04T09:45:36+05:30",
+  "updated_at": "2026-11-04T11:00:35+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6403,6 +6403,24 @@
       "status": "tapped",
       "symbol": "BOSCH-HCIL",
       "week": "2026-08-31"
+    },
+    "BOSCHLTD": {
+      "added_at": "2026-11-04",
+      "breakout_26w_session": {
+        "close": 40035.0,
+        "level": 39600.0,
+        "session": "2026-06-18"
+      },
+      "breakout_bar": "2026-11-04T10:30+05:30",
+      "breakout_price": 50920.0,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 50000.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "2181",
+      "status": "waiting",
+      "symbol": "BOSCHLTD",
+      "week": "2026-11-02"
     },
     "CAPLIPOINT": {
       "added_at": "2026-09-27",
@@ -17637,6 +17655,127 @@
         }
       ],
       "zones_seen": 4
+    },
+    "BOSCHLTD": {
+      "as_of": "2026-11-02",
+      "as_of_close": 48100.0,
+      "as_of_high": 48220.0,
+      "as_of_low": 47335.0,
+      "atr": 1104.6576268174297,
+      "breakout_26w_session": {
+        "close": 40035.0,
+        "level": 39600.0,
+        "session": "2026-06-18"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 48100.0,
+      "prev_highs": [
+        44940.0,
+        44725.0,
+        44900.0,
+        45600.0,
+        47625.0,
+        47625.0,
+        47700.0,
+        48220.0
+      ],
+      "prev_lows": [
+        44750.0,
+        45485.0,
+        46905.0,
+        46900.0,
+        47335.0
+      ],
+      "prev_volumes": [
+        21643.0,
+        21193.0,
+        21529.0,
+        27986.0,
+        20332.0,
+        16912.0,
+        26720.0,
+        15938.0,
+        16921.0,
+        10241.0,
+        17623.0,
+        11102.0,
+        14287.0,
+        8963.0,
+        26960.0,
+        25372.0,
+        28372.0,
+        31245.0,
+        20408.0
+      ],
+      "refreshed_on": "2026-11-04",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 1151.4150848939573,
+          "body_frac_at_birth": 0.865979381443299,
+          "born_index": 104,
+          "born_session": "2026-04-02",
+          "bottom": 28610.0,
+          "clv_at_birth": 0.9216494845360824,
+          "departed": true,
+          "entry": 29427.254715280913,
+          "origin_index": 102,
+          "origin_session": "2026-03-30",
+          "range_atr_at_birth": 2.1061040729923537,
+          "rvol_at_birth": 2.931275503465641,
+          "state": 0,
+          "stop": 28437.287737265906,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 29220.0,
+          "width": 610.0
+        },
+        {
+          "atr_at_birth": 1294.6169611924286,
+          "body_frac_at_birth": 0.8219512195121951,
+          "born_index": 107,
+          "born_session": "2026-04-08",
+          "bottom": 32555.0,
+          "clv_at_birth": 0.8219512195121951,
+          "departed": true,
+          "entry": 33593.03105301464,
+          "origin_index": 106,
+          "origin_session": "2026-04-07",
+          "range_atr_at_birth": 1.5834799492444571,
+          "rvol_at_birth": 2.975804540269633,
+          "state": 0,
+          "stop": 32360.807455821137,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 33360.0,
+          "width": 805.0
+        },
+        {
+          "atr_at_birth": 1121.3604366387851,
+          "body_frac_at_birth": 0.8495575221238938,
+          "born_index": 193,
+          "born_session": "2026-08-12",
+          "bottom": 41870.0,
+          "clv_at_birth": 0.8495575221238938,
+          "departed": true,
+          "entry": 43121.84487859498,
+          "origin_index": 189,
+          "origin_session": "2026-08-06",
+          "range_atr_at_birth": 1.5115568060174007,
+          "rvol_at_birth": 2.477088827715428,
+          "state": 0,
+          "stop": 41701.79593450418,
+          "tap_bar_index": 233,
+          "tap_session": "2026-10-09",
+          "taps": 2,
+          "top": 42920.0,
+          "width": 1050.0
+        }
+      ],
+      "zones_seen": 5
     },
     "CAPLIPOINT": {
       "as_of": "2026-09-25",
