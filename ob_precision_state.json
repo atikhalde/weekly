@@ -3759,6 +3759,13 @@
       "session": "2026-09-07",
       "tap_number": null
     },
+    "ROLEXRINGS|2026-11-04|168.25|161.08|ob": {
+      "kind": "ob",
+      "price": 188.82000732421875,
+      "sent_at": "2026-11-05T11:45:39+05:30",
+      "session": "2026-11-04",
+      "tap_number": 0
+    },
     "ROSSTECH|2026-09-22|1381.20|1310.10|tap|tap1": {
       "kind": "tap",
       "price": 1402.699951171875,
@@ -5481,7 +5488,7 @@
     "post_close": "2026-11-04"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-05T11:00:38+05:30",
+  "updated_at": "2026-11-05T11:45:39+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9796,6 +9803,24 @@
       "status": "waiting",
       "symbol": "RML",
       "week": "2026-09-07"
+    },
+    "ROLEXRINGS": {
+      "added_at": "2026-11-05",
+      "breakout_26w_session": {
+        "close": 177.2899932861328,
+        "level": 176.0,
+        "session": "2026-08-11"
+      },
+      "breakout_bar": "2026-11-05T11:25+05:30",
+      "breakout_price": 201.99000549316406,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 199.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "5279",
+      "status": "waiting",
+      "symbol": "ROLEXRINGS",
+      "week": "2026-11-02"
     },
     "ROSSTECH": {
       "added_at": "2026-09-27",
@@ -38676,6 +38701,133 @@
         }
       ],
       "zones_seen": 6
+    },
+    "ROLEXRINGS": {
+      "as_of": "2026-11-04",
+      "as_of_close": 188.82000732421875,
+      "as_of_high": 191.0,
+      "as_of_low": 169.2899932861328,
+      "atr": 9.306662846900286,
+      "breakout_26w_session": {
+        "close": 177.2899932861328,
+        "level": 176.0,
+        "session": "2026-08-11"
+      },
+      "closed_events": [
+        {
+          "atr": 9.306662846900286,
+          "born_session": "2026-11-04",
+          "bottom": 161.0800018310547,
+          "confirmed": true,
+          "detail": {
+            "entry": 169.92519931244206,
+            "origin_offset": 3,
+            "origin_session": "2026-10-30",
+            "stop": 159.68400240401965,
+            "width": 7.1699981689453125
+          },
+          "entry": 169.92519931244206,
+          "high": 191.0,
+          "kind": "ob",
+          "low": 169.2899932861328,
+          "origin_session": "2026-10-30",
+          "price": 188.82000732421875,
+          "reason": "",
+          "rvol": 6.690545623908778,
+          "session": "2026-11-04",
+          "signature": "2026-11-04|168.25|161.08",
+          "stop": 159.68400240401965,
+          "tap_number": 0,
+          "top": 168.25
+        }
+      ],
+      "post_close_done": null,
+      "prev_close": 188.82000732421875,
+      "prev_highs": [
+        163.77999877929688,
+        168.9499969482422,
+        168.47999572753906,
+        171.1999969482422,
+        168.25999450683594,
+        169.4499969482422,
+        171.1999969482422,
+        191.0
+      ],
+      "prev_lows": [
+        162.55999755859375,
+        161.0800018310547,
+        161.3000030517578,
+        165.97000122070312,
+        169.2899932861328
+      ],
+      "prev_volumes": [
+        4407699.0,
+        1460918.0,
+        1453954.0,
+        1025534.0,
+        895973.0,
+        879807.0,
+        1802137.0,
+        788383.0,
+        1496941.0,
+        1576973.0,
+        1520271.0,
+        1680856.0,
+        1172609.0,
+        2018276.0,
+        2321122.0,
+        876563.0,
+        1320668.0,
+        1452207.0,
+        15339801.0
+      ],
+      "refreshed_on": "2026-11-05",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 7.518615459668092,
+          "body_frac_at_birth": 0.8285948525015419,
+          "born_index": 190,
+          "born_session": "2026-08-11",
+          "bottom": 153.77999877929688,
+          "clv_at_birth": 0.8883392568273167,
+          "departed": true,
+          "entry": 158.80334773098244,
+          "origin_index": 189,
+          "origin_session": "2026-08-10",
+          "range_atr_at_birth": 3.2279885043532115,
+          "rvol_at_birth": 8.440027600683052,
+          "state": 0,
+          "stop": 152.65220646034666,
+          "tap_bar_index": 241,
+          "tap_session": "2026-10-26",
+          "taps": 4,
+          "top": 157.4499969482422,
+          "width": 3.6699981689453125
+        },
+        {
+          "atr_at_birth": 9.306662846900286,
+          "body_frac_at_birth": 0.8208199821898851,
+          "born_index": 248,
+          "born_session": "2026-11-04",
+          "bottom": 161.0800018310547,
+          "clv_at_birth": 0.8995858129150744,
+          "departed": true,
+          "entry": 169.92519931244206,
+          "origin_index": 245,
+          "origin_session": "2026-10-30",
+          "range_atr_at_birth": 2.332738068522382,
+          "rvol_at_birth": 6.690545623908778,
+          "state": 0,
+          "stop": 159.68400240401965,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 168.25,
+          "width": 7.1699981689453125
+        }
+      ],
+      "zones_seen": 5
     },
     "ROSSTECH": {
       "as_of": "2026-09-28",
