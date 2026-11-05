@@ -5481,7 +5481,7 @@
     "post_close": "2026-11-04"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-05T09:30:47+05:30",
+  "updated_at": "2026-11-05T09:45:31+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9371,6 +9371,24 @@
       "security_id": "11351",
       "status": "invalid",
       "symbol": "PETRONET",
+      "week": "2026-11-02"
+    },
+    "PGIL": {
+      "added_at": "2026-11-05",
+      "breakout_26w_session": {
+        "close": 1040.5,
+        "level": 985.0499877929688,
+        "session": "2026-06-24"
+      },
+      "breakout_bar": "2026-11-05T09:15+05:30",
+      "breakout_price": 1374.699951171875,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 1357.9000244140625,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "14260",
+      "status": "waiting",
+      "symbol": "PGIL",
       "week": "2026-11-02"
     },
     "PITTIENG": {
@@ -35841,6 +35859,127 @@
       "session_index": 248,
       "zones": [],
       "zones_seen": 2
+    },
+    "PGIL": {
+      "as_of": "2026-11-03",
+      "as_of_close": 1267.0999755859375,
+      "as_of_high": 1291.4000244140625,
+      "as_of_low": 1246.199951171875,
+      "atr": 54.12792050565218,
+      "breakout_26w_session": {
+        "close": 1040.5,
+        "level": 985.0499877929688,
+        "session": "2026-06-24"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 1267.0999755859375,
+      "prev_highs": [
+        1231.0,
+        1232.4000244140625,
+        1240.5,
+        1215.0,
+        1209.9000244140625,
+        1200.0,
+        1263.0,
+        1291.4000244140625
+      ],
+      "prev_lows": [
+        1163.199951171875,
+        1172.199951171875,
+        1170.0999755859375,
+        1180.0999755859375,
+        1246.199951171875
+      ],
+      "prev_volumes": [
+        177377.0,
+        129386.0,
+        56778.0,
+        215291.0,
+        449327.0,
+        119383.0,
+        201293.0,
+        83828.0,
+        59408.0,
+        144589.0,
+        83466.0,
+        125845.0,
+        78800.0,
+        73503.0,
+        65620.0,
+        79524.0,
+        44422.0,
+        113466.0,
+        92867.0
+      ],
+      "refreshed_on": "2026-11-05",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 45.856840594633695,
+          "body_frac_at_birth": 0.8178031227805398,
+          "born_index": 158,
+          "born_session": "2026-06-24",
+          "bottom": 922.75,
+          "clv_at_birth": 0.868560791015625,
+          "departed": true,
+          "entry": 955.0542191000028,
+          "origin_index": 157,
+          "origin_session": "2026-06-23",
+          "range_atr_at_birth": 2.8785236463814963,
+          "rvol_at_birth": 12.431393696608632,
+          "state": 0,
+          "stop": 915.871473910805,
+          "tap_bar_index": 167,
+          "tap_session": "2026-07-08",
+          "taps": 1,
+          "top": 946.7999877929688,
+          "width": 24.04998779296875
+        },
+        {
+          "atr_at_birth": 49.538503122883604,
+          "body_frac_at_birth": 0.7423850458772209,
+          "born_index": 189,
+          "born_session": "2026-08-07",
+          "bottom": 1040.0,
+          "clv_at_birth": 0.7553468045752223,
+          "departed": true,
+          "entry": 1073.916930562119,
+          "origin_index": 187,
+          "origin_session": "2026-08-05",
+          "range_atr_at_birth": 3.114749923819323,
+          "rvol_at_birth": 10.082308992338742,
+          "state": 0,
+          "stop": 1032.5692245315674,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1065.0,
+          "width": 25.0
+        },
+        {
+          "atr_at_birth": 60.277629024266034,
+          "body_frac_at_birth": 0.8831386119041942,
+          "born_index": 221,
+          "born_session": "2026-09-23",
+          "bottom": 1130.4000244140625,
+          "clv_at_birth": 0.9248748219384105,
+          "departed": true,
+          "entry": 1152.3799560546875,
+          "origin_index": 219,
+          "origin_session": "2026-09-21",
+          "range_atr_at_birth": 1.9874711525215591,
+          "rvol_at_birth": 3.265072571225778,
+          "state": 0,
+          "stop": 1121.3583800604226,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1146.0999755859375,
+          "width": 15.699951171875
+        }
+      ],
+      "zones_seen": 3
     },
     "PITTIENG": {
       "as_of": "2026-10-19",
