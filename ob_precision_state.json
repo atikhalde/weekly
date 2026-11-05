@@ -4760,6 +4760,13 @@
       "session": "2026-10-01",
       "tap_number": 1
     },
+    "TASTYBITE|2026-11-03|9535.00|9388.50|ob": {
+      "kind": "ob",
+      "price": 10188.5,
+      "sent_at": "2026-11-05T09:30:47+05:30",
+      "session": "2026-11-03",
+      "tap_number": 0
+    },
     "TATVA|2026-10-07|1790.00|1682.90|ob": {
       "kind": "ob",
       "price": 1991.199951171875,
@@ -5474,7 +5481,7 @@
     "post_close": "2026-11-04"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-05T09:15:45+05:30",
+  "updated_at": "2026-11-05T09:30:47+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10684,6 +10691,24 @@
       "security_id": "13976",
       "status": "waiting",
       "symbol": "TANLA",
+      "week": "2026-11-02"
+    },
+    "TASTYBITE": {
+      "added_at": "2026-11-05",
+      "breakout_26w_session": {
+        "close": 10005.0,
+        "level": 9614.5,
+        "session": "2026-08-14"
+      },
+      "breakout_bar": "2026-11-04T15:05+05:30",
+      "breakout_price": 10914.5,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 10544.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "20092",
+      "status": "waiting",
+      "symbol": "TASTYBITE",
       "week": "2026-11-02"
     },
     "TATVA": {
@@ -44322,6 +44347,133 @@
         }
       ],
       "zones_seen": 6
+    },
+    "TASTYBITE": {
+      "as_of": "2026-11-04",
+      "as_of_close": 10897.0,
+      "as_of_high": 11100.0,
+      "as_of_low": 10125.5,
+      "atr": 407.33443680513767,
+      "breakout_26w_session": {
+        "close": 10005.0,
+        "level": 9614.5,
+        "session": "2026-08-14"
+      },
+      "closed_events": [
+        {
+          "atr": 363.70631655937905,
+          "born_session": "2026-11-03",
+          "bottom": 9388.5,
+          "confirmed": true,
+          "detail": {
+            "entry": 9593.6,
+            "origin_offset": 1,
+            "origin_session": "2026-11-02",
+            "stop": 9333.944052516094,
+            "width": 146.5
+          },
+          "entry": 9593.6,
+          "high": 10245.0,
+          "kind": "ob",
+          "low": 9580.5,
+          "origin_session": "2026-11-02",
+          "price": 10188.5,
+          "reason": "",
+          "rvol": 4.768280123583934,
+          "session": "2026-11-03",
+          "signature": "2026-11-03|9535.00|9388.50",
+          "stop": 9333.944052516094,
+          "tap_number": 0,
+          "top": 9535.0
+        }
+      ],
+      "post_close_done": null,
+      "prev_close": 10897.0,
+      "prev_highs": [
+        9030.0,
+        9077.5,
+        9017.5,
+        9400.5,
+        9940.0,
+        9635.0,
+        10245.0,
+        11100.0
+      ],
+      "prev_lows": [
+        8870.5,
+        9150.5,
+        9388.5,
+        9580.5,
+        10125.5
+      ],
+      "prev_volumes": [
+        1591.0,
+        1934.0,
+        1566.0,
+        10012.0,
+        2331.0,
+        1452.0,
+        644.0,
+        736.0,
+        2194.0,
+        419.0,
+        1678.0,
+        1129.0,
+        431.0,
+        1050.0,
+        1429.0,
+        14308.0,
+        1611.0,
+        14353.0,
+        15073.0
+      ],
+      "refreshed_on": "2026-11-05",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 327.2185683173863,
+          "body_frac_at_birth": 0.5731475617479417,
+          "born_index": 245,
+          "born_session": "2026-10-30",
+          "bottom": 8800.0,
+          "clv_at_birth": 0.7378087397086763,
+          "departed": true,
+          "entry": 9033.899342297129,
+          "origin_index": 243,
+          "origin_session": "2026-10-28",
+          "range_atr_at_birth": 2.4127603884453857,
+          "rvol_at_birth": 6.01340702292643,
+          "state": 0,
+          "stop": 8750.917214752391,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 8975.0,
+          "width": 175.0
+        },
+        {
+          "atr_at_birth": 363.70631655937905,
+          "body_frac_at_birth": 0.8788562829194884,
+          "born_index": 247,
+          "born_session": "2026-11-03",
+          "bottom": 9388.5,
+          "clv_at_birth": 0.9149736644093304,
+          "departed": true,
+          "entry": 9593.6,
+          "origin_index": 246,
+          "origin_session": "2026-11-02",
+          "range_atr_at_birth": 1.8270235344991956,
+          "rvol_at_birth": 4.768280123583934,
+          "state": 0,
+          "stop": 9333.944052516094,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 9535.0,
+          "width": 146.5
+        }
+      ],
+      "zones_seen": 3
     },
     "TATVA": {
       "as_of": "2026-10-09",
