@@ -5481,7 +5481,7 @@
     "post_close": "2026-11-04"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-05T10:00:47+05:30",
+  "updated_at": "2026-11-05T11:00:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9340,6 +9340,20 @@
       "status": "tapped",
       "symbol": "PAYTM",
       "week": "2026-08-24"
+    },
+    "PDSL": {
+      "added_at": "2026-11-05",
+      "breakout_26w_session": {},
+      "breakout_bar": "2026-11-05T10:40+05:30",
+      "breakout_price": 420.6000061035156,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 418.5,
+      "resolved_at": "2026-11-05",
+      "resolved_reason": "all 1 order block(s) invalidated/exhausted",
+      "security_id": "5264",
+      "status": "invalid",
+      "symbol": "PDSL",
+      "week": "2026-11-02"
     },
     "PERSISTENT": {
       "added_at": "2026-10-13",
@@ -35767,6 +35781,59 @@
         }
       ],
       "zones_seen": 5
+    },
+    "PDSL": {
+      "as_of": "2026-11-03",
+      "as_of_close": 346.8999938964844,
+      "as_of_high": 354.6000061035156,
+      "as_of_low": 345.20001220703125,
+      "atr": 14.309336600601693,
+      "breakout_26w_session": {},
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 346.8999938964844,
+      "prev_highs": [
+        345.95001220703125,
+        338.3999938964844,
+        350.0,
+        337.29998779296875,
+        351.0,
+        347.54998779296875,
+        351.45001220703125,
+        354.6000061035156
+      ],
+      "prev_lows": [
+        328.25,
+        333.0,
+        328.75,
+        325.75,
+        345.20001220703125
+      ],
+      "prev_volumes": [
+        76936.0,
+        34294.0,
+        50295.0,
+        45809.0,
+        42551.0,
+        232825.0,
+        45258.0,
+        32563.0,
+        30094.0,
+        78977.0,
+        59214.0,
+        173529.0,
+        74964.0,
+        103692.0,
+        73015.0,
+        141564.0,
+        90774.0,
+        117498.0,
+        63654.0
+      ],
+      "refreshed_on": "2026-11-05",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 1
     },
     "PERSISTENT": {
       "as_of": "2026-10-09",
