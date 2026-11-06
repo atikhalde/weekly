@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-06",
+  "scan_time": "22:25",
+  "generated_at_ist": "2026-11-06T22:25:44",
+  "too_late": true,
+  "too_early": false,
+  "top3_actionable": [
+    {
+      "symbol": "LAURUSLABS",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 6/8",
+      "arm": "ant_below",
+      "pre": 6,
+      "price": 2340.0,
+      "qty": 42,
+      "invest": 98280.0,
+      "day_ret": 0.8533768315150736,
+      "rvol": 0.5405441631492551,
+      "close_pos": 0.9537037037037038,
+      "gap_pct": 2.722926626480981,
+      "prime": "\u2b50 Prime #1"
+    }
+  ],
+  "next_anticipated": [],
+  "excluded_locked": [],
+  "enterable": false
+}

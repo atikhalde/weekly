@@ -1,7 +1,7 @@
 {
-  "date": "2026-11-05",
-  "scan_time": "23:10",
-  "generated_at_ist": "2026-11-05T23:10:50",
+  "date": "2026-11-06",
+  "scan_time": "22:25",
+  "generated_at_ist": "2026-11-06T22:25:44",
   "too_late": true,
   "too_early": false,
   "top3_actionable": [
@@ -11,51 +11,17 @@
       "tier": "PRE 6/8",
       "arm": "ant_below",
       "pre": 6,
-      "price": 2346.0,
+      "price": 2340.0,
       "qty": 42,
-      "invest": 98532.0,
-      "day_ret": 0.9292763106068858,
-      "rvol": 0.5360636940345896,
-      "close_pos": 1.0,
-      "gap_pct": 2.4734982332155475,
+      "invest": 98280.0,
+      "day_ret": 0.8533768315150736,
+      "rvol": 0.5405441631492551,
+      "close_pos": 0.9537037037037038,
+      "gap_pct": 2.722926626480981,
       "prime": "\u2b50 Prime #1"
-    },
-    {
-      "symbol": "SONACOMS",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 6/8",
-      "arm": "ant_above",
-      "pre": 6,
-      "price": 915.25,
-      "qty": 109,
-      "invest": 99762.25,
-      "day_ret": 1.6831490751013867,
-      "rvol": 2.2413883457948938,
-      "close_pos": 0.9153371491153574,
-      "gap_pct": -1.8075639599555062,
-      "prime": ""
-    },
-    {
-      "symbol": "MOTILALOFS",
-      "badge": "\ud83d\udfe2 Confirmed",
-      "tier": "B",
-      "arm": "fresh_B",
-      "pre": 1,
-      "price": 1095.0,
-      "qty": 91,
-      "invest": 99645.0,
-      "day_ret": 5.323904610797481,
-      "rvol": 3.1060774134138627,
-      "close_pos": 0.9865506329113938,
-      "prime": ""
     }
   ],
   "next_anticipated": [],
-  "excluded_locked": [
-    [
-      "UNOMINDA",
-      "Locked at Upper Circuit +10%"
-    ]
-  ],
+  "excluded_locked": [],
   "enterable": false
 }
