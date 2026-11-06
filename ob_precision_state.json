@@ -4879,6 +4879,13 @@
       "session": "2026-10-21",
       "tap_number": 1
     },
+    "TDPOWERSYS|2026-08-05|572.50|553.05|tap|tap1": {
+      "kind": "tap",
+      "price": 573.95,
+      "sent_at": "2026-11-06T09:30:47+05:30",
+      "session": "2026-11-06",
+      "tap_number": 1
+    },
     "TDPOWERSYS|2026-08-05|572.5|553.0499877929688|ob": {
       "kind": "ob",
       "price": null,
@@ -5516,7 +5523,7 @@
     "post_close": "2026-11-05"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-06T09:15:37+05:30",
+  "updated_at": "2026-11-06T09:30:47+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10911,10 +10918,10 @@
       "breakout_price": 802.5499877929688,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-06",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "25178",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TDPOWERSYS",
       "week": "2026-09-07"
     },
