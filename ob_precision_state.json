@@ -2933,6 +2933,13 @@
       "session": "2026-09-07",
       "tap_number": null
     },
+    "MMP|2026-09-07|399.90|383.35|tap|tap1": {
+      "kind": "tap",
+      "price": 406.8,
+      "sent_at": "2026-11-06T11:30:42+05:30",
+      "session": "2026-11-06",
+      "tap_number": 1
+    },
     "MMP|2026-09-08|399.8999938964844|383.3500061035156|ob": {
       "kind": "ob",
       "price": null,
@@ -5530,7 +5537,7 @@
     "post_close": "2026-11-05"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-06T10:15:36+05:30",
+  "updated_at": "2026-11-06T11:30:42+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -8825,10 +8832,10 @@
       "breakout_price": 436.70001220703125,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-06",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "16395",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "MMP",
       "week": "2026-09-07"
     },
