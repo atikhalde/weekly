@@ -5572,7 +5572,7 @@
     "post_close": "2026-11-06"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-09T12:45:40+05:30",
+  "updated_at": "2026-11-09T14:30:47+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -11229,6 +11229,24 @@
       "status": "tapped",
       "symbol": "UNIMECH",
       "week": "2026-09-07"
+    },
+    "UNIONBANK": {
+      "added_at": "2026-11-09",
+      "breakout_26w_session": {
+        "close": 193.5500030517578,
+        "level": 192.3300018310547,
+        "session": "2026-11-09"
+      },
+      "breakout_bar": "2026-11-09T14:00+05:30",
+      "breakout_price": 192.94000244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 192.3300018310547,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "10753",
+      "status": "waiting",
+      "symbol": "UNIONBANK",
+      "week": "2026-11-09"
     },
     "UNIPARTS": {
       "added_at": "2026-09-27",
@@ -47491,6 +47509,106 @@
         }
       ],
       "zones_seen": 8
+    },
+    "UNIONBANK": {
+      "as_of": "2026-11-06",
+      "as_of_close": 187.0,
+      "as_of_high": 187.77999877929688,
+      "as_of_low": 184.4499969482422,
+      "atr": 4.673216185434982,
+      "breakout_26w_session": {
+        "close": 193.5500030517578,
+        "level": 192.3300018310547,
+        "session": "2026-11-09"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 187.0,
+      "prev_highs": [
+        183.27000427246094,
+        187.5,
+        187.74000549316406,
+        188.77000427246094,
+        186.8000030517578,
+        183.88999938964844,
+        188.89999389648438,
+        187.77999877929688
+      ],
+      "prev_lows": [
+        184.89999389648438,
+        182.80999755859375,
+        180.8800048828125,
+        184.25,
+        184.4499969482422
+      ],
+      "prev_volumes": [
+        4401142.0,
+        11744148.0,
+        23906312.0,
+        17076672.0,
+        19059193.0,
+        45883930.0,
+        21467851.0,
+        25073585.0,
+        12219529.0,
+        14349422.0,
+        20359161.0,
+        9024912.0,
+        20550962.0,
+        17287713.0,
+        10591813.0,
+        14040640.0,
+        12441148.0,
+        13387380.0,
+        9933499.0
+      ],
+      "refreshed_on": "2026-11-09",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 3.4186044131469053,
+          "body_frac_at_birth": 0.7956189542738445,
+          "born_index": 42,
+          "born_session": "2026-01-05",
+          "bottom": 152.6999969482422,
+          "clv_at_birth": 0.8850358358068486,
+          "departed": true,
+          "entry": 154.79999694824218,
+          "origin_index": 40,
+          "origin_session": "2026-01-01",
+          "range_atr_at_birth": 1.6029965225732703,
+          "rvol_at_birth": 2.8762136035822237,
+          "state": 2,
+          "stop": 152.18720628627014,
+          "tap_bar_index": 165,
+          "tap_session": "2026-07-09",
+          "taps": 2,
+          "top": 154.1999969482422,
+          "width": 1.5
+        },
+        {
+          "atr_at_birth": 5.365034910281731,
+          "body_frac_at_birth": 0.7379373365130876,
+          "born_index": 235,
+          "born_session": "2026-10-19",
+          "bottom": 170.74000549316406,
+          "clv_at_birth": 0.7833484429405413,
+          "departed": true,
+          "entry": 174.75569956998353,
+          "origin_index": 234,
+          "origin_session": "2026-10-16",
+          "range_atr_at_birth": 1.9701656188596344,
+          "rvol_at_birth": 3.7234897738097428,
+          "state": 0,
+          "stop": 169.9352502566218,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 173.7899932861328,
+          "width": 3.04998779296875
+        }
+      ],
+      "zones_seen": 4
     },
     "UNIPARTS": {
       "as_of": "2026-09-30",
