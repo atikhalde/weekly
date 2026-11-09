@@ -178,7 +178,7 @@
   "VRLLOG|2026-11-04": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
  "last_run": "intraday 2026-11-09",
- "last_run_at": "2026-11-09T09:15:32+05:30",
+ "last_run_at": "2026-11-09T12:30:49+05:30",
  "open": [
   {
    "born_session": "2026-11-04",
@@ -200,6 +200,7 @@
   }
  ],
  "sent": {
+  "forming|SURAKSHA|2026-11-09": "2026-11-09T12:30:47+05:30",
   "forming|TEXINFRA|2026-11-06": "2026-11-06T14:15:34+05:30",
   "rule|63MOONS|2026-07-30": "2026-10-30T15:45:31+05:30",
   "rule|AARTIDRUGS|2026-10-28": "2026-11-03T15:45:33+05:30",
