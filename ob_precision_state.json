@@ -5614,7 +5614,7 @@
     "post_close": "2026-11-10"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-11T09:45:31+05:30",
+  "updated_at": "2026-11-11T10:15:32+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7455,6 +7455,24 @@
       "status": "waiting",
       "symbol": "GAIL",
       "week": "2026-11-02"
+    },
+    "GALAPREC": {
+      "added_at": "2026-11-11",
+      "breakout_26w_session": {
+        "close": 930.2000122070312,
+        "level": 920.0499877929688,
+        "session": "2026-05-26"
+      },
+      "breakout_bar": "2026-11-11T09:45+05:30",
+      "breakout_price": 1280.5999755859375,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 1260.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "25134",
+      "status": "waiting",
+      "symbol": "GALAPREC",
+      "week": "2026-11-09"
     },
     "GALAXYSURF": {
       "added_at": "2026-10-15",
@@ -24070,6 +24088,106 @@
         }
       ],
       "zones_seen": 4
+    },
+    "GALAPREC": {
+      "as_of": "2026-11-09",
+      "as_of_close": 1163.800048828125,
+      "as_of_high": 1196.199951171875,
+      "as_of_low": 1146.0,
+      "atr": 53.65161306414104,
+      "breakout_26w_session": {
+        "close": 930.2000122070312,
+        "level": 920.0499877929688,
+        "session": "2026-05-26"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 1163.800048828125,
+      "prev_highs": [
+        1058.9000244140625,
+        1062.0,
+        1080.0,
+        1107.0,
+        1139.9000244140625,
+        1180.0,
+        1174.9000244140625,
+        1196.199951171875
+      ],
+      "prev_lows": [
+        1060.0,
+        1081.4000244140625,
+        1124.5,
+        1106.0,
+        1146.0
+      ],
+      "prev_volumes": [
+        74227.0,
+        24846.0,
+        23450.0,
+        8605.0,
+        16564.0,
+        45140.0,
+        11892.0,
+        27621.0,
+        49575.0,
+        13879.0,
+        9147.0,
+        7216.0,
+        20276.0,
+        9877.0,
+        13861.0,
+        26926.0,
+        39689.0,
+        50104.0,
+        28282.0
+      ],
+      "refreshed_on": "2026-11-11",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 30.75797925323422,
+          "body_frac_at_birth": 0.8380017931405682,
+          "born_index": 119,
+          "born_session": "2026-05-05",
+          "bottom": 730.0499877929688,
+          "clv_at_birth": 0.8380017931405682,
+          "departed": true,
+          "entry": 755.5364362655822,
+          "origin_index": 117,
+          "origin_session": "2026-04-30",
+          "range_atr_at_birth": 1.3346126367730193,
+          "rvol_at_birth": 3.11194498452879,
+          "state": 0,
+          "stop": 725.4362909049836,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 750.0,
+          "width": 19.95001220703125
+        },
+        {
+          "atr_at_birth": 39.922952259778135,
+          "body_frac_at_birth": 0.6950736241891099,
+          "born_index": 134,
+          "born_session": "2026-05-26",
+          "bottom": 851.0999755859375,
+          "clv_at_birth": 0.7363516081265371,
+          "departed": true,
+          "entry": 882.1861314067601,
+          "origin_index": 133,
+          "origin_session": "2026-05-25",
+          "range_atr_at_birth": 1.8811227961615395,
+          "rvol_at_birth": 4.924126749437486,
+          "state": 0,
+          "stop": 845.1115327469707,
+          "tap_bar_index": 143,
+          "tap_session": "2026-06-09",
+          "taps": 4,
+          "top": 875.0,
+          "width": 23.9000244140625
+        }
+      ],
+      "zones_seen": 5
     },
     "GALAXYSURF": {
       "as_of": "2026-10-30",
