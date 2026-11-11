@@ -5618,10 +5618,10 @@
   "data_outage_on": null,
   "digest_on": {
     "manual": "2026-09-28",
-    "post_close": "2026-11-10"
+    "post_close": "2026-11-11"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-11T11:30:37+05:30",
+  "updated_at": "2026-11-11T15:44:15+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
