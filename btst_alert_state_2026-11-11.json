@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-11",
+  "scan_time": "22:56",
+  "generated_at_ist": "2026-11-11T22:56:57",
+  "too_late": true,
+  "too_early": false,
+  "top3_actionable": [
+    {
+      "symbol": "APOLLO",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 8/8",
+      "arm": "ant_below",
+      "pre": 8,
+      "price": 454.1499938964844,
+      "qty": 220,
+      "invest": 99912.99865722656,
+      "day_ret": 8.492591322174414,
+      "rvol": 3.0675111232606507,
+      "close_pos": 0.9107578102976887,
+      "gap_pct": 2.647375370528537,
+      "prime": "\u2b50 Prime #1"
+    },
+    {
+      "symbol": "CNL",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 6/8",
+      "arm": "ant_above",
+      "pre": 6,
+      "price": 1466.300048828125,
+      "qty": 68,
+      "invest": 99708.4033203125,
+      "day_ret": 7.374053532695779,
+      "rvol": 1.7355987116738465,
+      "close_pos": 0.9440501672124786,
+      "gap_pct": -3.1443496067706094,
+      "prime": ""
+    },
+    {
+      "symbol": "ICIL",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 6/8",
+      "arm": "ant_above",
+      "pre": 6,
+      "price": 542.7999877929688,
+      "qty": 184,
+      "invest": 99875.19775390625,
+      "day_ret": 6.431370155484073,
+      "rvol": 1.672476265492853,
+      "close_pos": 0.9436616592309539,
+      "gap_pct": -1.268654438986707,
+      "prime": ""
+    }
+  ],
+  "next_anticipated": [],
+  "excluded_locked": [],
+  "enterable": false
+}
