@@ -301,6 +301,13 @@
       "session": "2026-11-04",
       "tap_number": 0
     },
+    "ALIVUS|2026-11-04|1451.00|1380.00|tap|tap1": {
+      "kind": "tap",
+      "price": 1464.5,
+      "sent_at": "2026-11-11T10:30:44+05:30",
+      "session": "2026-11-11",
+      "tap_number": 1
+    },
     "ALKYLAMINE|2026-05-06|1594.0|1524.0999755859375|ob": {
       "kind": "ob",
       "price": null,
@@ -5614,7 +5621,7 @@
     "post_close": "2026-11-10"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-11T10:15:32+05:30",
+  "updated_at": "2026-11-11T10:30:44+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5911,10 +5918,10 @@
       "breakout_price": 1447.0,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-11",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "5265",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ALIVUS",
       "week": "2026-08-31"
     },
