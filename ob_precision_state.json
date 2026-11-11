@@ -5621,7 +5621,7 @@
     "post_close": "2026-11-10"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-11T11:00:39+05:30",
+  "updated_at": "2026-11-11T11:30:37+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6376,6 +6376,24 @@
       "status": "tapped",
       "symbol": "AZAD",
       "week": "2026-09-28"
+    },
+    "BAFNAPH": {
+      "added_at": "2026-11-11",
+      "breakout_26w_session": {
+        "close": 176.33999633789062,
+        "level": 173.25999450683594,
+        "session": "2026-06-05"
+      },
+      "breakout_bar": "2026-11-11T11:15+05:30",
+      "breakout_price": 482.25,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 479.95001220703125,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "17735",
+      "status": "waiting",
+      "symbol": "BAFNAPH",
+      "week": "2026-11-09"
     },
     "BAJAJ-AUTO": {
       "added_at": "2026-09-27",
@@ -16766,6 +16784,85 @@
         }
       ],
       "zones_seen": 8
+    },
+    "BAFNAPH": {
+      "as_of": "2026-11-09",
+      "as_of_close": 472.79998779296875,
+      "as_of_high": 472.79998779296875,
+      "as_of_low": 472.79998779296875,
+      "atr": 9.470624911165832,
+      "breakout_26w_session": {
+        "close": 176.33999633789062,
+        "level": 173.25999450683594,
+        "session": "2026-06-05"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 472.79998779296875,
+      "prev_highs": [
+        460.6000061035156,
+        457.0,
+        438.95001220703125,
+        430.20001220703125,
+        438.79998779296875,
+        447.54998779296875,
+        456.5,
+        472.79998779296875
+      ],
+      "prev_lows": [
+        430.20001220703125,
+        438.79998779296875,
+        447.54998779296875,
+        454.3999938964844,
+        472.79998779296875
+      ],
+      "prev_volumes": [
+        480.0,
+        2305.0,
+        811.0,
+        20755.0,
+        5626.0,
+        19261.0,
+        4534.0,
+        1422.0,
+        9309.0,
+        4915.0,
+        11610.0,
+        8494.0,
+        7963.0,
+        5286.0,
+        15197.0,
+        5404.0,
+        1386.0,
+        10171.0,
+        505.0
+      ],
+      "refreshed_on": "2026-11-11",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 7.293819563193421,
+          "body_frac_at_birth": 0.6714131001564317,
+          "born_index": 103,
+          "born_session": "2026-04-09",
+          "bottom": 113.79000091552734,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 114.08399963378906,
+          "origin_index": 101,
+          "origin_session": "2026-04-07",
+          "range_atr_at_birth": 1.2517453720523832,
+          "rvol_at_birth": 1.9599060140978852,
+          "state": 0,
+          "stop": 112.69592798104833,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 114.0,
+          "width": 0.20999908447265625
+        }
+      ],
+      "zones_seen": 2
     },
     "BAJAJ-AUTO": {
       "as_of": "2026-09-30",
