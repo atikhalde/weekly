@@ -3843,6 +3843,13 @@
       "session": "2026-09-24",
       "tap_number": 1
     },
+    "RKFORGE|2026-11-11|720.00|699.50|ob": {
+      "kind": "ob",
+      "price": 764.7000122070312,
+      "sent_at": "2026-11-12T09:45:35+05:30",
+      "session": "2026-11-11",
+      "tap_number": 0
+    },
     "RML|2026-06-16|930.0|925.0|ob": {
       "kind": "ob",
       "price": null,
@@ -5642,7 +5649,7 @@
     "post_close": "2026-11-11"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-12T09:15:36+05:30",
+  "updated_at": "2026-11-12T09:45:35+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10115,6 +10122,24 @@
       "status": "tapped",
       "symbol": "RISHABH",
       "week": "2026-08-17"
+    },
+    "RKFORGE": {
+      "added_at": "2026-11-12",
+      "breakout_26w_session": {
+        "close": 642.25,
+        "level": 632.0,
+        "session": "2026-07-29"
+      },
+      "breakout_bar": "2026-11-12T09:15+05:30",
+      "breakout_price": 781.6500244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 772.7999877929688,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "11411",
+      "status": "waiting",
+      "symbol": "RKFORGE",
+      "week": "2026-11-09"
     },
     "RML": {
       "added_at": "2026-09-27",
@@ -40026,6 +40051,175 @@
           "taps": 3,
           "top": 705.4500122070312,
           "width": 18.45001220703125
+        }
+      ],
+      "zones_seen": 4
+    },
+    "RKFORGE": {
+      "as_of": "2026-11-11",
+      "as_of_close": 764.7000122070312,
+      "as_of_high": 770.0,
+      "as_of_low": 717.5,
+      "atr": 33.30564446423487,
+      "breakout_26w_session": {
+        "close": 642.25,
+        "level": 632.0,
+        "session": "2026-07-29"
+      },
+      "closed_events": [
+        {
+          "atr": 33.30564446423487,
+          "born_session": "2026-11-11",
+          "bottom": 699.5,
+          "confirmed": true,
+          "detail": {
+            "entry": 725.9950160035622,
+            "origin_offset": 1,
+            "origin_session": "2026-11-09",
+            "stop": 694.5041533303647,
+            "width": 20.5
+          },
+          "entry": 725.9950160035622,
+          "high": 770.0,
+          "kind": "ob",
+          "low": 717.5,
+          "origin_session": "2026-11-09",
+          "price": 764.7000122070312,
+          "reason": "",
+          "rvol": 1.871997399449559,
+          "session": "2026-11-11",
+          "signature": "2026-11-11|720.00|699.50",
+          "stop": 694.5041533303647,
+          "tap_number": 0,
+          "top": 720.0
+        }
+      ],
+      "post_close_done": null,
+      "prev_close": 764.7000122070312,
+      "prev_highs": [
+        683.9500122070312,
+        711.0,
+        707.9000244140625,
+        703.5,
+        729.0,
+        713.9000244140625,
+        723.4000244140625,
+        770.0
+      ],
+      "prev_lows": [
+        682.0,
+        700.0,
+        686.4500122070312,
+        699.5,
+        717.5
+      ],
+      "prev_volumes": [
+        360345.0,
+        305872.0,
+        463547.0,
+        375986.0,
+        1010214.0,
+        470013.0,
+        590948.0,
+        867240.0,
+        473916.0,
+        878882.0,
+        1322840.0,
+        1401917.0,
+        7249302.0,
+        1901881.0,
+        758895.0,
+        1587604.0,
+        981786.0,
+        686223.0,
+        2271260.0
+      ],
+      "refreshed_on": "2026-11-12",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 21.073673826933035,
+          "body_frac_at_birth": 0.8996421024077145,
+          "born_index": 145,
+          "born_session": "2026-06-12",
+          "bottom": 532.75,
+          "clv_at_birth": 0.8996421024077145,
+          "departed": true,
+          "entry": 542.9,
+          "origin_index": 142,
+          "origin_session": "2026-06-09",
+          "range_atr_at_birth": 1.3239278847718097,
+          "rvol_at_birth": 2.0830452119011613,
+          "state": 0,
+          "stop": 529.58894892596,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 540.0,
+          "width": 7.25
+        },
+        {
+          "atr_at_birth": 17.457938761696617,
+          "body_frac_at_birth": 0.5972647365472308,
+          "born_index": 168,
+          "born_session": "2026-07-16",
+          "bottom": 555.2999877929688,
+          "clv_at_birth": 0.8419450350070682,
+          "departed": true,
+          "entry": 561.8800048828125,
+          "origin_index": 167,
+          "origin_session": "2026-07-15",
+          "range_atr_at_birth": 1.8845308637607554,
+          "rvol_at_birth": 12.12108810085706,
+          "state": 0,
+          "stop": 552.6812969787143,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 560.0,
+          "width": 4.70001220703125
+        },
+        {
+          "atr_at_birth": 20.17595310646468,
+          "body_frac_at_birth": 0.7509253113094942,
+          "born_index": 175,
+          "born_session": "2026-07-27",
+          "bottom": 569.5999755859375,
+          "clv_at_birth": 0.7509253113094942,
+          "departed": true,
+          "entry": 586.6316715591637,
+          "origin_index": 174,
+          "origin_session": "2026-07-24",
+          "range_atr_at_birth": 2.0098177062066984,
+          "rvol_at_birth": 5.773541371913461,
+          "state": 2,
+          "stop": 566.5735826199679,
+          "tap_bar_index": 237,
+          "tap_session": "2026-10-26",
+          "taps": 2,
+          "top": 583.0,
+          "width": 13.4000244140625
+        },
+        {
+          "atr_at_birth": 33.30564446423487,
+          "body_frac_at_birth": 0.8057140531994048,
+          "born_index": 248,
+          "born_session": "2026-11-11",
+          "bottom": 699.5,
+          "clv_at_birth": 0.8990478515625,
+          "departed": true,
+          "entry": 725.9950160035622,
+          "origin_index": 247,
+          "origin_session": "2026-11-09",
+          "range_atr_at_birth": 1.576309386728034,
+          "rvol_at_birth": 1.871997399449559,
+          "state": 0,
+          "stop": 694.5041533303647,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 720.0,
+          "width": 20.5
         }
       ],
       "zones_seen": 4
