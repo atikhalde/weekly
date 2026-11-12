@@ -5649,7 +5649,7 @@
     "post_close": "2026-11-11"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-12T09:45:35+05:30",
+  "updated_at": "2026-11-12T10:15:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -5790,6 +5790,24 @@
       "status": "tapped",
       "symbol": "ACMESOLAR",
       "week": "2026-08-17"
+    },
+    "ACUTAAS": {
+      "added_at": "2026-11-12",
+      "breakout_26w_session": {
+        "close": 2886.5,
+        "level": 2849.89990234375,
+        "session": "2026-05-19"
+      },
+      "breakout_bar": "2026-11-12T09:50+05:30",
+      "breakout_price": 4058.5,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 4045.300048828125,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "5578",
+      "status": "waiting",
+      "symbol": "ACUTAAS",
+      "week": "2026-11-09"
     },
     "ADANIPORTS": {
       "added_at": "2026-11-04",
@@ -12787,6 +12805,127 @@
         }
       ],
       "zones_seen": 4
+    },
+    "ACUTAAS": {
+      "as_of": "2026-11-11",
+      "as_of_close": 3916.89990234375,
+      "as_of_high": 3978.89990234375,
+      "as_of_low": 3853.60009765625,
+      "atr": 169.10873733115847,
+      "breakout_26w_session": {
+        "close": 2886.5,
+        "level": 2849.89990234375,
+        "session": "2026-05-19"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 3916.89990234375,
+      "prev_highs": [
+        4024.0,
+        4045.300048828125,
+        3963.10009765625,
+        3953.89990234375,
+        3860.0,
+        3820.0,
+        3955.0,
+        3978.89990234375
+      ],
+      "prev_lows": [
+        3759.0,
+        3742.5,
+        3704.89990234375,
+        3782.5,
+        3853.60009765625
+      ],
+      "prev_volumes": [
+        347396.0,
+        211008.0,
+        482617.0,
+        557451.0,
+        304749.0,
+        309343.0,
+        348109.0,
+        1244552.0,
+        4746620.0,
+        2271934.0,
+        2936878.0,
+        1147965.0,
+        463072.0,
+        434803.0,
+        373994.0,
+        430548.0,
+        274004.0,
+        441416.0,
+        517440.0
+      ],
+      "refreshed_on": "2026-11-12",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 66.48040948888475,
+          "body_frac_at_birth": 0.6937538355167556,
+          "born_index": 55,
+          "born_session": "2026-01-28",
+          "bottom": 1636.5999755859375,
+          "clv_at_birth": 0.8089751647282734,
+          "departed": true,
+          "entry": 1676.080078125,
+          "origin_index": 53,
+          "origin_session": "2026-01-23",
+          "range_atr_at_birth": 2.4804303355206185,
+          "rvol_at_birth": 3.6305147651238734,
+          "state": 0,
+          "stop": 1626.6279141626048,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1664.800048828125,
+          "width": 28.2000732421875
+        },
+        {
+          "atr_at_birth": 95.30402226042773,
+          "body_frac_at_birth": 0.7815946823878622,
+          "born_index": 88,
+          "born_session": "2026-03-17",
+          "bottom": 2071.0,
+          "clv_at_birth": 0.8593652345758711,
+          "departed": true,
+          "entry": 2167.154724006877,
+          "origin_index": 86,
+          "origin_session": "2026-03-13",
+          "range_atr_at_birth": 1.6190297656743673,
+          "rvol_at_birth": 1.9266959148129368,
+          "state": 0,
+          "stop": 2056.704396660936,
+          "tap_bar_index": 99,
+          "tap_session": "2026-04-06",
+          "taps": 2,
+          "top": 2150.0,
+          "width": 79.0
+        },
+        {
+          "atr_at_birth": 160.92263020795116,
+          "body_frac_at_birth": 0.7938833157147822,
+          "born_index": 238,
+          "born_session": "2026-10-27",
+          "bottom": 3085.0,
+          "clv_at_birth": 0.8022243722486099,
+          "departed": true,
+          "entry": 3248.365975781181,
+          "origin_index": 236,
+          "origin_session": "2026-10-23",
+          "range_atr_at_birth": 3.352542767308954,
+          "rvol_at_birth": 7.657801330050557,
+          "state": 0,
+          "stop": 3060.8616054688073,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 3219.39990234375,
+          "width": 134.39990234375
+        }
+      ],
+      "zones_seen": 7
     },
     "ADANIPORTS": {
       "as_of": "2026-11-11",
