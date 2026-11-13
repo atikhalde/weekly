@@ -427,6 +427,13 @@
       "session": "2026-10-29",
       "tap_number": 0
     },
+    "APOLLO|2026-11-11|422.95|404.00|ob": {
+      "kind": "ob",
+      "price": 454.1499938964844,
+      "sent_at": "2026-11-13T14:45:39+05:30",
+      "session": "2026-11-11",
+      "tap_number": 0
+    },
     "ARFIN|2026-10-06|87.95|86.42|ob": {
       "kind": "ob",
       "price": 96.36000061035156,
@@ -5691,7 +5698,7 @@
     "post_close": "2026-11-12"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-13T12:30:56+05:30",
+  "updated_at": "2026-11-13T14:45:39+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6206,6 +6213,24 @@
       "status": "waiting",
       "symbol": "APLAPOLLO",
       "week": "2026-08-24"
+    },
+    "APOLLO": {
+      "added_at": "2026-11-13",
+      "breakout_26w_session": {
+        "close": 340.70001220703125,
+        "level": 337.79998779296875,
+        "session": "2026-05-19"
+      },
+      "breakout_bar": "2026-11-13T14:15+05:30",
+      "breakout_price": 466.70001220703125,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 466.5,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "1134",
+      "status": "waiting",
+      "symbol": "APOLLO",
+      "week": "2026-11-09"
     },
     "APOLLOPIPE": {
       "added_at": "2026-09-27",
@@ -15503,6 +15528,175 @@
         }
       ],
       "zones_seen": 4
+    },
+    "APOLLO": {
+      "as_of": "2026-11-12",
+      "as_of_close": 440.1000061035156,
+      "as_of_high": 464.0,
+      "as_of_low": 438.0,
+      "atr": 23.70781002123162,
+      "breakout_26w_session": {
+        "close": 340.70001220703125,
+        "level": 337.79998779296875,
+        "session": "2026-05-19"
+      },
+      "closed_events": [
+        {
+          "atr": 23.531487715172513,
+          "born_session": "2026-11-11",
+          "bottom": 404.0,
+          "confirmed": true,
+          "detail": {
+            "entry": 427.1856799957623,
+            "origin_offset": 1,
+            "origin_session": "2026-11-09",
+            "stop": 400.4702768427241,
+            "width": 18.95001220703125
+          },
+          "entry": 427.1856799957623,
+          "high": 457.79998779296875,
+          "kind": "ob",
+          "low": 416.8999938964844,
+          "origin_session": "2026-11-09",
+          "price": 454.1499938964844,
+          "reason": "",
+          "rvol": 2.1093368285602816,
+          "session": "2026-11-11",
+          "signature": "2026-11-11|422.95|404.00",
+          "stop": 400.4702768427241,
+          "tap_number": 0,
+          "top": 422.95001220703125
+        }
+      ],
+      "post_close_done": null,
+      "prev_close": 440.1000061035156,
+      "prev_highs": [
+        403.8999938964844,
+        405.0,
+        438.0,
+        445.75,
+        428.20001220703125,
+        422.95001220703125,
+        457.79998779296875,
+        464.0
+      ],
+      "prev_lows": [
+        428.0,
+        410.95001220703125,
+        404.0,
+        416.8999938964844,
+        438.0
+      ],
+      "prev_volumes": [
+        8069949.0,
+        14129273.0,
+        8418674.0,
+        7304067.0,
+        5078947.0,
+        8740930.0,
+        52592481.0,
+        39162735.0,
+        12124150.0,
+        5802620.0,
+        6988575.0,
+        5590148.0,
+        4683347.0,
+        18374888.0,
+        11077893.0,
+        6984083.0,
+        6148969.0,
+        27775698.0,
+        15296472.0
+      ],
+      "refreshed_on": "2026-11-13",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 12.611723394984036,
+          "body_frac_at_birth": 0.7697391125709121,
+          "born_index": 101,
+          "born_session": "2026-04-09",
+          "bottom": 205.00999450683594,
+          "clv_at_birth": 0.7993082424837609,
+          "departed": true,
+          "entry": 212.10800476074218,
+          "origin_index": 100,
+          "origin_session": "2026-04-08",
+          "range_atr_at_birth": 2.520670037750463,
+          "rvol_at_birth": 6.226013720321494,
+          "state": 0,
+          "stop": 203.11823599758833,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 210.0800018310547,
+          "width": 5.07000732421875
+        },
+        {
+          "atr_at_birth": 14.552932684911545,
+          "body_frac_at_birth": 0.8818805404970305,
+          "born_index": 106,
+          "born_session": "2026-04-17",
+          "bottom": 235.0,
+          "clv_at_birth": 0.9059631759275137,
+          "departed": true,
+          "entry": 237.7860076904297,
+          "origin_index": 104,
+          "origin_session": "2026-04-15",
+          "range_atr_at_birth": 2.995960130339917,
+          "rvol_at_birth": 4.55242444691029,
+          "state": 0,
+          "stop": 232.81706009726327,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 236.99000549316406,
+          "width": 1.9900054931640625
+        },
+        {
+          "atr_at_birth": 23.250380162125328,
+          "body_frac_at_birth": 0.8060204355543126,
+          "born_index": 131,
+          "born_session": "2026-05-25",
+          "bottom": 347.6000061035156,
+          "clv_at_birth": 0.8060204355543126,
+          "departed": true,
+          "entry": 362.7350562221513,
+          "origin_index": 130,
+          "origin_session": "2026-05-22",
+          "range_atr_at_birth": 2.5720004307878983,
+          "rvol_at_birth": 3.4846766893754824,
+          "state": 0,
+          "stop": 344.11244907919684,
+          "tap_bar_index": 210,
+          "tap_session": "2026-09-16",
+          "taps": 1,
+          "top": 358.54998779296875,
+          "width": 10.949981689453125
+        },
+        {
+          "atr_at_birth": 23.531487715172513,
+          "body_frac_at_birth": 0.8789727886131363,
+          "born_index": 247,
+          "born_session": "2026-11-11",
+          "bottom": 404.0,
+          "clv_at_birth": 0.9107580821228896,
+          "departed": true,
+          "entry": 427.1856799957623,
+          "origin_index": 246,
+          "origin_session": "2026-11-09",
+          "range_atr_at_birth": 1.7380963920149037,
+          "rvol_at_birth": 2.1093368285602816,
+          "state": 0,
+          "stop": 400.4702768427241,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 422.95001220703125,
+          "width": 18.95001220703125
+        }
+      ],
+      "zones_seen": 5
     },
     "APOLLOPIPE": {
       "as_of": "2026-11-12",
