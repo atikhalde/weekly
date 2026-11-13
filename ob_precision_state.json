@@ -5054,6 +5054,13 @@
       "session": "2026-11-06",
       "tap_number": 0
     },
+    "TEXINFRA|2026-11-06|121.00|118.52|tap|tap1": {
+      "kind": "tap",
+      "price": 123.09,
+      "sent_at": "2026-11-13T11:45:33+05:30",
+      "session": "2026-11-13",
+      "tap_number": 1
+    },
     "TFCILTD|2026-07-24|81.81999969482422|81.05000305175781|ob": {
       "kind": "ob",
       "price": null,
@@ -5684,7 +5691,7 @@
     "post_close": "2026-11-12"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-13T11:00:42+05:30",
+  "updated_at": "2026-11-13T11:45:33+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6022,6 +6029,24 @@
       "security_id": "79",
       "status": "waiting",
       "symbol": "ALEMBICLTD",
+      "week": "2026-11-09"
+    },
+    "ALICON": {
+      "added_at": "2026-11-13",
+      "breakout_26w_session": {
+        "close": 869.7999877929688,
+        "level": 782.0,
+        "session": "2026-09-30"
+      },
+      "breakout_bar": "2026-11-13T09:30+05:30",
+      "breakout_price": 917.2999877929688,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 909.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "13656",
+      "status": "waiting",
+      "symbol": "ALICON",
       "week": "2026-11-09"
     },
     "ALIVUS": {
@@ -11381,10 +11406,10 @@
       "breakout_price": 118.93000030517578,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-13",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "11549",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TEXINFRA",
       "week": "2026-09-07"
     },
@@ -14329,6 +14354,106 @@
           "taps": 0,
           "top": 97.80000305175781,
           "width": 1.5900039672851562
+        }
+      ],
+      "zones_seen": 3
+    },
+    "ALICON": {
+      "as_of": "2026-11-11",
+      "as_of_close": 840.75,
+      "as_of_high": 855.2999877929688,
+      "as_of_low": 830.25,
+      "atr": 37.76353415330056,
+      "breakout_26w_session": {
+        "close": 869.7999877929688,
+        "level": 782.0,
+        "session": "2026-09-30"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 840.75,
+      "prev_highs": [
+        882.2999877929688,
+        866.0999755859375,
+        868.4500122070312,
+        869.75,
+        873.9000244140625,
+        869.0,
+        867.7999877929688,
+        855.2999877929688
+      ],
+      "prev_lows": [
+        850.0,
+        846.7999877929688,
+        825.2000122070312,
+        831.0499877929688,
+        830.25
+      ],
+      "prev_volumes": [
+        71543.0,
+        33355.0,
+        9228.0,
+        14725.0,
+        21222.0,
+        30114.0,
+        51093.0,
+        86596.0,
+        18093.0,
+        20277.0,
+        11875.0,
+        5966.0,
+        37265.0,
+        9715.0,
+        12170.0,
+        10095.0,
+        11724.0,
+        14429.0,
+        17478.0
+      ],
+      "refreshed_on": "2026-11-13",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 23.614581389572695,
+          "body_frac_at_birth": 0.6888891744334795,
+          "born_index": 175,
+          "born_session": "2026-07-27",
+          "bottom": 625.0,
+          "clv_at_birth": 0.852631864491959,
+          "departed": true,
+          "entry": 653.7006368571543,
+          "origin_index": 174,
+          "origin_session": "2026-07-24",
+          "range_atr_at_birth": 1.8103221604799136,
+          "rvol_at_birth": 3.021930046111548,
+          "state": 0,
+          "stop": 621.4578127915642,
+          "tap_bar_index": 202,
+          "tap_session": "2026-09-02",
+          "taps": 2,
+          "top": 649.4500122070312,
+          "width": 24.45001220703125
+        },
+        {
+          "atr_at_birth": 38.69449085792252,
+          "body_frac_at_birth": 0.9714780061141305,
+          "born_index": 221,
+          "born_session": "2026-09-30",
+          "bottom": 712.0,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 736.965008354426,
+          "origin_index": 219,
+          "origin_session": "2026-09-28",
+          "range_atr_at_birth": 3.7149991332827645,
+          "rvol_at_birth": 11.554341377331404,
+          "state": 0,
+          "stop": 706.1958263713116,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 730.0,
+          "width": 18.0
         }
       ],
       "zones_seen": 3
