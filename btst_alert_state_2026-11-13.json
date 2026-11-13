@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-13",
+  "scan_time": "22:52",
+  "generated_at_ist": "2026-11-13T22:52:04",
+  "too_late": true,
+  "too_early": false,
+  "top3_actionable": [
+    {
+      "symbol": "TIPSMUSIC",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 6/8",
+      "arm": "ant_above",
+      "pre": 6,
+      "price": 816.4500122070312,
+      "qty": 122,
+      "invest": 99606.90148925781,
+      "day_ret": 4.245403406762294,
+      "rvol": 1.7909858003413366,
+      "close_pos": 0.9112503051757812,
+      "gap_pct": -0.9458487301585744,
+      "prime": ""
+    }
+  ],
+  "next_anticipated": [],
+  "excluded_locked": [],
+  "enterable": false
+}
