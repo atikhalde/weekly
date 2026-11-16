@@ -5733,7 +5733,7 @@
     "post_close": "2026-11-13"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-16T11:30:48+05:30",
+  "updated_at": "2026-11-16T14:15:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6826,6 +6826,24 @@
       "status": "tapped",
       "symbol": "BLUSPRING",
       "week": "2026-08-24"
+    },
+    "BOROLTD": {
+      "added_at": "2026-11-16",
+      "breakout_26w_session": {
+        "close": 312.3500061035156,
+        "level": 300.0,
+        "session": "2026-11-02"
+      },
+      "breakout_bar": "2026-11-16T13:50+05:30",
+      "breakout_price": 335.95001220703125,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 334.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "19401",
+      "status": "waiting",
+      "symbol": "BOROLTD",
+      "week": "2026-11-16"
     },
     "BOSCH-HCIL": {
       "added_at": "2026-09-27",
@@ -19403,6 +19421,85 @@
         }
       ],
       "zones_seen": 4
+    },
+    "BOROLTD": {
+      "as_of": "2026-11-13",
+      "as_of_close": 311.5,
+      "as_of_high": 318.6000061035156,
+      "as_of_low": 305.5,
+      "atr": 14.99327353704797,
+      "breakout_26w_session": {
+        "close": 312.3500061035156,
+        "level": 300.0,
+        "session": "2026-11-02"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 311.5,
+      "prev_highs": [
+        315.75,
+        319.79998779296875,
+        320.20001220703125,
+        320.0,
+        315.8999938964844,
+        315.0,
+        314.3500061035156,
+        318.6000061035156
+      ],
+      "prev_lows": [
+        301.70001220703125,
+        307.95001220703125,
+        308.0,
+        308.29998779296875,
+        305.5
+      ],
+      "prev_volumes": [
+        72339.0,
+        542861.0,
+        358873.0,
+        127584.0,
+        172133.0,
+        164887.0,
+        63645.0,
+        105993.0,
+        130687.0,
+        15838011.0,
+        9354889.0,
+        1258180.0,
+        569225.0,
+        211953.0,
+        685309.0,
+        93410.0,
+        80834.0,
+        157333.0,
+        163424.0
+      ],
+      "refreshed_on": "2026-11-16",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 14.515041346234655,
+          "body_frac_at_birth": 0.8504801809453919,
+          "born_index": 239,
+          "born_session": "2026-10-30",
+          "bottom": 237.39999389648438,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 241.04000244140624,
+          "origin_index": 237,
+          "origin_session": "2026-10-28",
+          "range_atr_at_birth": 2.5111879517792537,
+          "rvol_at_birth": 15.804254692402496,
+          "state": 0,
+          "stop": 235.22273769454918,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 240.0,
+          "width": 2.600006103515625
+        }
+      ],
+      "zones_seen": 3
     },
     "BOSCH-HCIL": {
       "as_of": "2026-10-01",
