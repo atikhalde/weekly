@@ -1,9 +1,9 @@
 {
   "date": "2026-11-16",
-  "scan_time": "04:16",
-  "generated_at_ist": "2026-11-16T04:16:29",
+  "scan_time": "15:15",
+  "generated_at_ist": "2026-11-16T15:15:36",
   "too_late": false,
-  "too_early": true,
+  "too_early": false,
   "top3_actionable": [],
   "next_anticipated": [],
   "excluded_locked": [],
