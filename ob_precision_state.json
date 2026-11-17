@@ -5747,7 +5747,7 @@
     "post_close": "2026-11-16"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-17T09:30:48+05:30",
+  "updated_at": "2026-11-17T09:45:36+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7652,6 +7652,24 @@
       "status": "tapped",
       "symbol": "EXICOM",
       "week": "2026-09-07"
+    },
+    "FILATEX": {
+      "added_at": "2026-11-17",
+      "breakout_26w_session": {
+        "close": 54.4900016784668,
+        "level": 54.400001525878906,
+        "session": "2026-06-18"
+      },
+      "breakout_bar": "2026-11-17T09:20+05:30",
+      "breakout_price": 114.66000366210938,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 114.58000183105469,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "24532",
+      "status": "waiting",
+      "symbol": "FILATEX",
+      "week": "2026-11-16"
     },
     "FINCABLES": {
       "added_at": "2026-09-27",
@@ -11672,6 +11690,24 @@
       "status": "waiting",
       "symbol": "TVSMOTOR",
       "week": "2026-11-02"
+    },
+    "TVSSCS": {
+      "added_at": "2026-11-17",
+      "breakout_26w_session": {
+        "close": 140.30999755859375,
+        "level": 137.0,
+        "session": "2026-06-19"
+      },
+      "breakout_bar": "2026-11-17T09:30+05:30",
+      "breakout_price": 147.2899932861328,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 146.5,
+      "resolved_at": "2026-11-17",
+      "resolved_reason": "all 3 order block(s) invalidated/exhausted",
+      "security_id": "18151",
+      "status": "invalid",
+      "symbol": "TVSSCS",
+      "week": "2026-11-16"
     },
     "TVSSRICHAK": {
       "added_at": "2026-09-27",
@@ -24929,6 +24965,148 @@
         }
       ],
       "zones_seen": 6
+    },
+    "FILATEX": {
+      "as_of": "2026-11-16",
+      "as_of_close": 103.47000122070312,
+      "as_of_high": 106.0,
+      "as_of_low": 97.98999786376953,
+      "atr": 5.929039844763603,
+      "breakout_26w_session": {
+        "close": 54.4900016784668,
+        "level": 54.400001525878906,
+        "session": "2026-06-18"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 103.47000122070312,
+      "prev_highs": [
+        93.0,
+        96.66000366210938,
+        94.41999816894531,
+        95.06999969482422,
+        102.8499984741211,
+        103.75,
+        103.23999786376953,
+        106.0
+      ],
+      "prev_lows": [
+        91.94000244140625,
+        93.66000366210938,
+        99.11000061035156,
+        97.51000213623047,
+        97.98999786376953
+      ],
+      "prev_volumes": [
+        1278870.0,
+        2994107.0,
+        1855660.0,
+        2996757.0,
+        2085095.0,
+        1473126.0,
+        920184.0,
+        544209.0,
+        913226.0,
+        788675.0,
+        595819.0,
+        1968398.0,
+        978507.0,
+        629058.0,
+        551103.0,
+        3352300.0,
+        1762487.0,
+        1529980.0,
+        2668251.0
+      ],
+      "refreshed_on": "2026-11-17",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 2.1925475711892957,
+          "body_frac_at_birth": 0.8089889759459599,
+          "born_index": 137,
+          "born_session": "2026-06-05",
+          "bottom": 47.52000045776367,
+          "clv_at_birth": 0.8112357913144855,
+          "departed": true,
+          "entry": 48.10799789428711,
+          "origin_index": 136,
+          "origin_session": "2026-06-04",
+          "range_atr_at_birth": 2.029601093593783,
+          "rvol_at_birth": 3.889606858332528,
+          "state": 0,
+          "stop": 47.19111832208528,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 47.939998626708984,
+          "width": 0.4199981689453125
+        },
+        {
+          "atr_at_birth": 2.0236646604344606,
+          "body_frac_at_birth": 0.8258576021160996,
+          "born_index": 156,
+          "born_session": "2026-07-03",
+          "bottom": 51.619998931884766,
+          "clv_at_birth": 0.92084454760117,
+          "departed": true,
+          "entry": 52.16599807739258,
+          "origin_index": 154,
+          "origin_session": "2026-07-01",
+          "range_atr_at_birth": 1.8728403918036838,
+          "rvol_at_birth": 2.9064452791729054,
+          "state": 0,
+          "stop": 51.31644923281959,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 52.0099983215332,
+          "width": 0.3899993896484375
+        },
+        {
+          "atr_at_birth": 3.5825345160966253,
+          "body_frac_at_birth": 0.6922267501733044,
+          "born_index": 164,
+          "born_session": "2026-07-15",
+          "bottom": 60.5099983215332,
+          "clv_at_birth": 0.7783612022711882,
+          "departed": true,
+          "entry": 64.6448562128974,
+          "origin_index": 163,
+          "origin_session": "2026-07-14",
+          "range_atr_at_birth": 2.657335637742573,
+          "rvol_at_birth": 7.7998604683263,
+          "state": 0,
+          "stop": 59.97261814411871,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 64.0,
+          "width": 3.490001678466797
+        },
+        {
+          "atr_at_birth": 4.497042739666255,
+          "body_frac_at_birth": 0.6861094595288953,
+          "born_index": 206,
+          "born_session": "2026-09-11",
+          "bottom": 75.05999755859375,
+          "clv_at_birth": 0.7901384943442484,
+          "departed": true,
+          "entry": 76.4740005493164,
+          "origin_index": 204,
+          "origin_session": "2026-09-09",
+          "range_atr_at_birth": 3.6979868428038745,
+          "rvol_at_birth": 9.31648469412048,
+          "state": 0,
+          "stop": 74.38544114764382,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 76.06999969482422,
+          "width": 1.0100021362304688
+        }
+      ],
+      "zones_seen": 7
     },
     "FINCABLES": {
       "as_of": "2026-10-19",
@@ -49731,6 +49909,63 @@
         }
       ],
       "zones_seen": 4
+    },
+    "TVSSCS": {
+      "as_of": "2026-11-16",
+      "as_of_close": 137.1999969482422,
+      "as_of_high": 142.5,
+      "as_of_low": 130.0,
+      "atr": 5.472814727369873,
+      "breakout_26w_session": {
+        "close": 140.30999755859375,
+        "level": 137.0,
+        "session": "2026-06-19"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 137.1999969482422,
+      "prev_highs": [
+        117.11000061035156,
+        122.9000015258789,
+        119.0,
+        120.5,
+        123.06999969482422,
+        124.4000015258789,
+        123.55000305175781,
+        142.5
+      ],
+      "prev_lows": [
+        118.2300033569336,
+        119.94000244140625,
+        120.27999877929688,
+        120.80000305175781,
+        130.0
+      ],
+      "prev_volumes": [
+        233083.0,
+        875822.0,
+        545787.0,
+        559256.0,
+        391432.0,
+        458375.0,
+        292610.0,
+        202036.0,
+        1067792.0,
+        434227.0,
+        272817.0,
+        774529.0,
+        621257.0,
+        328577.0,
+        192992.0,
+        389297.0,
+        539665.0,
+        260586.0,
+        37298342.0
+      ],
+      "refreshed_on": "2026-11-17",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 3
     },
     "TVSSRICHAK": {
       "as_of": "2026-10-22",
