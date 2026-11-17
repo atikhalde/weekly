@@ -1,75 +1,26 @@
 {
   "date": "2026-11-17",
-  "scan_time": "15:20",
-  "generated_at_ist": "2026-11-17T15:20:32",
+  "scan_time": "15:25",
+  "generated_at_ist": "2026-11-17T15:25:33",
   "too_late": false,
   "too_early": false,
   "top3_actionable": [
     {
-      "symbol": "WELSPUNLIV",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 7/8",
-      "arm": "ant_below",
-      "pre": 7,
-      "price": 266.70001220703125,
-      "qty": 374,
-      "invest": 99745.80456542969,
-      "day_ret": 8.883812177976269,
-      "rvol": 1.626496714018392,
-      "close_pos": 0.9912247567806614,
-      "gap_pct": 0.26923984165369613,
-      "prime": "\u2b50 Prime #1"
-    },
-    {
-      "symbol": "SGFIN",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 7/8",
-      "arm": "ant_above",
-      "pre": 7,
-      "price": 795.3499755859375,
-      "qty": 125,
-      "invest": 99418.74694824219,
-      "day_ret": 6.3942195938081925,
-      "rvol": 2.903594355159558,
-      "close_pos": 0.9375490331743628,
-      "gap_pct": -6.901878438970094,
-      "prime": ""
+      "symbol": "KDDL",
+      "badge": "\ud83d\udfe2 Confirmed",
+      "tier": "A",
+      "arm": "fresh_A",
+      "pre": 6,
+      "price": 4627.0,
+      "qty": 21,
+      "invest": 97167.0,
+      "day_ret": 17.639582463164906,
+      "rvol": 29.683815737458765,
+      "close_pos": 0.9882448106775803,
+      "prime": "\ud83d\udd25 Prime #2"
     }
   ],
-  "next_anticipated": [
-    {
-      "symbol": "TIPSMUSIC",
-      "close": 833.7999877929688,
-      "level": 820.0,
-      "which": "C",
-      "gap_pct": -1.6829253406059452,
-      "side": "above",
-      "pre": 7,
-      "ret_12m": 70.38928729809584,
-      "dist_200dma": 30.86287243079575,
-      "day_ret": 3.5390538224280954,
-      "prev_close": 807.1500244140625,
-      "high": 834.5,
-      "close_pos": 0.9783277954479489,
-      "rvol": 0.8459886640899378,
-      "vol_today": 486516.0,
-      "vma50": 575085.72,
-      "vma_bars": 50,
-      "atr_pct": 3.7795984983423008,
-      "turnover_cr": 53.099418775031126,
-      "partial_frac": 1.0,
-      "base_from_high": -2.629831409849137,
-      "ret_3m_prior": 20.308540027106915,
-      "ok": true,
-      "mcap_cr": 10303.23,
-      "rank": 1
-    }
-  ],
-  "excluded_locked": [
-    [
-      "TIPSMUSIC",
-      "Locked at Upper Circuit +2%"
-    ]
-  ],
+  "next_anticipated": [],
+  "excluded_locked": [],
   "enterable": true
 }
