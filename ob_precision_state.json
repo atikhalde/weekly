@@ -5747,7 +5747,7 @@
     "post_close": "2026-11-16"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-17T09:45:36+05:30",
+  "updated_at": "2026-11-17T10:00:41+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6331,6 +6331,24 @@
       "symbol": "ARIHANTCAP",
       "week": "2026-10-12"
     },
+    "ARIS": {
+      "added_at": "2026-11-17",
+      "breakout_26w_session": {
+        "close": 153.3699951171875,
+        "level": 153.25,
+        "session": "2026-11-17"
+      },
+      "breakout_bar": "2026-11-17T09:40+05:30",
+      "breakout_price": 154.3699951171875,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 153.25,
+      "resolved_at": "2026-11-17",
+      "resolved_reason": "all 1 order block(s) invalidated/exhausted",
+      "security_id": "757614",
+      "status": "invalid",
+      "symbol": "ARIS",
+      "week": "2026-11-16"
+    },
     "ARROWGREEN": {
       "added_at": "2026-09-27",
       "breakout_26w_session": {
@@ -6700,6 +6718,24 @@
       "status": "invalid",
       "symbol": "BANARISUG",
       "week": "2026-08-17"
+    },
+    "BANCOINDIA": {
+      "added_at": "2026-11-17",
+      "breakout_26w_session": {
+        "close": 709.2000122070312,
+        "level": 708.9500122070312,
+        "session": "2026-11-17"
+      },
+      "breakout_bar": "2026-11-17T09:35+05:30",
+      "breakout_price": 714.1500244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 708.9500122070312,
+      "resolved_at": "2026-11-17",
+      "resolved_reason": "all 1 order block(s) invalidated/exhausted",
+      "security_id": "13880",
+      "status": "invalid",
+      "symbol": "BANCOINDIA",
+      "week": "2026-11-16"
     },
     "BANKINDIA": {
       "added_at": "2026-11-11",
@@ -8030,6 +8066,24 @@
       "status": "waiting",
       "symbol": "GRAPHITE",
       "week": "2026-09-07"
+    },
+    "GROWW": {
+      "added_at": "2026-11-17",
+      "breakout_26w_session": {
+        "close": 229.7100067138672,
+        "level": 229.16000366210938,
+        "session": "2026-11-17"
+      },
+      "breakout_bar": "2026-11-17T09:45+05:30",
+      "breakout_price": 229.4600067138672,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 229.16000366210938,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "759806",
+      "status": "waiting",
+      "symbol": "GROWW",
+      "week": "2026-11-16"
     },
     "GUFICBIO": {
       "added_at": "2026-09-27",
@@ -16139,6 +16193,63 @@
       ],
       "zones_seen": 2
     },
+    "ARIS": {
+      "as_of": "2026-11-13",
+      "as_of_close": 146.86000061035156,
+      "as_of_high": 151.6699981689453,
+      "as_of_low": 143.8300018310547,
+      "atr": 7.353144831133255,
+      "breakout_26w_session": {
+        "close": 153.3699951171875,
+        "level": 153.25,
+        "session": "2026-11-17"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 146.86000061035156,
+      "prev_highs": [
+        146.3000030517578,
+        150.39999389648438,
+        151.0,
+        149.5,
+        151.5,
+        148.67999267578125,
+        153.0,
+        151.6699981689453
+      ],
+      "prev_lows": [
+        142.10000610351562,
+        144.0500030517578,
+        143.4600067138672,
+        144.3000030517578,
+        143.8300018310547
+      ],
+      "prev_volumes": [
+        1302278.0,
+        1099819.0,
+        527561.0,
+        1258597.0,
+        651029.0,
+        811841.0,
+        2144127.0,
+        1263991.0,
+        1572979.0,
+        1010664.0,
+        911303.0,
+        1749947.0,
+        1853837.0,
+        1961310.0,
+        1740452.0,
+        886923.0,
+        355460.0,
+        3751892.0,
+        2444643.0
+      ],
+      "refreshed_on": "2026-11-17",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 1
+    },
     "ARROWGREEN": {
       "as_of": "2026-11-06",
       "as_of_close": 723.2000122070312,
@@ -18443,6 +18554,63 @@
       "session_index": 248,
       "zones": [],
       "zones_seen": 2
+    },
+    "BANCOINDIA": {
+      "as_of": "2026-11-16",
+      "as_of_close": 673.9000244140625,
+      "as_of_high": 684.1500244140625,
+      "as_of_low": 665.5499877929688,
+      "atr": 23.37585850398752,
+      "breakout_26w_session": {
+        "close": 709.2000122070312,
+        "level": 708.9500122070312,
+        "session": "2026-11-17"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 673.9000244140625,
+      "prev_highs": [
+        610.0,
+        629.7999877929688,
+        625.9500122070312,
+        693.7000122070312,
+        692.0,
+        685.9500122070312,
+        691.9500122070312,
+        684.1500244140625
+      ],
+      "prev_lows": [
+        643.2999877929688,
+        660.4000244140625,
+        672.0,
+        670.2999877929688,
+        665.5499877929688
+      ],
+      "prev_volumes": [
+        51192.0,
+        108732.0,
+        44607.0,
+        195920.0,
+        83042.0,
+        88402.0,
+        49650.0,
+        38052.0,
+        45978.0,
+        53162.0,
+        52890.0,
+        61212.0,
+        121837.0,
+        114362.0,
+        3333934.0,
+        623514.0,
+        233357.0,
+        231156.0,
+        148830.0
+      ],
+      "refreshed_on": "2026-11-17",
+      "session_index": 248,
+      "zones": [],
+      "zones_seen": 1
     },
     "BANKINDIA": {
       "as_of": "2026-11-09",
@@ -27200,6 +27368,127 @@
         }
       ],
       "zones_seen": 4
+    },
+    "GROWW": {
+      "as_of": "2026-11-16",
+      "as_of_close": 224.9199981689453,
+      "as_of_high": 227.3000030517578,
+      "as_of_low": 222.33999633789062,
+      "atr": 7.658727859131282,
+      "breakout_26w_session": {
+        "close": 229.7100067138672,
+        "level": 229.16000366210938,
+        "session": "2026-11-17"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 224.9199981689453,
+      "prev_highs": [
+        209.89999389648438,
+        225.75,
+        218.0,
+        222.60000610351562,
+        227.91000366210938,
+        224.85000610351562,
+        229.16000366210938,
+        227.3000030517578
+      ],
+      "prev_lows": [
+        217.0,
+        220.0,
+        220.08999633789062,
+        218.67999267578125,
+        222.33999633789062
+      ],
+      "prev_volumes": [
+        20901514.0,
+        18141584.0,
+        10781201.0,
+        16469697.0,
+        19275406.0,
+        13574790.0,
+        11926762.0,
+        11906450.0,
+        14177487.0,
+        28523991.0,
+        53198062.0,
+        24498504.0,
+        82340069.0,
+        198554804.0,
+        28857092.0,
+        34239524.0,
+        22763163.0,
+        38206011.0,
+        14985636.0
+      ],
+      "refreshed_on": "2026-11-17",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 9.598446776279346,
+          "body_frac_at_birth": 0.7792790487922414,
+          "born_index": 27,
+          "born_session": "2025-12-19",
+          "bottom": 142.39999389648438,
+          "clv_at_birth": 0.8683680958356021,
+          "departed": true,
+          "entry": 144.99000244140626,
+          "origin_index": 25,
+          "origin_session": "2025-12-17",
+          "range_atr_at_birth": 2.081586343419193,
+          "rvol_at_birth": 4.095615413913953,
+          "state": 0,
+          "stop": 140.96022688004248,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 144.25,
+          "width": 1.850006103515625
+        },
+        {
+          "atr_at_birth": 7.546319993427043,
+          "body_frac_at_birth": 0.8288867115118982,
+          "born_index": 98,
+          "born_session": "2026-04-08",
+          "bottom": 166.00999450683594,
+          "clv_at_birth": 0.908923096791582,
+          "departed": true,
+          "entry": 167.81600646972657,
+          "origin_index": 97,
+          "origin_session": "2026-04-07",
+          "range_atr_at_birth": 1.4404365474370855,
+          "rvol_at_birth": 2.7764581470260796,
+          "state": 0,
+          "stop": 164.8780465078219,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 167.3000030517578,
+          "width": 1.290008544921875
+        },
+        {
+          "atr_at_birth": 6.6049037249605504,
+          "body_frac_at_birth": 0.8568701706568125,
+          "born_index": 240,
+          "born_session": "2026-11-03",
+          "bottom": 188.6999969482422,
+          "clv_at_birth": 0.9131675540937396,
+          "departed": true,
+          "entry": 191.77999267578124,
+          "origin_index": 238,
+          "origin_session": "2026-10-30",
+          "range_atr_at_birth": 1.5866992410402858,
+          "rvol_at_birth": 1.9938220148741692,
+          "state": 0,
+          "stop": 187.7092613894981,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 190.89999389648438,
+          "width": 2.1999969482421875
+        }
+      ],
+      "zones_seen": 6
     },
     "GUFICBIO": {
       "as_of": "2026-10-01",
