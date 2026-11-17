@@ -1,25 +1,10 @@
 {
-  "date": "2026-11-17",
-  "scan_time": "15:25",
-  "generated_at_ist": "2026-11-17T15:25:33",
+  "date": "2026-11-18",
+  "scan_time": "00:14",
+  "generated_at_ist": "2026-11-18T00:14:40",
   "too_late": false,
-  "too_early": false,
-  "top3_actionable": [
-    {
-      "symbol": "KDDL",
-      "badge": "\ud83d\udfe2 Confirmed",
-      "tier": "A",
-      "arm": "fresh_A",
-      "pre": 6,
-      "price": 4627.0,
-      "qty": 21,
-      "invest": 97167.0,
-      "day_ret": 17.639582463164906,
-      "rvol": 29.683815737458765,
-      "close_pos": 0.9882448106775803,
-      "prime": "\ud83d\udd25 Prime #2"
-    }
-  ],
+  "too_early": true,
+  "top3_actionable": [],
   "next_anticipated": [],
   "excluded_locked": [],
   "enterable": true
