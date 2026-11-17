@@ -167,6 +167,35 @@
    "symbol": "RKFORGE",
    "target": 772.7999877929688,
    "target_b": 772.7999877929688
+  },
+  {
+   "born_session": "2026-11-16",
+   "breakout_session": "2026-11-02",
+   "entry": 311.5,
+   "entry_a": 311.5,
+   "entry_b": 341.1000061035156,
+   "entry_session": "2026-11-13",
+   "exit": {
+    "b": {
+     "open": true
+    },
+    "fill": "order",
+    "outcome": "win",
+    "price": 334.0,
+    "reason": "swing-high target filled (the alert ran late)",
+    "session": "2026-11-16",
+    "sessions": 1
+   },
+   "id": "BOROLTD-OBE-2026-11-16",
+   "last_checked": "2026-11-13",
+   "late_sessions": 1,
+   "origin_session": "2026-11-13",
+   "sessions_held": 0,
+   "stop": 300.0,
+   "strategy": "precision_ob_entry",
+   "symbol": "BOROLTD",
+   "target": 334.0,
+   "target_b": 346.95001220703125
   }
  ],
  "cycles": {
@@ -179,6 +208,7 @@
   "ALEMBICLTD|2026-08-26": "rule|ALEMBICLTD|2026-11-11",
   "ALICON|2026-09-30": "rule|ALICON|2026-09-30",
   "ALIVUS|2026-06-30": "rule|ALIVUS|2026-08-03",
+  "ANGELONE|2026-06-15": "rule|ANGELONE|2026-11-03",
   "APLAPOLLO|2026-08-28": "rule|APLAPOLLO|2026-10-27",
   "APOLLOPIPE|2026-08-19": "rule|APOLLOPIPE|2026-08-25",
   "APOLLO|2026-05-19": "rule|APOLLO|2026-05-25",
@@ -191,6 +221,7 @@
   "AZAD|2026-04-22": "rule|AZAD|2026-04-23",
   "AZAD|2026-05-08": "rule|AZAD|2026-07-06",
   "BHARTIARTL|2026-11-03": "rule|BHARTIARTL|2026-11-03",
+  "BOROLTD|2026-11-02": "rule|BOROLTD|2026-11-16",
   "BOSCHLTD|2026-06-18": "rule|BOSCHLTD|2026-08-12",
   "COFORGE|2026-08-03": "rule|COFORGE|2026-08-28",
   "CONSOFINVT|2026-07-09": "rule|CONSOFINVT|2026-07-14",
@@ -200,6 +231,7 @@
   "DYNAMATECH|2026-04-22": "rule|DYNAMATECH|2026-09-11",
   "DYNAMATECH|2026-09-25": "rule|DYNAMATECH|2026-09-25",
   "EMCURE|2026-06-24": "rule|EMCURE|2026-11-04",
+  "FILATEX|2026-06-18": "rule|FILATEX|2026-07-03",
   "GABRIEL|2026-06-19": "rule|GABRIEL|2026-06-19",
   "GAEL|2026-05-07": "rule|GAEL|2026-05-07",
   "GAIL|2026-07-31": "rule|GAIL|2026-11-04",
@@ -212,6 +244,7 @@
   "INDIGO|2026-06-24": "rule|INDIGO|2026-10-30",
   "JINDALSAW|2026-07-09": "rule|JINDALSAW|2026-10-14",
   "KALYANKJIL|2026-07-13": "rule|KALYANKJIL|2026-11-06",
+  "KDDL|2026-06-22": "rule|KDDL|2026-08-03",
   "KRISHANA|2026-06-24": "rule|KRISHANA|2026-07-23",
   "LAURUSLABS|2026-05-11": "rule|LAURUSLABS|2026-06-23",
   "MANAKCOAT|2026-10-29": "rule|MANAKCOAT|2026-10-29",
@@ -267,8 +300,8 @@
   "VINCOFE|2026-11-04": "OB close back below the 26W level",
   "VRLLOG|2026-11-04": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "intraday 2026-11-17",
- "last_run_at": "2026-11-17T09:30:34+05:30",
+ "last_run": "postclose 2026-11-17",
+ "last_run_at": "2026-11-17T15:31:33+05:30",
  "open": [
   {
    "born_session": "2026-11-04",
@@ -313,6 +346,7 @@
   "rule|ALIVUS|2026-06-23": "2026-10-07T15:54:49+05:30",
   "rule|ALIVUS|2026-08-03": "2026-11-02T15:45:30+05:30",
   "rule|ANANDRATHI|2026-06-29": "2026-10-07T15:54:49+05:30",
+  "rule|ANGELONE|2026-11-03": "2026-11-17T15:31:31+05:30",
   "rule|ANTELOPUS|2026-09-02": "2026-10-07T15:54:49+05:30",
   "rule|APARINDS|2026-05-27": "2026-10-07T15:54:49+05:30",
   "rule|APLAPOLLO|2026-10-27": "2026-10-28T15:45:31+05:30",
@@ -343,6 +377,7 @@
   "rule|BLISSGVS|2026-05-26": "2026-10-07T15:54:49+05:30",
   "rule|BLSE|2026-07-01": "2026-10-07T15:54:49+05:30",
   "rule|BLUSPRING|2026-05-29": "2026-10-07T15:54:49+05:30",
+  "rule|BOROLTD|2026-11-16": "2026-11-17T15:31:32+05:30",
   "rule|BOSCH-HCIL|2026-09-29": "2026-10-07T15:54:49+05:30",
   "rule|BOSCHLTD|2026-08-12": "2026-11-04T15:45:31+05:30",
   "rule|CAPLIPOINT|2026-05-14": "2026-10-07T15:54:49+05:30",
@@ -380,6 +415,7 @@
   "rule|ENGINERSIN|2026-08-05": "2026-10-07T15:54:49+05:30",
   "rule|ENTERO|2026-08-11": "2026-10-07T15:54:49+05:30",
   "rule|EXICOM|2026-05-21": "2026-10-07T15:54:49+05:30",
+  "rule|FILATEX|2026-07-03": "2026-11-17T15:31:32+05:30",
   "rule|FINCABLES|2026-08-06": "2026-10-07T15:54:49+05:30",
   "rule|FINEORG|2026-08-07": "2026-10-07T15:54:49+05:30",
   "rule|FOSECOIND|2026-08-26": "2026-10-07T15:54:49+05:30",
@@ -419,6 +455,7 @@
   "rule|JYOTICNC|2026-08-18": "2026-10-07T15:54:49+05:30",
   "rule|KABRAEXTRU|2026-08-05": "2026-10-07T15:54:49+05:30",
   "rule|KALYANKJIL|2026-11-06": "2026-11-11T15:45:25+05:30",
+  "rule|KDDL|2026-08-03": "2026-11-17T15:31:32+05:30",
   "rule|KINGFA|2026-08-07": "2026-10-07T15:54:49+05:30",
   "rule|KMEW|2026-06-22": "2026-10-07T15:54:49+05:30",
   "rule|KOPRAN|2026-05-25": "2026-10-07T15:54:49+05:30",
