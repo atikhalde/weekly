@@ -3815,6 +3815,13 @@
       "session": "2026-11-09",
       "tap_number": 0
     },
+    "QUESS|2026-11-09|323.00|312.85|tap|tap1": {
+      "kind": "tap",
+      "price": 328.65,
+      "sent_at": "2026-11-18T11:45:28+05:30",
+      "session": "2026-11-18",
+      "tap_number": 1
+    },
     "RACLGEAR|2026-08-06|1265.0|1238.9000244140625|ob": {
       "kind": "ob",
       "price": null,
@@ -5775,7 +5782,7 @@
     "post_close": "2026-11-17"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-18T11:00:42+05:30",
+  "updated_at": "2026-11-18T11:45:28+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10392,10 +10399,10 @@
       "breakout_price": 359.79998779296875,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-18",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "17704",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "QUESS",
       "week": "2026-08-24"
     },
