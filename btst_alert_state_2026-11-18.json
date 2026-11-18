@@ -1,55 +1,10 @@
 {
   "date": "2026-11-18",
-  "scan_time": "15:20",
-  "generated_at_ist": "2026-11-18T15:20:35",
+  "scan_time": "15:25",
+  "generated_at_ist": "2026-11-18T15:25:32",
   "too_late": false,
   "too_early": false,
-  "top3_actionable": [
-    {
-      "symbol": "NAVINFLUOR",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 6/8",
-      "arm": "ant_above",
-      "pre": 6,
-      "price": 10250.0,
-      "qty": 9,
-      "invest": 92250.0,
-      "day_ret": 4.405398523045578,
-      "rvol": 2.21892729410232,
-      "close_pos": 0.9133782483156881,
-      "gap_pct": -0.8362026561731432,
-      "prime": ""
-    },
-    {
-      "symbol": "ICIL",
-      "badge": "\ud83d\udd2d Anticipate",
-      "tier": "PRE 6/8",
-      "arm": "ant_above",
-      "pre": 6,
-      "price": 578.0,
-      "qty": 173,
-      "invest": 99994.0,
-      "day_ret": 5.081358572368755,
-      "rvol": 1.6498716915467508,
-      "close_pos": 0.9536082474226816,
-      "gap_pct": -3.214285714285714,
-      "prime": ""
-    },
-    {
-      "symbol": "PGIL",
-      "badge": "\ud83d\udfe2 Confirmed",
-      "tier": "B",
-      "arm": "fresh_B",
-      "pre": 5,
-      "price": 1417.5999755859375,
-      "qty": 70,
-      "invest": 99231.99829101562,
-      "day_ret": 3.3462146276850957,
-      "rvol": 3.2793697726219584,
-      "close_pos": 0.9811467125413054,
-      "prime": ""
-    }
-  ],
+  "top3_actionable": [],
   "next_anticipated": [],
   "excluded_locked": [],
   "enterable": true
