@@ -371,6 +371,13 @@
       "session": "2026-11-13",
       "tap_number": 0
     },
+    "ANGELONE|2026-11-13|340.40|336.95|tap|tap1": {
+      "kind": "tap",
+      "price": 341.0,
+      "sent_at": "2026-11-18T12:00:40+05:30",
+      "session": "2026-11-18",
+      "tap_number": 1
+    },
     "ANTELOPUS|2026-09-25|1161.20|1119.10|ob": {
       "kind": "ob",
       "price": 1261.699951171875,
@@ -5782,7 +5789,7 @@
     "post_close": "2026-11-17"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-18T11:45:28+05:30",
+  "updated_at": "2026-11-18T12:00:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6237,10 +6244,10 @@
       "breakout_price": 360.8999938964844,
       "exchange_segment": "NSE_EQ",
       "level_26w": 360.45001220703125,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-18",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "324",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "ANGELONE",
       "week": "2026-11-16"
     },
