@@ -1806,6 +1806,13 @@
       "session": "2026-10-21",
       "tap_number": 1
     },
+    "FLUOROCHEM|2026-11-11|4600.00|4549.70|tap|tap1": {
+      "kind": "tap",
+      "price": 4824.10009765625,
+      "sent_at": "2026-11-19T15:15:36+05:30",
+      "session": "2026-11-16",
+      "tap_number": 1
+    },
     "FOSECOIND|2026-09-16|6277.50|6100.00|tap|tap1": {
       "kind": "tap",
       "price": 6344.5,
@@ -5831,7 +5838,7 @@
     "post_close": "2026-11-18"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-19T14:45:37+05:30",
+  "updated_at": "2026-11-19T15:15:36+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7848,6 +7855,24 @@
       "status": "tapped",
       "symbol": "FINEORG",
       "week": "2026-10-05"
+    },
+    "FLUOROCHEM": {
+      "added_at": "2026-11-19",
+      "breakout_26w_session": {
+        "close": 3964.0,
+        "level": 3948.0,
+        "session": "2026-06-30"
+      },
+      "breakout_bar": "2026-11-19T14:50+05:30",
+      "breakout_price": 4982.2001953125,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 4958.89990234375,
+      "resolved_at": "2026-11-19",
+      "resolved_reason": "tap 1 on the precision OB",
+      "security_id": "13750",
+      "status": "tapped",
+      "symbol": "FLUOROCHEM",
+      "week": "2026-11-16"
     },
     "FMGOETZE": {
       "added_at": "2026-09-27",
@@ -25819,6 +25844,173 @@
         }
       ],
       "zones_seen": 6
+    },
+    "FLUOROCHEM": {
+      "as_of": "2026-11-18",
+      "as_of_close": 4820.39990234375,
+      "as_of_high": 4838.89990234375,
+      "as_of_low": 4665.0,
+      "atr": 169.8595691190819,
+      "breakout_26w_session": {
+        "close": 3964.0,
+        "level": 3948.0,
+        "session": "2026-06-30"
+      },
+      "closed_events": [
+        {
+          "atr": 170.37561806858017,
+          "born_session": "2026-11-11",
+          "bottom": 4549.7001953125,
+          "confirmed": true,
+          "detail": {
+            "next_entry": 4620.119921875,
+            "swept": false,
+            "tapped_entry": 4620.119921875
+          },
+          "entry": 4620.119921875,
+          "high": 4860.0,
+          "kind": "tap",
+          "low": 4587.39990234375,
+          "origin_session": "2026-11-09",
+          "price": 4824.10009765625,
+          "reason": "",
+          "rvol": 1.2412184785408227,
+          "session": "2026-11-16",
+          "signature": "2026-11-11|4600.00|4549.70",
+          "stop": 4524.456977742396,
+          "tap_number": 1,
+          "top": 4600.0
+        }
+      ],
+      "post_close_done": null,
+      "prev_close": 4820.39990234375,
+      "prev_highs": [
+        4714.0,
+        4641.2998046875,
+        4878.39990234375,
+        4899.0,
+        4796.7998046875,
+        4860.0,
+        4872.39990234375,
+        4838.89990234375
+      ],
+      "prev_lows": [
+        4756.10009765625,
+        4703.0,
+        4587.39990234375,
+        4713.60009765625,
+        4665.0
+      ],
+      "prev_volumes": [
+        71158.0,
+        144961.0,
+        68920.0,
+        95699.0,
+        59298.0,
+        39048.0,
+        57269.0,
+        61771.0,
+        294084.0,
+        186966.0,
+        107586.0,
+        81418.0,
+        52184.0,
+        227193.0,
+        155817.0,
+        44421.0,
+        132528.0,
+        93104.0,
+        106539.0
+      ],
+      "refreshed_on": "2026-11-19",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 121.67015571933197,
+          "body_frac_at_birth": 0.9135895950012868,
+          "born_index": 111,
+          "born_session": "2026-04-30",
+          "bottom": 3341.0,
+          "clv_at_birth": 0.921118652910518,
+          "departed": true,
+          "entry": 3441.90062802948,
+          "origin_index": 110,
+          "origin_session": "2026-04-29",
+          "range_atr_at_birth": 2.2922622289324157,
+          "rvol_at_birth": 5.210478728784364,
+          "state": 0,
+          "stop": 3322.7494766421,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 3420.0,
+          "width": 79.0
+        },
+        {
+          "atr_at_birth": 120.30020246721952,
+          "body_frac_at_birth": 0.9231119791666667,
+          "born_index": 162,
+          "born_session": "2026-07-15",
+          "bottom": 3872.5,
+          "clv_at_birth": 0.9231119791666667,
+          "departed": true,
+          "entry": 3963.1540364440993,
+          "origin_index": 160,
+          "origin_session": "2026-07-13",
+          "range_atr_at_birth": 1.8703210417398093,
+          "rvol_at_birth": 3.315752345050318,
+          "state": 0,
+          "stop": 3854.4549696299173,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 3941.5,
+          "width": 69.0
+        },
+        {
+          "atr_at_birth": 123.93586064416569,
+          "body_frac_at_birth": 0.7480841769502576,
+          "born_index": 165,
+          "born_session": "2026-07-20",
+          "bottom": 4043.199951171875,
+          "clv_at_birth": 0.9377395509596069,
+          "departed": true,
+          "entry": 4165.80845491595,
+          "origin_index": 164,
+          "origin_session": "2026-07-17",
+          "range_atr_at_birth": 1.684744769459745,
+          "rvol_at_birth": 1.834992688637759,
+          "state": 0,
+          "stop": 4024.60957207525,
+          "tap_bar_index": 232,
+          "tap_session": "2026-10-26",
+          "taps": 2,
+          "top": 4143.5,
+          "width": 100.300048828125
+        },
+        {
+          "atr_at_birth": 168.28811713403053,
+          "body_frac_at_birth": 0.7190592988434165,
+          "born_index": 243,
+          "born_session": "2026-11-11",
+          "bottom": 4549.7001953125,
+          "clv_at_birth": 0.8431143347978001,
+          "departed": true,
+          "entry": 4620.119921875,
+          "origin_index": 242,
+          "origin_session": "2026-11-09",
+          "range_atr_at_birth": 2.045300125124802,
+          "rvol_at_birth": 2.166282565560195,
+          "state": 1,
+          "stop": 4524.456977742396,
+          "tap_bar_index": 246,
+          "tap_session": "2026-11-16",
+          "taps": 1,
+          "top": 4600.0,
+          "width": 50.2998046875
+        }
+      ],
+      "zones_seen": 4
     },
     "FMGOETZE": {
       "as_of": "2026-09-28",
