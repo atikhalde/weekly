@@ -5866,7 +5866,7 @@
     "post_close": "2026-11-19"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-20T12:00:46+05:30",
+  "updated_at": "2026-11-20T13:00:40+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7847,6 +7847,24 @@
       "status": "tapped",
       "symbol": "EXICOM",
       "week": "2026-09-07"
+    },
+    "FEDERALBNK": {
+      "added_at": "2026-11-20",
+      "breakout_26w_session": {
+        "close": 304.1499938964844,
+        "level": 302.0,
+        "session": "2026-06-05"
+      },
+      "breakout_bar": "2026-11-20T12:30+05:30",
+      "breakout_price": 372.6499938964844,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 371.70001220703125,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "1023",
+      "status": "waiting",
+      "symbol": "FEDERALBNK",
+      "week": "2026-11-16"
     },
     "FILATEX": {
       "added_at": "2026-11-17",
@@ -25564,6 +25582,85 @@
         }
       ],
       "zones_seen": 6
+    },
+    "FEDERALBNK": {
+      "as_of": "2026-11-19",
+      "as_of_close": 364.5,
+      "as_of_high": 366.0,
+      "as_of_low": 357.1499938964844,
+      "atr": 8.69573007143563,
+      "breakout_26w_session": {
+        "close": 304.1499938964844,
+        "level": 302.0,
+        "session": "2026-06-05"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 364.5,
+      "prev_highs": [
+        344.1000061035156,
+        362.0,
+        365.75,
+        362.3500061035156,
+        368.8999938964844,
+        366.6000061035156,
+        367.3999938964844,
+        366.0
+      ],
+      "prev_lows": [
+        358.20001220703125,
+        359.0,
+        361.79998779296875,
+        358.25,
+        357.1499938964844
+      ],
+      "prev_volumes": [
+        10708600.0,
+        7054706.0,
+        9726140.0,
+        5919741.0,
+        4842055.0,
+        4212280.0,
+        3838078.0,
+        5730252.0,
+        4250209.0,
+        7088667.0,
+        8075197.0,
+        5113514.0,
+        14455891.0,
+        10149220.0,
+        3833460.0,
+        5930570.0,
+        5756495.0,
+        5732488.0,
+        3296719.0
+      ],
+      "refreshed_on": "2026-11-20",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 7.251407694296605,
+          "body_frac_at_birth": 0.7350566152896533,
+          "born_index": 42,
+          "born_session": "2026-01-16",
+          "bottom": 242.3000030517578,
+          "clv_at_birth": 0.7366722229370929,
+          "departed": true,
+          "entry": 249.80525338497338,
+          "origin_index": 41,
+          "origin_session": "2026-01-14",
+          "range_atr_at_birth": 4.268136374760043,
+          "rvol_at_birth": 5.900564905672957,
+          "state": 0,
+          "stop": 241.2122918976133,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 248.5,
+          "width": 6.1999969482421875
+        }
+      ],
+      "zones_seen": 2
     },
     "FILATEX": {
       "as_of": "2026-11-19",
