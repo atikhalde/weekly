@@ -1,44 +1,11 @@
 {
   "date": "2026-11-20",
-  "scan_time": "15:20",
-  "generated_at_ist": "2026-11-20T15:20:34",
+  "scan_time": "15:25",
+  "generated_at_ist": "2026-11-20T15:25:30",
   "too_late": false,
   "too_early": false,
   "top3_actionable": [],
-  "next_anticipated": [
-    {
-      "symbol": "KRISHANA",
-      "close": 246.5,
-      "level": 251.83999633789062,
-      "which": "D",
-      "gap_pct": 2.1203924775816856,
-      "side": "below",
-      "pre": 6,
-      "ret_12m": 138.0952409025751,
-      "dist_200dma": 61.06331909897762,
-      "day_ret": 2.708333333333335,
-      "prev_close": 242.11000061035156,
-      "high": 246.5,
-      "close_pos": 1.0,
-      "rvol": 0.46755499039194204,
-      "vol_today": 462136.0,
-      "vma50": 988409.94,
-      "vma_bars": 50,
-      "atr_pct": 3.93972736757688,
-      "turnover_cr": 24.905803659400636,
-      "partial_frac": 1.0,
-      "base_from_high": -5.051180283674994,
-      "ret_3m_prior": 24.606277307086867,
-      "ok": true,
-      "mcap_cr": 7484.54,
-      "rank": 1
-    }
-  ],
-  "excluded_locked": [
-    [
-      "KRISHANA",
-      "Locked at Upper Circuit +2%"
-    ]
-  ],
+  "next_anticipated": [],
+  "excluded_locked": [],
   "enterable": true
 }
