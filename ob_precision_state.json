@@ -5866,7 +5866,7 @@
     "post_close": "2026-11-19"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-20T13:00:40+05:30",
+  "updated_at": "2026-11-20T13:30:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10395,6 +10395,24 @@
       "status": "tapped",
       "symbol": "POLICYBZR",
       "week": "2026-08-24"
+    },
+    "POONAWALLA": {
+      "added_at": "2026-11-20",
+      "breakout_26w_session": {
+        "close": 512.4500122070312,
+        "level": 511.8999938964844,
+        "session": "2026-11-20"
+      },
+      "breakout_bar": "2026-11-20T13:10+05:30",
+      "breakout_price": 512.75,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 511.8999938964844,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "11403",
+      "status": "waiting",
+      "symbol": "POONAWALLA",
+      "week": "2026-11-16"
     },
     "PPLPHARMA": {
       "added_at": "2026-09-27",
@@ -41017,6 +41035,85 @@
       "session_index": 248,
       "zones": [],
       "zones_seen": 2
+    },
+    "POONAWALLA": {
+      "as_of": "2026-11-19",
+      "as_of_close": 504.75,
+      "as_of_high": 508.20001220703125,
+      "as_of_low": 493.6000061035156,
+      "atr": 17.37842895927948,
+      "breakout_26w_session": {
+        "close": 512.4500122070312,
+        "level": 511.8999938964844,
+        "session": "2026-11-20"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 504.75,
+      "prev_highs": [
+        481.95001220703125,
+        490.5,
+        497.8500061035156,
+        493.0,
+        493.0,
+        497.5,
+        503.0,
+        508.20001220703125
+      ],
+      "prev_lows": [
+        481.5,
+        482.3500061035156,
+        486.3999938964844,
+        487.29998779296875,
+        493.6000061035156
+      ],
+      "prev_volumes": [
+        1913710.0,
+        1549392.0,
+        729108.0,
+        477161.0,
+        21236896.0,
+        13126605.0,
+        4757951.0,
+        3888803.0,
+        1211715.0,
+        1744724.0,
+        1642857.0,
+        1125164.0,
+        1322247.0,
+        2472738.0,
+        834148.0,
+        993943.0,
+        1492799.0,
+        1248408.0,
+        2993901.0
+      ],
+      "refreshed_on": "2026-11-20",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 14.00511092982019,
+          "body_frac_at_birth": 0.6515582989686265,
+          "born_index": 144,
+          "born_session": "2026-06-19",
+          "bottom": 401.6000061035156,
+          "clv_at_birth": 0.7365441640514908,
+          "departed": true,
+          "entry": 408.52998046875,
+          "origin_index": 143,
+          "origin_session": "2026-06-18",
+          "range_atr_at_birth": 2.520507546841827,
+          "rvol_at_birth": 6.128955339746794,
+          "state": 2,
+          "stop": 399.4992394640426,
+          "tap_bar_index": 234,
+          "tap_session": "2026-10-29",
+          "taps": 4,
+          "top": 406.54998779296875,
+          "width": 4.949981689453125
+        }
+      ],
+      "zones_seen": 3
     },
     "PPLPHARMA": {
       "as_of": "2026-10-22",
