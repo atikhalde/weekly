@@ -1,10 +1,26 @@
 {
-  "date": "2026-11-20",
-  "scan_time": "15:25",
-  "generated_at_ist": "2026-11-20T15:25:30",
+  "date": "2026-11-23",
+  "scan_time": "15:15",
+  "generated_at_ist": "2026-11-23T15:15:39",
   "too_late": false,
   "too_early": false,
-  "top3_actionable": [],
+  "top3_actionable": [
+    {
+      "symbol": "RATNAVEER",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_above",
+      "pre": 7,
+      "price": 403.20001220703125,
+      "qty": 248,
+      "invest": 99993.60302734375,
+      "day_ret": 6.287071495922825,
+      "rvol": 1.8540791134446248,
+      "close_pos": 0.9086297656017993,
+      "gap_pct": -3.4111358088602417,
+      "prime": ""
+    }
+  ],
   "next_anticipated": [],
   "excluded_locked": [],
   "enterable": true
