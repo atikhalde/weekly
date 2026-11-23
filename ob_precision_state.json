@@ -462,6 +462,13 @@
       "session": "2026-11-18",
       "tap_number": 0
     },
+    "APOLLOPIPE|2026-11-18|501.00|491.05|tap|tap1": {
+      "kind": "tap",
+      "price": 503.35,
+      "sent_at": "2026-11-23T10:30:50+05:30",
+      "session": "2026-11-23",
+      "tap_number": 1
+    },
     "APOLLO|2026-11-11|422.95|404.00|ob": {
       "kind": "ob",
       "price": 454.1499938964844,
@@ -5915,7 +5922,7 @@
     "post_close": "2026-11-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-23T10:00:41+05:30",
+  "updated_at": "2026-11-23T10:30:50+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -6478,10 +6485,10 @@
       "breakout_price": 562.0499877929688,
       "exchange_segment": "NSE_EQ",
       "level_26w": null,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "14361",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "APOLLOPIPE",
       "week": "2026-08-17"
     },
