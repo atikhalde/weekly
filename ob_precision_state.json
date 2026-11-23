@@ -5089,6 +5089,13 @@
       "session": "2026-11-18",
       "tap_number": 0
     },
+    "SUNTV|2026-11-18|667.35|642.20|tap|tap1": {
+      "kind": "tap",
+      "price": 674.9,
+      "sent_at": "2026-11-23T15:30:46+05:30",
+      "session": "2026-11-23",
+      "tap_number": 1
+    },
     "SURAKSHA|2026-08-13|265.0|257.5|ob": {
       "kind": "ob",
       "price": null,
@@ -5922,7 +5929,7 @@
     "post_close": "2026-11-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-23T10:30:50+05:30",
+  "updated_at": "2026-11-23T15:30:46+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -11739,10 +11746,10 @@
       "breakout_price": 677.5,
       "exchange_segment": "NSE_EQ",
       "level_26w": 673.9500122070312,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-23",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "13404",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "SUNTV",
       "week": "2026-11-16"
     },
