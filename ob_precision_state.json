@@ -5817,6 +5817,13 @@
       "session": "2026-10-06",
       "tap_number": 1
     },
+    "WINDMACHIN|2026-11-19|296.75|290.00|ob": {
+      "kind": "ob",
+      "price": 313.45001220703125,
+      "sent_at": "2026-11-23T09:31:33+05:30",
+      "session": "2026-11-19",
+      "tap_number": 0
+    },
     "YASHO|2026-05-11|1555.699951171875|1545.0|ob": {
       "kind": "ob",
       "price": null,
@@ -5908,7 +5915,7 @@
     "post_close": "2026-11-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-23T09:30:48+05:30",
+  "updated_at": "2026-11-23T09:31:33+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -12591,6 +12598,24 @@
       "status": "tapped",
       "symbol": "WINDLAS",
       "week": "2026-08-31"
+    },
+    "WINDMACHIN": {
+      "added_at": "2026-11-23",
+      "breakout_26w_session": {
+        "close": 364.75,
+        "level": 343.8999938964844,
+        "session": "2026-11-23"
+      },
+      "breakout_bar": "2026-11-23T09:15+05:30",
+      "breakout_price": 365.1000061035156,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 343.8999938964844,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "24969",
+      "status": "waiting",
+      "symbol": "WINDMACHIN",
+      "week": "2026-11-23"
     },
     "WSTCSTPAPR": {
       "added_at": "2026-09-27",
@@ -55003,6 +55028,133 @@
         }
       ],
       "zones_seen": 2
+    },
+    "WINDMACHIN": {
+      "as_of": "2026-11-20",
+      "as_of_close": 321.20001220703125,
+      "as_of_high": 325.0,
+      "as_of_low": 305.45001220703125,
+      "atr": 12.575579682318354,
+      "breakout_26w_session": {
+        "close": 364.75,
+        "level": 343.8999938964844,
+        "session": "2026-11-23"
+      },
+      "closed_events": [
+        {
+          "atr": 12.039086750729863,
+          "born_session": "2026-11-19",
+          "bottom": 290.0,
+          "confirmed": true,
+          "detail": {
+            "entry": 298.9170356151314,
+            "origin_offset": 1,
+            "origin_session": "2026-11-18",
+            "stop": 288.1941369873905,
+            "width": 6.75
+          },
+          "entry": 298.9170356151314,
+          "high": 317.79998779296875,
+          "kind": "ob",
+          "low": 295.0,
+          "origin_session": "2026-11-18",
+          "price": 313.45001220703125,
+          "reason": "",
+          "rvol": 2.1196730716057743,
+          "session": "2026-11-19",
+          "signature": "2026-11-19|296.75|290.00",
+          "stop": 288.1941369873905,
+          "tap_number": 0,
+          "top": 296.75
+        }
+      ],
+      "post_close_done": null,
+      "prev_close": 321.20001220703125,
+      "prev_highs": [
+        302.6499938964844,
+        303.04998779296875,
+        299.0,
+        301.0,
+        298.54998779296875,
+        299.8999938964844,
+        317.79998779296875,
+        325.0
+      ],
+      "prev_lows": [
+        295.0,
+        292.0,
+        290.0,
+        295.0,
+        305.45001220703125
+      ],
+      "prev_volumes": [
+        28722.0,
+        14844.0,
+        35754.0,
+        24518.0,
+        32358.0,
+        76551.0,
+        62323.0,
+        133482.0,
+        72166.0,
+        40250.0,
+        18226.0,
+        87928.0,
+        45054.0,
+        45316.0,
+        31951.0,
+        28204.0,
+        25147.0,
+        138373.0,
+        184570.0
+      ],
+      "refreshed_on": "2026-11-23",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 14.991800143032316,
+          "body_frac_at_birth": 0.7330555386013455,
+          "born_index": 97,
+          "born_session": "2026-04-13",
+          "bottom": 245.61000061035156,
+          "clv_at_birth": 0.8444442749023438,
+          "departed": true,
+          "entry": 254.2760040283203,
+          "origin_index": 95,
+          "origin_session": "2026-04-09",
+          "range_atr_at_birth": 2.401312694708753,
+          "rvol_at_birth": 2.279905697129588,
+          "state": 0,
+          "stop": 243.36123058889672,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 251.8000030517578,
+          "width": 6.19000244140625
+        },
+        {
+          "atr_at_birth": 12.039086750729863,
+          "body_frac_at_birth": 0.611842968237609,
+          "born_index": 247,
+          "born_session": "2026-11-19",
+          "bottom": 290.0,
+          "clv_at_birth": 0.8092114949605814,
+          "departed": true,
+          "entry": 298.9170356151314,
+          "origin_index": 246,
+          "origin_session": "2026-11-18",
+          "range_atr_at_birth": 1.8938303432016148,
+          "rvol_at_birth": 2.1196730716057743,
+          "state": 0,
+          "stop": 288.1941369873905,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 296.75,
+          "width": 6.75
+        }
+      ],
+      "zones_seen": 5
     },
     "WSTCSTPAPR": {
       "as_of": "2026-09-25",
