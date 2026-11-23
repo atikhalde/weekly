@@ -5915,7 +5915,7 @@
     "post_close": "2026-11-20"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-23T09:31:33+05:30",
+  "updated_at": "2026-11-23T10:00:41+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7726,6 +7726,24 @@
       "status": "tapped",
       "symbol": "EDELWEISS",
       "week": "2026-08-31"
+    },
+    "EICHERMOT": {
+      "added_at": "2026-11-23",
+      "breakout_26w_session": {
+        "close": 8179.0,
+        "level": 8165.0,
+        "session": "2026-11-23"
+      },
+      "breakout_bar": "2026-11-23T09:15+05:30",
+      "breakout_price": 8255.5,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 8165.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "910",
+      "status": "waiting",
+      "symbol": "EICHERMOT",
+      "week": "2026-11-23"
     },
     "EIMCOELECO": {
       "added_at": "2026-09-27",
@@ -24664,6 +24682,85 @@
         }
       ],
       "zones_seen": 5
+    },
+    "EICHERMOT": {
+      "as_of": "2026-11-20",
+      "as_of_close": 8113.0,
+      "as_of_high": 8149.0,
+      "as_of_low": 7988.0,
+      "atr": 212.00508647672635,
+      "breakout_26w_session": {
+        "close": 8179.0,
+        "level": 8165.0,
+        "session": "2026-11-23"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 8113.0,
+      "prev_highs": [
+        7837.0,
+        7696.0,
+        7654.0,
+        7947.0,
+        7848.0,
+        7795.5,
+        8072.5,
+        8149.0
+      ],
+      "prev_lows": [
+        7534.0,
+        7610.5,
+        7670.0,
+        7675.0,
+        7988.0
+      ],
+      "prev_volumes": [
+        331591.0,
+        333270.0,
+        377246.0,
+        303706.0,
+        387958.0,
+        355990.0,
+        409128.0,
+        561452.0,
+        973786.0,
+        400115.0,
+        373126.0,
+        689851.0,
+        726200.0,
+        523543.0,
+        1719822.0,
+        742414.0,
+        523630.0,
+        883416.0,
+        510609.0
+      ],
+      "refreshed_on": "2026-11-23",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 172.71991218410204,
+          "body_frac_at_birth": 0.9508928571428571,
+          "born_index": 238,
+          "born_session": "2026-11-05",
+          "bottom": 7332.0,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 7465.089584193139,
+          "origin_index": 237,
+          "origin_session": "2026-11-04",
+          "range_atr_at_birth": 1.2968973708210234,
+          "rvol_at_birth": 2.2243971078767015,
+          "state": 0,
+          "stop": 7306.092013172385,
+          "tap_bar_index": 243,
+          "tap_session": "2026-11-13",
+          "taps": 2,
+          "top": 7434.0,
+          "width": 102.0
+        }
+      ],
+      "zones_seen": 2
     },
     "EIMCOELECO": {
       "as_of": "2026-10-09",
