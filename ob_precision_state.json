@@ -5940,10 +5940,10 @@
   "data_outage_on": null,
   "digest_on": {
     "manual": "2026-09-28",
-    "post_close": "2026-11-23"
+    "post_close": "2026-11-24"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-24T09:30:51+05:30",
+  "updated_at": "2026-11-24T15:45:49+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
