@@ -5950,7 +5950,7 @@
     "post_close": "2026-11-24"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-25T09:30:42+05:30",
+  "updated_at": "2026-11-25T09:31:22+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9559,6 +9559,24 @@
       "status": "invalid",
       "symbol": "MANORAMA",
       "week": "2026-09-07"
+    },
+    "MARICO": {
+      "added_at": "2026-11-25",
+      "breakout_26w_session": {
+        "close": 890.0,
+        "level": 889.0999755859375,
+        "session": "2026-11-04"
+      },
+      "breakout_bar": "2026-11-25T09:15+05:30",
+      "breakout_price": 926.9000244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 925.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "4067",
+      "status": "waiting",
+      "symbol": "MARICO",
+      "week": "2026-11-23"
     },
     "MARINE": {
       "added_at": "2026-09-27",
@@ -35657,6 +35675,106 @@
       "refreshed_on": "2026-09-29",
       "session_index": 248,
       "zones": [],
+      "zones_seen": 2
+    },
+    "MARICO": {
+      "as_of": "2026-11-23",
+      "as_of_close": 919.5,
+      "as_of_high": 924.0,
+      "as_of_low": 905.1500244140625,
+      "atr": 19.156113578463643,
+      "breakout_26w_session": {
+        "close": 890.0,
+        "level": 889.0999755859375,
+        "session": "2026-11-04"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 919.5,
+      "prev_highs": [
+        915.0,
+        907.9500122070312,
+        913.6500244140625,
+        924.0,
+        916.7999877929688,
+        918.7999877929688,
+        924.2999877929688,
+        924.0
+      ],
+      "prev_lows": [
+        907.5499877929688,
+        903.5,
+        904.8499755859375,
+        911.5999755859375,
+        905.1500244140625
+      ],
+      "prev_volumes": [
+        1768613.0,
+        832409.0,
+        3393736.0,
+        2410486.0,
+        2290127.0,
+        14640938.0,
+        6020712.0,
+        2996826.0,
+        2924452.0,
+        2113525.0,
+        3094712.0,
+        1388570.0,
+        1465205.0,
+        1982248.0,
+        1899223.0,
+        1703422.0,
+        1943109.0,
+        1556130.0,
+        2321380.0
+      ],
+      "refreshed_on": "2026-11-25",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 17.69923651686582,
+          "body_frac_at_birth": 0.8464428151464768,
+          "born_index": 232,
+          "born_session": "2026-10-29",
+          "bottom": 762.25,
+          "clv_at_birth": 0.9538083358351913,
+          "departed": true,
+          "entry": 776.1858625730358,
+          "origin_index": 231,
+          "origin_session": "2026-10-28",
+          "range_atr_at_birth": 2.2628087801869095,
+          "rvol_at_birth": 1.9199035289400876,
+          "state": 0,
+          "stop": 759.5951145224701,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 773.0,
+          "width": 10.75
+        },
+        {
+          "atr_at_birth": 22.295251908146007,
+          "body_frac_at_birth": 0.8758358079661608,
+          "born_index": 235,
+          "born_session": "2026-11-03",
+          "bottom": 778.25,
+          "clv_at_birth": 1.0,
+          "departed": true,
+          "entry": 804.0131453434662,
+          "origin_index": 234,
+          "origin_session": "2026-11-02",
+          "range_atr_at_birth": 2.3480352156042086,
+          "rvol_at_birth": 6.2159240114612775,
+          "state": 0,
+          "stop": 774.9057122137781,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 800.0,
+          "width": 21.75
+        }
+      ],
       "zones_seen": 2
     },
     "MARINE": {
