@@ -287,6 +287,7 @@
   "TIPSMUSIC|2026-10-16": "rule|TIPSMUSIC|2026-10-16",
   "TITAN|2026-07-27": "rule|TITAN|2026-11-06",
   "TVSMOTOR|2026-07-28": "rule|TVSMOTOR|2026-10-28",
+  "VIJAYA|2026-08-12": "rule|VIJAYA|2026-11-18",
   "VINCOFE|2026-08-27": "rule|VINCOFE|2026-11-04",
   "VRLLOG|2026-11-04": "rule|VRLLOG|2026-11-04",
   "WESTLIFE|2026-08-05": "rule|WESTLIFE|2026-08-05",
@@ -310,8 +311,8 @@
   "VINCOFE|2026-11-04": "OB close back below the 26W level",
   "VRLLOG|2026-11-04": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "intraday 2026-11-25",
- "last_run_at": "2026-11-25T09:30:33+05:30",
+ "last_run": "postclose 2026-11-25",
+ "last_run_at": "2026-11-25T15:31:28+05:30",
  "open": [
   {
    "born_session": "2026-11-04",
@@ -621,6 +622,7 @@
   "rule|VALIANTORG|2026-09-11": "2026-10-07T15:54:49+05:30",
   "rule|VARROC|2026-08-07": "2026-10-07T15:54:49+05:30",
   "rule|VENUSPIPES|2026-06-22": "2026-10-07T15:54:49+05:30",
+  "rule|VIJAYA|2026-11-18": "2026-11-25T15:31:28+05:30",
   "rule|VINCOFE|2026-11-04": "2026-11-05T15:45:37+05:30",
   "rule|VINDHYATEL|2026-05-07": "2026-10-07T15:54:49+05:30",
   "rule|VISHNU|2026-04-16": "2026-10-07T15:54:49+05:30",
