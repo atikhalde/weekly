@@ -310,8 +310,8 @@
   "VINCOFE|2026-11-04": "OB close back below the 26W level",
   "VRLLOG|2026-11-04": "OB candle predates the breakout (zone born on the breakout, origin the day before)"
  },
- "last_run": "postclose 2026-11-24",
- "last_run_at": "2026-11-24T15:31:27+05:30",
+ "last_run": "intraday 2026-11-25",
+ "last_run_at": "2026-11-25T09:30:33+05:30",
  "open": [
   {
    "born_session": "2026-11-04",
