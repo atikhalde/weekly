@@ -5656,6 +5656,13 @@
       "session": "2026-09-18",
       "tap_number": null
     },
+    "VIJAYA|2026-11-20|1536.00|1500.00|ob": {
+      "kind": "ob",
+      "price": 1572.300048828125,
+      "sent_at": "2026-11-25T10:00:52+05:30",
+      "session": "2026-11-20",
+      "tap_number": 0
+    },
     "VINCOFE|2026-05-26|133.89999389648438|129.22000122070312|ob": {
       "kind": "ob",
       "price": null,
@@ -5950,7 +5957,7 @@
     "post_close": "2026-11-24"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-25T09:31:22+05:30",
+  "updated_at": "2026-11-25T10:00:52+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -12453,6 +12460,24 @@
       "status": "waiting",
       "symbol": "VHLTD",
       "week": "2026-10-12"
+    },
+    "VIJAYA": {
+      "added_at": "2026-11-25",
+      "breakout_26w_session": {
+        "close": 1510.5999755859375,
+        "level": 1440.0,
+        "session": "2026-08-12"
+      },
+      "breakout_bar": "2026-11-25T09:40+05:30",
+      "breakout_price": 1635.199951171875,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 1593.5999755859375,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "5585",
+      "status": "waiting",
+      "symbol": "VIJAYA",
+      "week": "2026-11-23"
     },
     "VINCOFE": {
       "added_at": "2026-09-27",
@@ -53984,6 +54009,175 @@
         }
       ],
       "zones_seen": 1
+    },
+    "VIJAYA": {
+      "as_of": "2026-11-23",
+      "as_of_close": 1572.5999755859375,
+      "as_of_high": 1637.0,
+      "as_of_low": 1546.0,
+      "atr": 61.02026792846753,
+      "breakout_26w_session": {
+        "close": 1510.5999755859375,
+        "level": 1440.0,
+        "session": "2026-08-12"
+      },
+      "closed_events": [
+        {
+          "atr": 58.7141346921958,
+          "born_session": "2026-11-20",
+          "bottom": 1500.0,
+          "confirmed": true,
+          "detail": {
+            "entry": 1546.5685442445952,
+            "origin_offset": 1,
+            "origin_session": "2026-11-19",
+            "stop": 1491.1928797961707,
+            "width": 36.0
+          },
+          "entry": 1546.5685442445952,
+          "high": 1587.0,
+          "kind": "ob",
+          "low": 1500.300048828125,
+          "origin_session": "2026-11-19",
+          "price": 1572.300048828125,
+          "reason": "",
+          "rvol": 2.646487432209616,
+          "session": "2026-11-20",
+          "signature": "2026-11-20|1536.00|1500.00",
+          "stop": 1491.1928797961707,
+          "tap_number": 0,
+          "top": 1536.0
+        }
+      ],
+      "post_close_done": null,
+      "prev_close": 1572.5999755859375,
+      "prev_highs": [
+        1438.0,
+        1436.0,
+        1498.0,
+        1490.5,
+        1549.800048828125,
+        1553.699951171875,
+        1587.0,
+        1637.0
+      ],
+      "prev_lows": [
+        1457.0,
+        1457.0999755859375,
+        1500.0,
+        1500.300048828125,
+        1546.0
+      ],
+      "prev_volumes": [
+        111861.0,
+        37973.0,
+        82452.0,
+        50161.0,
+        61745.0,
+        76208.0,
+        437137.0,
+        101508.0,
+        138323.0,
+        102937.0,
+        232251.0,
+        153839.0,
+        55287.0,
+        825649.0,
+        102732.0,
+        552678.0,
+        133115.0,
+        538498.0,
+        431614.0
+      ],
+      "refreshed_on": "2026-11-25",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 32.95596890649659,
+          "body_frac_at_birth": 0.7922311640021437,
+          "born_index": 92,
+          "born_session": "2026-04-07",
+          "bottom": 877.7000122070312,
+          "clv_at_birth": 0.7922311640021437,
+          "departed": true,
+          "entry": 902.9320744031694,
+          "origin_index": 91,
+          "origin_session": "2026-04-06",
+          "range_atr_at_birth": 1.6795129204963657,
+          "rvol_at_birth": 2.933182337312237,
+          "state": 0,
+          "stop": 872.7566168710567,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 897.0,
+          "width": 19.29998779296875
+        },
+        {
+          "atr_at_birth": 35.71399189710304,
+          "body_frac_at_birth": 0.5886148313881279,
+          "born_index": 105,
+          "born_session": "2026-04-27",
+          "bottom": 1022.0,
+          "clv_at_birth": 0.853995256179745,
+          "departed": true,
+          "entry": 1046.4285185414785,
+          "origin_index": 103,
+          "origin_session": "2026-04-23",
+          "range_atr_at_birth": 1.5246111756073881,
+          "rvol_at_birth": 1.8518941216349203,
+          "state": 0,
+          "stop": 1016.6429012154346,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1040.0,
+          "width": 18.0
+        },
+        {
+          "atr_at_birth": 56.78148945579734,
+          "body_frac_at_birth": 0.8252420664235797,
+          "born_index": 245,
+          "born_session": "2026-11-18",
+          "bottom": 1457.0,
+          "clv_at_birth": 0.8252420664235797,
+          "departed": true,
+          "entry": 1500.2206681020434,
+          "origin_index": 244,
+          "origin_session": "2026-11-17",
+          "range_atr_at_birth": 1.6325755828288315,
+          "rvol_at_birth": 3.0781277977923147,
+          "state": 0,
+          "stop": 1448.4827765816303,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1490.0,
+          "width": 33.0
+        },
+        {
+          "atr_at_birth": 58.7141346921958,
+          "body_frac_at_birth": 0.8096898820971888,
+          "born_index": 247,
+          "born_session": "2026-11-20",
+          "bottom": 1500.0,
+          "clv_at_birth": 0.8304502946866297,
+          "departed": true,
+          "entry": 1546.5685442445952,
+          "origin_index": 246,
+          "origin_session": "2026-11-19",
+          "range_atr_at_birth": 1.4766453023005897,
+          "rvol_at_birth": 2.646487432209616,
+          "state": 0,
+          "stop": 1491.1928797961707,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1536.0,
+          "width": 36.0
+        }
+      ],
+      "zones_seen": 6
     },
     "VINCOFE": {
       "as_of": "2026-11-13",
