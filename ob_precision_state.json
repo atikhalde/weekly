@@ -5194,6 +5194,13 @@
       "session": "2026-11-11",
       "tap_number": 0
     },
+    "TANLA|2026-11-11|650.00|644.00|tap|tap1": {
+      "kind": "tap",
+      "price": 652.5,
+      "sent_at": "2026-11-25T12:45:38+05:30",
+      "session": "2026-11-25",
+      "tap_number": 1
+    },
     "TASTYBITE|2026-11-03|9535.00|9388.50|ob": {
       "kind": "ob",
       "price": 10188.5,
@@ -5964,7 +5971,7 @@
     "post_close": "2026-11-24"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-25T11:15:31+05:30",
+  "updated_at": "2026-11-25T12:45:38+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -11907,10 +11914,10 @@
       "breakout_price": 664.7999877929688,
       "exchange_segment": "NSE_EQ",
       "level_26w": 656.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-25",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "13976",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "TANLA",
       "week": "2026-11-02"
     },
