@@ -1,10 +1,26 @@
 {
   "date": "2026-11-25",
-  "scan_time": "15:15",
-  "generated_at_ist": "2026-11-25T15:15:36",
+  "scan_time": "15:20",
+  "generated_at_ist": "2026-11-25T15:20:37",
   "too_late": false,
   "too_early": false,
-  "top3_actionable": [],
+  "top3_actionable": [
+    {
+      "symbol": "FILATEX",
+      "badge": "\ud83d\udd2d Anticipate",
+      "tier": "PRE 7/8",
+      "arm": "ant_below",
+      "pre": 7,
+      "price": 112.9800033569336,
+      "qty": 885,
+      "invest": 99987.30297088623,
+      "day_ret": 4.572382820756049,
+      "rvol": 0.5832460283941129,
+      "close_pos": 0.9614040977076476,
+      "gap_pct": 1.3964029050027866,
+      "prime": "\u2b50 Prime #1"
+    }
+  ],
   "next_anticipated": [],
   "excluded_locked": [],
   "enterable": true
