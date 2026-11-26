@@ -945,6 +945,13 @@
       "session": "2026-11-16",
       "tap_number": 0
     },
+    "BOROLTD|2026-11-16|310.00|305.50|tap|tap1": {
+      "kind": "tap",
+      "price": 312.45,
+      "sent_at": "2026-11-26T11:15:35+05:30",
+      "session": "2026-11-26",
+      "tap_number": 1
+    },
     "BOSCH-HCIL|2026-07-31|1328.0|1305.0|ob": {
       "kind": "ob",
       "price": null,
@@ -5985,7 +5992,7 @@
     "post_close": "2026-11-25"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-26T09:30:52+05:30",
+  "updated_at": "2026-11-26T11:15:35+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -7162,10 +7169,10 @@
       "breakout_price": 335.95001220703125,
       "exchange_segment": "NSE_EQ",
       "level_26w": 334.0,
-      "resolved_at": null,
-      "resolved_reason": null,
+      "resolved_at": "2026-11-26",
+      "resolved_reason": "tap 1 on the precision OB",
       "security_id": "19401",
-      "status": "waiting",
+      "status": "tapped",
       "symbol": "BOROLTD",
       "week": "2026-11-16"
     },
@@ -10632,6 +10639,24 @@
       "status": "tapped",
       "symbol": "PREMIERPOL",
       "week": "2026-10-12"
+    },
+    "PRESTIGE": {
+      "added_at": "2026-11-26",
+      "breakout_26w_session": {
+        "close": 1703.5,
+        "level": 1698.9000244140625,
+        "session": "2026-07-06"
+      },
+      "breakout_bar": "2026-11-26T10:55+05:30",
+      "breakout_price": 1744.5999755859375,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 1741.5,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "20302",
+      "status": "waiting",
+      "symbol": "PRESTIGE",
+      "week": "2026-11-23"
     },
     "PRUDENT": {
       "added_at": "2026-09-27",
@@ -41958,6 +41983,106 @@
         }
       ],
       "zones_seen": 4
+    },
+    "PRESTIGE": {
+      "as_of": "2026-11-25",
+      "as_of_close": 1685.0999755859375,
+      "as_of_high": 1701.0,
+      "as_of_low": 1663.5,
+      "atr": 50.55406597099711,
+      "breakout_26w_session": {
+        "close": 1703.5,
+        "level": 1698.9000244140625,
+        "session": "2026-07-06"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 1685.0999755859375,
+      "prev_highs": [
+        1700.0,
+        1666.9000244140625,
+        1704.0999755859375,
+        1693.5,
+        1679.4000244140625,
+        1687.4000244140625,
+        1697.0,
+        1701.0
+      ],
+      "prev_lows": [
+        1657.4000244140625,
+        1652.0999755859375,
+        1633.0,
+        1661.5,
+        1663.5
+      ],
+      "prev_volumes": [
+        326170.0,
+        434001.0,
+        260326.0,
+        408033.0,
+        448832.0,
+        608183.0,
+        520714.0,
+        519912.0,
+        836621.0,
+        658620.0,
+        1031409.0,
+        502977.0,
+        376653.0,
+        582154.0,
+        492217.0,
+        319044.0,
+        1638224.0,
+        1862726.0,
+        1004064.0
+      ],
+      "refreshed_on": "2026-11-26",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 53.314956920977906,
+          "body_frac_at_birth": 0.6452087437365914,
+          "born_index": 138,
+          "born_session": "2026-06-16",
+          "bottom": 1320.0,
+          "clv_at_birth": 0.8982029362639933,
+          "departed": true,
+          "entry": 1356.596692245776,
+          "origin_index": 134,
+          "origin_session": "2026-06-10",
+          "range_atr_at_birth": 1.2529326231499045,
+          "rvol_at_birth": 1.9068321762168536,
+          "state": 0,
+          "stop": 1312.0027564618533,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1347.0,
+          "width": 27.0
+        },
+        {
+          "atr_at_birth": 54.92035616613533,
+          "body_frac_at_birth": 0.9252947537096627,
+          "born_index": 240,
+          "born_session": "2026-11-12",
+          "bottom": 1571.699951171875,
+          "clv_at_birth": 0.9861267082687372,
+          "departed": true,
+          "entry": 1613.7856885239669,
+          "origin_index": 238,
+          "origin_session": "2026-11-09",
+          "range_atr_at_birth": 1.7061060363197667,
+          "rvol_at_birth": 2.298800183429905,
+          "state": 0,
+          "stop": 1563.4618977469547,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 1603.9000244140625,
+          "width": 32.2000732421875
+        }
+      ],
+      "zones_seen": 2
     },
     "PRUDENT": {
       "as_of": "2026-10-19",
