@@ -1,0 +1,11 @@
+{
+  "date": "2026-11-27",
+  "scan_time": "00:46",
+  "generated_at_ist": "2026-11-27T00:46:52",
+  "too_late": false,
+  "too_early": true,
+  "top3_actionable": [],
+  "next_anticipated": [],
+  "excluded_locked": [],
+  "enterable": true
+}
