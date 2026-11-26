@@ -1,7 +1,7 @@
 {
   "date": "2026-11-26",
-  "scan_time": "15:15",
-  "generated_at_ist": "2026-11-26T15:15:32",
+  "scan_time": "15:20",
+  "generated_at_ist": "2026-11-26T15:20:31",
   "too_late": false,
   "too_early": false,
   "top3_actionable": [
@@ -19,20 +19,6 @@
       "close_pos": 0.9397590361445783,
       "gap_pct": 0.6515444015444015,
       "prime": "\u2b50 Prime #1"
-    },
-    {
-      "symbol": "ACE",
-      "badge": "\ud83d\udfe2 Confirmed",
-      "tier": "B",
-      "arm": "fresh_B",
-      "pre": 5,
-      "price": 1298.0,
-      "qty": 77,
-      "invest": 99946.0,
-      "day_ret": 8.528428093645491,
-      "rvol": 9.312007201736584,
-      "close_pos": 1.0,
-      "prime": "\ud83d\udd25 Prime #2"
     },
     {
       "symbol": "MCX",
