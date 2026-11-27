@@ -6020,7 +6020,7 @@
     "post_close": "2026-11-26"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-27T09:30:51+05:30",
+  "updated_at": "2026-11-27T09:31:29+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -10122,6 +10122,24 @@
       "symbol": "NILKAMAL",
       "week": "2026-08-17"
     },
+    "NINSYS": {
+      "added_at": "2026-11-27",
+      "breakout_26w_session": {
+        "close": 734.5999755859375,
+        "level": 715.0,
+        "session": "2026-06-01"
+      },
+      "breakout_bar": "2026-11-27T09:20+05:30",
+      "breakout_price": 1003.9000244140625,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 991.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "14194",
+      "status": "waiting",
+      "symbol": "NINSYS",
+      "week": "2026-11-23"
+    },
     "NITINSPIN": {
       "added_at": "2026-09-27",
       "breakout_26w_session": {
@@ -11929,6 +11947,24 @@
       "status": "waiting",
       "symbol": "SWANDEF",
       "week": "2026-09-14"
+    },
+    "SWARAJ": {
+      "added_at": "2026-11-27",
+      "breakout_26w_session": {
+        "close": 326.8500061035156,
+        "level": 318.95001220703125,
+        "session": "2026-07-06"
+      },
+      "breakout_bar": "2026-11-27T09:20+05:30",
+      "breakout_price": 397.5,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 395.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "764496",
+      "status": "waiting",
+      "symbol": "SWARAJ",
+      "week": "2026-11-23"
     },
     "SYRMA": {
       "added_at": "2026-09-27",
@@ -38741,6 +38777,106 @@
       "zones": [],
       "zones_seen": 1
     },
+    "NINSYS": {
+      "as_of": "2026-11-25",
+      "as_of_close": 976.0999755859375,
+      "as_of_high": 996.0,
+      "as_of_low": 965.0499877929688,
+      "atr": 41.16753532533371,
+      "breakout_26w_session": {
+        "close": 734.5999755859375,
+        "level": 715.0,
+        "session": "2026-06-01"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 976.0999755859375,
+      "prev_highs": [
+        912.0,
+        915.0,
+        925.0,
+        940.0,
+        954.5999755859375,
+        955.0,
+        994.0,
+        996.0
+      ],
+      "prev_lows": [
+        907.5499877929688,
+        915.0,
+        934.9500122070312,
+        936.8499755859375,
+        965.0499877929688
+      ],
+      "prev_volumes": [
+        7481.0,
+        12444.0,
+        17093.0,
+        9315.0,
+        27990.0,
+        6618.0,
+        6519.0,
+        16359.0,
+        19349.0,
+        41755.0,
+        10882.0,
+        4872.0,
+        2713.0,
+        3856.0,
+        4823.0,
+        15081.0,
+        4830.0,
+        8228.0,
+        4315.0
+      ],
+      "refreshed_on": "2026-11-27",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 20.431694029551686,
+          "body_frac_at_birth": 0.6684633561442886,
+          "born_index": 84,
+          "born_session": "2026-03-24",
+          "bottom": 282.45001220703125,
+          "clv_at_birth": 0.9685534556705395,
+          "departed": true,
+          "entry": 308.62771713235054,
+          "origin_index": 83,
+          "origin_session": "2026-03-23",
+          "range_atr_at_birth": 2.7237092438832615,
+          "rvol_at_birth": 7.057250687647924,
+          "state": 0,
+          "stop": 279.38525810259847,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 304.95001220703125,
+          "width": 22.5
+        },
+        {
+          "atr_at_birth": 25.22219156844873,
+          "body_frac_at_birth": 0.5745095645680147,
+          "born_index": 212,
+          "born_session": "2026-09-30",
+          "bottom": 700.0,
+          "clv_at_birth": 0.8499995212928921,
+          "departed": true,
+          "entry": 724.5399944823208,
+          "origin_index": 210,
+          "origin_session": "2026-09-28",
+          "range_atr_at_birth": 2.02202888918652,
+          "rvol_at_birth": 3.76498859763125,
+          "state": 0,
+          "stop": 696.2166712647327,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 720.0,
+          "width": 20.0
+        }
+      ],
+      "zones_seen": 2
+    },
     "NITINSPIN": {
       "as_of": "2026-09-25",
       "as_of_close": 612.3499755859375,
@@ -50544,6 +50680,85 @@
       "session_index": 213,
       "zones": [],
       "zones_seen": 0
+    },
+    "SWARAJ": {
+      "as_of": "2026-11-25",
+      "as_of_close": 360.6000061035156,
+      "as_of_high": 366.29998779296875,
+      "as_of_low": 342.29998779296875,
+      "atr": 16.342980650033997,
+      "breakout_26w_session": {
+        "close": 326.8500061035156,
+        "level": 318.95001220703125,
+        "session": "2026-07-06"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 360.6000061035156,
+      "prev_highs": [
+        364.79998779296875,
+        367.95001220703125,
+        363.5,
+        364.8999938964844,
+        365.0,
+        364.0,
+        359.8999938964844,
+        366.29998779296875
+      ],
+      "prev_lows": [
+        351.29998779296875,
+        356.0,
+        355.1499938964844,
+        347.0,
+        342.29998779296875
+      ],
+      "prev_volumes": [
+        49537.0,
+        22192.0,
+        63520.0,
+        62784.0,
+        167655.0,
+        48656.0,
+        25054.0,
+        64541.0,
+        14151.0,
+        15064.0,
+        41810.0,
+        15654.0,
+        72890.0,
+        21128.0,
+        45891.0,
+        16790.0,
+        10466.0,
+        69611.0,
+        338766.0
+      ],
+      "refreshed_on": "2026-11-27",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 12.969731450406668,
+          "body_frac_at_birth": 0.75111083984375,
+          "born_index": 148,
+          "born_session": "2026-07-01",
+          "bottom": 246.0,
+          "clv_at_birth": 0.9155558268229167,
+          "departed": true,
+          "entry": 254.3345516610732,
+          "origin_index": 144,
+          "origin_session": "2026-06-24",
+          "range_atr_at_birth": 1.734808472020792,
+          "rvol_at_birth": 2.257510729613734,
+          "state": 0,
+          "stop": 244.054540282439,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 252.0,
+          "width": 6.0
+        }
+      ],
+      "zones_seen": 3
     },
     "SYRMA": {
       "as_of": "2026-09-28",
