@@ -6020,7 +6020,7 @@
     "post_close": "2026-11-26"
   },
   "logic_version": 1,
-  "updated_at": "2026-11-27T11:00:42+05:30",
+  "updated_at": "2026-11-27T15:30:41+05:30",
   "waiting": {
     "360ONE": {
       "added_at": "2026-09-27",
@@ -9059,6 +9059,24 @@
       "status": "invalid",
       "symbol": "JKPAPER",
       "week": "2026-09-07"
+    },
+    "JLHL": {
+      "added_at": "2026-11-27",
+      "breakout_26w_session": {
+        "close": 284.17999267578125,
+        "level": 283.9800109863281,
+        "session": "2026-06-30"
+      },
+      "breakout_bar": "2026-11-27T15:05+05:30",
+      "breakout_price": 340.54998779296875,
+      "exchange_segment": "NSE_EQ",
+      "level_26w": 340.0,
+      "resolved_at": null,
+      "resolved_reason": null,
+      "security_id": "18553",
+      "status": "waiting",
+      "symbol": "JLHL",
+      "week": "2026-11-23"
     },
     "JSFB": {
       "added_at": "2026-09-27",
@@ -32386,6 +32404,85 @@
       "session_index": 248,
       "zones": [],
       "zones_seen": 4
+    },
+    "JLHL": {
+      "as_of": "2026-11-26",
+      "as_of_close": 298.0,
+      "as_of_high": 310.29998779296875,
+      "as_of_low": 296.0,
+      "atr": 15.732052143465506,
+      "breakout_26w_session": {
+        "close": 284.17999267578125,
+        "level": 283.9800109863281,
+        "session": "2026-06-30"
+      },
+      "closed_events": [],
+      "post_close_done": null,
+      "prev_close": 298.0,
+      "prev_highs": [
+        292.8999938964844,
+        294.75,
+        294.25,
+        291.3500061035156,
+        329.70001220703125,
+        312.54998779296875,
+        329.0,
+        310.29998779296875
+      ],
+      "prev_lows": [
+        279.0,
+        279.75,
+        291.75,
+        292.5,
+        296.0
+      ],
+      "prev_volumes": [
+        121025.0,
+        44300.0,
+        135044.0,
+        42032.0,
+        139755.0,
+        172304.0,
+        31557.0,
+        24654.0,
+        78288.0,
+        75065.0,
+        51601.0,
+        67638.0,
+        99319.0,
+        37263.0,
+        99872.0,
+        18711481.0,
+        2416550.0,
+        14833898.0,
+        856077.0
+      ],
+      "refreshed_on": "2026-11-27",
+      "session_index": 248,
+      "zones": [
+        {
+          "atr_at_birth": 13.376469961648437,
+          "body_frac_at_birth": 0.7247241810354835,
+          "born_index": 245,
+          "born_session": "2026-11-20",
+          "bottom": 279.0,
+          "clv_at_birth": 0.753753447355205,
+          "departed": true,
+          "entry": 288.4077645930967,
+          "origin_index": 244,
+          "origin_session": "2026-11-19",
+          "range_atr_at_birth": 3.7341699529279775,
+          "rvol_at_birth": 18.02480878573893,
+          "state": 0,
+          "stop": 276.99352950575275,
+          "tap_bar_index": -1,
+          "tap_session": "",
+          "taps": 0,
+          "top": 286.0,
+          "width": 7.0
+        }
+      ],
+      "zones_seen": 2
     },
     "JSFB": {
       "as_of": "2026-09-28",
